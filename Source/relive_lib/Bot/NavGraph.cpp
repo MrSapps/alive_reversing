@@ -1310,7 +1310,7 @@ void NavGraph::Build(const NavInput& input)
                 // in the path's data, half a cell either side covers what was measured)
                 const s32 tall = half ? 30 : 60;
                 // (one that comes down kills only who is within 3 of it)
-                const s32 reach = f.mX2 - f.mX1 > f.mY2 - f.mY1 ? kSweepReach : 12;
+                const s32 reach = f.mX2 - f.mX1 > f.mY2 - f.mY1 ? kSweepReach : 11;
                 if (f.mKind == FeatureKind::eSweep && f.mHalf == half && x >= f.mX1 - reach && x <= f.mX2 + reach && n.mY - tall <= f.mY2 && n.mY >= f.mY1)
                 {
                     // (measured: its box ends 6 above its rectangle's bottom, and Abe crouched is 34 high)

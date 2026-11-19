@@ -4316,6 +4316,40 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 {
                     const Entity* wheel = world.Find(team.mAbeWheel);
                     teamPre.insert(teamPre.begin(), regionFact(UseNode(nav, *wheel, nullptr)));
+                    // Drills along the floor the Mudokons are brought by, that a lever stops or slows: that first. A
+                    // Mudokon is not timed under a drill as he is. (The brewery's third Zulag: "pulling the levers
+                    // to stop most of the drills ... The drills move slow enough now that you can lead the whole
+                    // group past them". Led back as they ran, the first one was drilled.)
+                    {
+                        s32 x1 = wheel->CentreX();
+                        s32 x2 = wheel->CentreX();
+                        for (u32 id : team.mMuds)
+                        {
+                            if (const Entity* mud = world.Find(id))
+                            {
+                                x1 = std::min(x1, mud->mLive ? mud->mLiveX : mud->CentreX());
+                                x2 = std::max(x2, mud->mLive ? mud->mLiveX : mud->CentreX());
+                            }
+                        }
+                        for (const Entity& drill : world.mEntities)
+                        {
+                            if (drill.mKind != EntityKind::eDrill || drill.mGone || drill.mInputs[0] != 1 || drill.mSwitch <= 1 || drill.mHalf != wheel->mHalf || std::abs(drill.mY2 - wheel->mY2) > 40 ||
+                                drill.CentreX() < x1 || drill.CentreX() > x2)
+                            {
+                                continue;
+                            }
+                            bool lever = false;
+                            for (const Entity& l : world.mEntities)
+                            {
+                                lever = lever || (l.mKind == EntityKind::eLever && l.mSwitch == drill.mSwitch);
+                            }
+                            const Goap::Fact stopped{Key::Switch(drill.mSwitch), drill.mInputs[1] ? 1 : 0};
+                            if (lever && std::find(teamPre.begin(), teamPre.end(), stopped) == teamPre.end())
+                            {
+                                teamPre.push_back(stopped);
+                            }
+                        }
+                    }
                     step.mKind = StepKind::eTogether;
                     add("Work together " + name + " sw" + std::to_string(entity.mSwitch), teamPre, {{Key::Switch(entity.mSwitch), entity.mOp == 1 ? 0 : 1}}, 600, step);
                     break;

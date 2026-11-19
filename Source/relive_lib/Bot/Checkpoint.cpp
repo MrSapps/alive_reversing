@@ -34,6 +34,12 @@ bool Checkpoint::CanSave(BaseMap& map)
         {
             return false;
         }
+        // (nor with the ghost of a slap lock on its way to its door: put back from a save taken then, the door
+        // of the Mudomo vault's path 11 never opened, with every lock slapped)
+        if (pObj && pObj->Type() == ReliveTypes::eSlapLock_OrbWhirlWind && !pObj->GetDead())
+        {
+            return false;
+        }
     }
     return sControlledCharacter && sControlledCharacter->mHealth > FP_FromInteger(0) && gNumCamSwappers == 0 && map.mCamState == BaseMap::CamChangeStates::eInactive_0 && !map.mPendingSaveRestore && !map.GetActiveModal();
 }

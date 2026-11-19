@@ -4824,13 +4824,17 @@ bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::v
     {
         const Body& body = bodies[k];
         const s32 t = static_cast<s32>(k) + late;
+        // (where he stands still there is no guessing where he is: less to spare. The brewery's third Zulag: the
+        // hoist at 637 is a cell from the drill at 600..625, and with the margin for a moving Abe the cell under
+        // it was never clear to stop in.)
+        const s32 slack = k > 0 && bodies[k - 1].mX == body.mX && bodies[k - 1].mY == body.mY ? 4 : kSlack;
         for (const SweepAt& sweep : world.mSweeps)
         {
             s32 x1 = 0;
             s32 y1 = 0;
             s32 x2 = 0;
             s32 y2 = 0;
-            if (sweep.mHalf == body.mHalf && sweep.At(t < 0 ? 0 : t, x1, y1, x2, y2) && body.mX + 3 + kSlack >= x1 && body.mX - 3 - kSlack <= x2 && body.mY >= y1 && body.mY - body.mTall <= y2)
+            if (sweep.mHalf == body.mHalf && sweep.At(t < 0 ? 0 : t, x1, y1, x2, y2) && body.mX + 3 + slack >= x1 && body.mX - 3 - slack <= x2 && body.mY >= y1 && body.mY - body.mTall <= y2)
             {
                 return false;
             }
@@ -14357,6 +14361,13 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                     {
                         continue;
                     }
+                    // (not one it stood at the floor's end over and could not eat: the others first. The Mudomo
+                    // vault's path 11: at 412 with a Fleech at 412 for 2,250 frames, three more left alive on the
+                    // floor he then came down onto.)
+                    if (mSkipPreyFor > 0 && std::abs(f.mX - mSkipPreyX) <= 30)
+                    {
+                        continue;
+                    }
                     // (floor all the way to it)
                     bool floor = true;
                     for (s32 x = std::min(me->mX, f.mX); floor && x <= std::max(me->mX, f.mX); x += cell)
@@ -14371,12 +14382,38 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                         prey = &f;
                     }
                 }
+                mSkipPreyFor = std::max(0, mSkipPreyFor - 1);
                 const bool onFloor = me->mMotion <= 4 || (me->mMotion >= 7 && me->mMotion <= 10) || me->mMotion == 40;
                 if (prey && onFloor && at >= 0 && mHunt < 2500)
                 {
                     mHunt++;
                     mLeg = -1;
                     const s32 dx = prey->mX - me->mX;
+                    // (walked after and no nearer for 30 turns: it runs from the Paramite at the Paramite's walk, three
+                    // cells ahead, the length of the floor. At a run then, where there is the room for one. The Mudomo
+                    // vault's path 11: followed so from 562 to 1534, and every Fleech alive when he came down.)
+                    mChaseStill = std::abs(dx) + 3 >= mChaseDx ? mChaseStill + 1 : 0;
+                    mChaseDx = std::abs(dx);
+                    const bool flees = mChaseStill > 30;
+                    // (got no nearer in 60 turns, where it stands: that one is left for now. The Mudomo vault's
+                    // path 11 in the run from the Mines: held left at 412 against the floor's end for 2,250
+                    // frames after one that was said to be at 412, with three more alive along the floor.)
+                    if (me->mX == mHuntLastX)
+                    {
+                        if (++mHuntStill > 60)
+                        {
+                            mHuntStill = 0;
+                            mSkipPreyX = prey->mX;
+                            mSkipPreyFor = 900;
+                            bot.Log("the Paramite gets no nearer the Fleech at " + std::to_string(prey->mX) + ": the others first");
+                            return TaskStep::Do(Prim::Wait(1));
+                        }
+                    }
+                    else
+                    {
+                        mHuntStill = 0;
+                        mHuntLastX = me->mX;
+                    }
                     if (mHunt % 25 == 1)
                     {
                         bot.Log("Paramite at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + " motion " + std::to_string(me->mMotion) + " after the Fleech at " + std::to_string(prey->mX) + " (" + std::to_string(mHunt) + ")");
@@ -14431,6 +14468,13 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                         {
                             if (me->mMotion == 0 && std::abs(dx) <= cell * 7 / 4)
                             {
+                                if (++mEatTries > 6)
+                                {
+                                    mEatTries = 0;
+                                    mSkipPreyX = prey->mX;
+                                    mSkipPreyFor = 900;
+                                    return TaskStep::Do(Prim::Wait(1));
+                                }
                                 return TaskStep::Do(Prim::Wait(12, Btn::eDown));
                             }
                             // (it is let be, and the way gone on with)
@@ -14462,7 +14506,7 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                                 return TaskStep::Do(Prim::Wait(1));
                             }
                             const u32 bite = running && std::abs(dx) <= 5 * cell ? static_cast<u32>(Btn::eAction) : 0u;
-                            return TaskStep::Do(Prim::Wait(1, toward | (std::abs(dx) > 3 * cell || running ? run : 0u) | bite));
+                            return TaskStep::Do(Prim::Wait(1, toward | (std::abs(dx) > 3 * cell || running || flees ? run : 0u) | bite));
                         }
                         return TaskStep::Do(Prim::Wait(1));
                     }
@@ -14472,7 +14516,7 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                     }
                     if (std::abs(dx) > cell * 7 / 4)
                     {
-                        return TaskStep::Do(Prim::Wait(2, toward | (std::abs(dx) > 3 * cell ? run : 0u)));
+                        return TaskStep::Do(Prim::Wait(2, toward | (std::abs(dx) > 3 * cell || flees ? run : 0u)));
                     }
                     return TaskStep::Do(Prim::Wait(12, Btn::eDown));
                     }
