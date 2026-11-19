@@ -860,6 +860,8 @@ private:
     s32 mHopWaits = 0;
     // Frames waited in a shadow for the Sligs of its floor to walk away
     s32 mShadowWaits = 0;
+    // Frames a move through Sligs' sight was put off for a Greeter's beam
+    s32 mGreeterWaits = 0;
     // For each Slig about (as World::mSligs has them): the frame it last did anything but stand
     std::vector<s32> mSligMoved;
     s32 mHopFaced = -1;

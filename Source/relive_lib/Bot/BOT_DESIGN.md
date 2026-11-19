@@ -3082,3 +3082,25 @@ Slig that stands guard at a running jump".) `bw7b.txt` this time: 17 deaths to t
 second screen, the one running jump there ruled out after two deaths at it.
 
 Check set otherwise: ctest 11/11; m1, tr1, t13 0; a1 14; bw1, blk9t, b14, wr 0; fc3 0.
+
+### Terminal 5 (`feeco_depot` 5 and 10), begun (2026-11-19; `la/t5.txt` from the depot's hub, `la/t10.txt` at the Greeters' door)
+
+From the hub the door that the three bosses open leads straight to Terminal 5 (path 5), and its first door to the
+three screens of Greeters (path 10).
+
+- **The Greeters' screens: through, 11 deaths** (`t10.txt`: 3 at the drop onto the first, 5 on the second, 3 at the
+  last hoist; back in path 5 at f=2755). The move through the background Sligs' sight that ends at a hoist he
+  then goes up is put off until the Greeter between is passed with its beam beyond it and going on, and from then
+  on nothing is held for the beam and no rest is taken in cover (`GoToTask::ZMove`, `Bot::GreeterGo`: "Wait until
+  his beam is on his left side ... so you'll already be past him when you alert him"). Only that move: asked of
+  the moves from cover to cover as well, the second screen was seven deaths and no way on. A Greeter's body is
+  where its beam is (measured: 1365 with the beam at 1345..1365).
+- The trace has the beams now (`beam<x1>..<x2>v<speed>`, `g` for a Greeter's).
+- **Where it stops:** path 5 itself, no plan at 1037,1160 (f=11,339) after two farts for the mines that did not
+  get there. The guide: a lever, a Brew and a fart flown up to the Chant Protector; a flying Slig taken over to
+  bomb the mines; then four blind Mudokons brought down three lifts one or two at a time to work the wheels that
+  open the way to the door, which is needed whatever the profile ("Freeing your brethren drops the gate on the
+  right, so enter the door that was behind it and take the train to SoulStorm Brewery").
+
+Check set: as before (ctest 11/11; m1, tr1, t13 0; a1 14; bw1, blk9t, b14, wr 0; fc3 0; bw7b stuck on the
+Executive Offices' flying Sligs with 17 deaths).
