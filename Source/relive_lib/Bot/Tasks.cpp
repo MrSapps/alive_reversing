@@ -3658,7 +3658,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 s32 after = 0;
                 for (const RockAt& f : bot.GetWorld().mFleechesAwake)
                 {
-                    after += f.mChasing && f.mHalf == here.mHalf && std::abs(f.mX - here.mX) < 500 && std::abs(f.mY - here.mY) < 200 ? 1 : 0;
+                    // (not ones a wall keeps from him: Necrum's path 6, the three left behind the door of the room
+                    // before, 125 off through the wall, had him walk in under the two that sleep over the rings)
+                    after += f.mChasing && f.mHalf == here.mHalf && std::abs(f.mX - here.mX) < 500 && std::abs(f.mY - here.mY) < 200 && !Domain::ParamiteWall(nav, f.mX, here.mX, here.mY, here.mHalf) ? 1 : 0;
                 }
                 if (after >= 3)
                 {

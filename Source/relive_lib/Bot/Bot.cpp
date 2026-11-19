@@ -1392,7 +1392,7 @@ bool Bot::Replan(BaseMap& map)
         bool hunted = false;
         for (const RockAt& f : mWorld.mFleechesAwake)
         {
-            fleeches += f.mChasing && f.mHalf == mAbe.mHalfScale && std::abs(f.mX - mAbe.mX) < 600 && std::abs(f.mY - mAbe.mY) < 250 ? 1 : 0;
+            fleeches += f.mChasing && f.mHalf == mAbe.mHalfScale && std::abs(f.mX - mAbe.mX) < 600 && std::abs(f.mY - mAbe.mY) < 250 && !Domain::ParamiteWall(mKnow->mNav, f.mX, mAbe.mX, mAbe.mY, mAbe.mHalfScale) ? 1 : 0;
         }
         for (const ParamiteAt& p : mWorld.mParamites)
         {
@@ -1942,6 +1942,33 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 flier = flier || (f.mHalf == at.mHalf && std::abs(f.mY - at.mY) < 220 && std::abs(f.mX - at.mX) < 1000);
             }
             if (!flier)
+            {
+                return -1;
+            }
+        }
+        // A running jump begun by a Fleech asleep, with none awake on that screen to get away from: no. The run
+        // wakes it: a noise within six cells of it, on the screen shown (Fleech::IncreaseAnger). Measured from where
+        // the jump starts, with its run-up: three cells more. (Necrum's path 6: the jumps up to the levers'
+        // ledges, new with the stand jumps, woke the one that hangs at 912 in the second room, a cell from the
+        // run-up, and had him bitten at the levers of the third: 9 deaths where there were 2. One awake behind a
+        // shut door, on another screen, is nothing to run from. The Scrab trial's jump over the pit at 1562,840
+        // starts 275 from the one asleep at 1837 and is left alone.)
+        if (e.mKind == EdgeKind::eRunJump && !world->mFleechesAsleep.empty() && !world->mInvisible)
+        {
+            const NavNode& a = know->mNav.Nodes()[e.mFrom];
+            const s32 cam = know->mNav.CameraOf(a.mX, a.mY - 5);
+            const s32 near = NavGraph::GridStep(a.mHalf) * 9;
+            bool asleep = false;
+            bool awake = false;
+            for (const RockAt& f : world->mFleechesAsleep)
+            {
+                asleep = asleep || (f.mHalf == a.mHalf && know->mNav.CameraOf(f.mX, f.mY - 5) == cam && std::abs(f.mX - a.mX) < near);
+            }
+            for (const RockAt& f : world->mFleechesAwake)
+            {
+                awake = awake || (f.mHalf == a.mHalf && know->mNav.CameraOf(f.mX, f.mY - 5) == cam);
+            }
+            if (asleep && !awake)
             {
                 return -1;
             }
