@@ -101,6 +101,38 @@ void LevelGraph::Measure()
     }
 }
 
+bool LevelGraph::LeadsToNew(s32 from, s32 avoid, const std::function<bool(s32 path)>& seen) const
+{
+    std::set<s32> done{from, avoid};
+    std::vector<s32> open{from};
+    while (!open.empty())
+    {
+        const s32 at = open.back();
+        open.pop_back();
+        for (const PathSummary& p : mPaths)
+        {
+            if (p.mPath != at)
+            {
+                continue;
+            }
+            for (const auto& exit : p.mExits)
+            {
+                if (exit.first != mLevel || done.count(exit.second) != 0)
+                {
+                    continue;
+                }
+                if (!seen(exit.second))
+                {
+                    return true;
+                }
+                done.insert(exit.second);
+                open.push_back(exit.second);
+            }
+        }
+    }
+    return false;
+}
+
 s32 LevelGraph::Distance(s32 path) const
 {
     const auto it = mDistance.find(path);
