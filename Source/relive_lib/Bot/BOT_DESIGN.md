@@ -3398,3 +3398,17 @@ What FeeCo's path 3 and the Barracks' first path took, each a rule or a memory t
     not by a step back off the ledge he came up at: that is the run past the guard at 1962,1400 into the well.
   With these it is through the door at 2037,380 into the boom machine's rooms at f=15,287, 34 deaths on the way
   (16 at the hop 2187,860, 11 at Lever#12015): not stuck, far from clean.
+  Later the same day, further into that path (all without `look`, as the run from the Mines plays):
+  - "No grenade to be had" is no longer a matter of which is nearer: a flood from where he stands over what is
+    open, with the grenade floors kept off, that does not come to a boom machine (`Bot::Replan`). In the
+    machine's rooms the plan is the walkthrough's again.
+  - The wait for a Slig's back to roll two cells (`HushSlig`) is for Sligs that stand 55 frames or more at an
+    end of their beat; others are left to the rules there were.
+  - Out of a shadow by a roll with Sligs that never leave the screen: after 600 frames of waiting for them to,
+    as the nearest, stood facing him at the end of its beat, begins its turn, with every other walking away.
+    (Before the turn, by a guess or a measure of how long it stands, he was shot as he rolled.)
+  Where it stands: `b1l.txt` gets to the boom machine and has a grenade (20 deaths at that shadow), and is
+  stuck carrying it back over the same open stretch (137..212, some 50 frames while the Slig of 87..187 walks to
+  its far end and stands) to throw it: 65 deaths, STUCK at f=21,009. `look` found such moments by trying; there
+  is no rule for the way back. With `look` the whole path is stuck at the machine too (588 tries). The rooms
+  alone (`la/b2n.txt`) are no test without `look`: shot 300 frames in with no save to go back to.

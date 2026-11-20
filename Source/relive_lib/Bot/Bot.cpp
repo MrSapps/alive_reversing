@@ -365,7 +365,7 @@ bool Bot::Replan(BaseMap& map)
     const PathKnowledge* know = mKnow;
     const s32 abeNode = AbeNode();
     // A Slig a grenade is to be thrown at, and no grenade to be had yet: none on him, none had in this path so
-    // far, and its machine further off than the Slig is. Its floor is then a floor like any other, got by as
+    // far, and no way to its machine as things are. Its floor is then a floor like any other, got by as
     // such Sligs are elsewhere. (The Barracks' path 1 from its first screen: the machine is twelve screens on,
     // behind the Slig that stands guard at 2137,1739, and with that Slig's floor shut until it was blown up
     // there was no plan at all. The walkthrough: "roll off the edge to land hanging below the Slig. Once he
@@ -395,11 +395,51 @@ bool Bot::Replan(BaseMap& map)
                     }
                 }
             }
-            const s32 toMachine = std::abs(machine->CentreX() - mAbe.mX) + std::abs(machine->mY2 - mAbe.mY);
+            // (a machine there is a way to as things are, with those floors kept off, is one to go to first: the
+            // boom machine's rooms of that path, where the machine is a screen further off than the Sligs the
+            // grenades are for)
+            bool reached = false;
+            {
+                const NavGraph& nav = know->mNav;
+                std::set<s32> machines;
+                for (const Entity& e : mWorld.mEntities)
+                {
+                    if (e.mKind == EntityKind::eRockSack && e.mInputs[1] == 2 && !e.mGone)
+                    {
+                        machines.insert(Domain::UseNode(nav, e, nullptr));
+                    }
+                }
+                std::vector<char> seen(nav.Nodes().size(), 0);
+                std::vector<s32> open;
+                if (abeNode >= 0)
+                {
+                    open.push_back(abeNode);
+                    seen[abeNode] = 1;
+                }
+                while (!open.empty() && !reached)
+                {
+                    const s32 cur = open.back();
+                    open.pop_back();
+                    reached = machines.count(cur) != 0;
+                    for (s32 k = 0; k < nav.Nodes()[cur].mEdgeCount; k++)
+                    {
+                        const NavEdge& e = nav.Edges()[nav.Nodes()[cur].mFirstEdge + k];
+                        s32 switchId = 0;
+                        s32 openValue = 0;
+                        if (seen[e.mTo] || (nav.Condition(e, &switchId, &openValue) && mWorld.Switch(switchId) != openValue) ||
+                            (e.mClear >= 0 && nav.Input().mFeatures[e.mClear].mKind == FeatureKind::eDanger && nav.Input().mFeatures[e.mClear].mSwitch > 1 && mWorld.Switch(nav.Input().mFeatures[e.mClear].mSwitch) == 0))
+                        {
+                            continue;
+                        }
+                        seen[e.mTo] = 1;
+                        open.push_back(e.mTo);
+                    }
+                }
+            }
             for (const Domain::GrenadeTarget& target : Domain::GrenadeTargets(know->mNav.Input(), mWorld))
             {
                 const Entity* slig = mWorld.Find(target.mSlig);
-                if (slig && slig->mKind == EntityKind::eSlig && flown.count(target.mSlig) == 0 && std::abs(slig->CentreX() - mAbe.mX) + std::abs(slig->mY2 - mAbe.mY) < toMachine)
+                if (!reached && slig && slig->mKind == EntityKind::eSlig && flown.count(target.mSlig) == 0)
                 {
                     mWorld.mNoGrenadeFor.insert(World::HazardSwitch(target.mSlig));
                 }

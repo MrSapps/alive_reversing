@@ -2416,7 +2416,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     // roll is one. So he rolls two cells, no more, just after it has turned its back: it turns to that (some ten
     // frames), finds him still and hidden, and listens out its time. The walkthrough of the Barracks' war room:
     // "Whenever the top Slig turns away, roll forward a couple of spaces, then wait."
-    if (const SligAt* hush = bot.IsAe() && first.mKind == EdgeKind::eRoll && nav.Nodes()[cur].mHidden && !bot.GetWorld().mInvisible ? HushSlig(bot) : nullptr)
+    // (one that stands at neither end of its beat long enough for that is not waited on so: the Barracks' path 1,
+    // the Slig of the boom machine's floor, waited on for 1,600 frames a time with "too many steps" at the end)
+    if (const SligAt* hush = bot.IsAe() && first.mKind == EdgeKind::eRoll && nav.Nodes()[cur].mHidden && !bot.GetWorld().mInvisible ? HushSlig(bot) : nullptr; hush && std::max(hush->mPauseLeft, hush->mPauseRight) >= 55)
     {
         const AbeState& abe = bot.Abe();
         const bool faces = hush->mFacingLeft == (abe.mX < hush->mX);
@@ -3167,7 +3169,55 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     last = shade;
                 }
-                else if (watched && watchedNext && here.mHidden && !nav.Nodes()[first.mTo].mHidden && mHiding < 4000)
+                // (Sligs that never leave the screen: out as the nearest of this floor on the screen, stood at the end
+                // of its beat with its face to him, is about to turn and walk off, and every other walks away. The
+                // roll and the standing up are heard, which is nothing to one that stands there with its face
+                // this way already; one that walks away turns round to them. Then after it at a sneak, which is
+                // not heard. The Barracks' path 1, the boom machine's floor: one walks 87 to 187 by the machine
+                // and never leaves. Waited on to leave for 4,000 frames he went out under its eyes; gone out as
+                // it walked away it turned at the roll, 26 times. What the tries of `look` found is this.)
+                bool nearTurns = mHiding > 600;
+                {
+                    const SligAt* nearest = nullptr;
+                    for (const SligAt& slig : bot.GetWorld().mSligs)
+                    {
+                        if (slig.mAsleep || slig.mPossessed || slig.mHalf != here.mHalf || std::abs(slig.mY - here.mY) > 10 || nav.CameraOf(slig.mX, slig.mY - 5) != nav.CameraOf(here.mX, here.mY - 5))
+                        {
+                            continue;
+                        }
+                        if (!nearest || std::abs(slig.mX - here.mX) < std::abs(nearest->mX - here.mX))
+                        {
+                            nearest = &slig;
+                        }
+                    }
+                    for (const SligAt& slig : bot.GetWorld().mSligs)
+                    {
+                        if (&slig == nearest || slig.mAsleep || slig.mPossessed || slig.mHalf != here.mHalf || std::abs(slig.mY - here.mY) > 10 || nav.CameraOf(slig.mX, slig.mY - 5) != nav.CameraOf(here.mX, here.mY - 5))
+                        {
+                            continue;
+                        }
+                        nearTurns = nearTurns && slig.mMotion == 2 && slig.mFacingLeft == (slig.mX < here.mX);
+                    }
+                    const bool stands = nearest && nearest->mMotion == 0 && nearest->mFacingLeft == (here.mX < nearest->mX);
+                    // (as it begins to turn, not before: gone out some frames before the turn, by a guess at how
+                    // long it stands and then by a measure of it, he was shot as he rolled)
+                    const bool turns = nearest && nearest->mMotion == 5 && mNearStood >= 10;
+                    if (stands)
+                    {
+                        mNearStood++;
+                    }
+                    else if (!turns)
+                    {
+                        mNearStood = 0;
+                    }
+                    nearTurns = nearTurns && turns;
+                }
+                if (shade >= last && nearTurns && watched && watchedNext && here.mHidden && !nav.Nodes()[first.mTo].mHidden && mHiding < 4000)
+                {
+                    bot.Log("the Slig that stands at the end of its beat turns to go: out of the shadow at " + std::to_string(here.mX) + "," + std::to_string(here.mY));
+                    mHiding = 4000;
+                }
+                else if (shade >= last && watched && watchedNext && here.mHidden && !nav.Nodes()[first.mTo].mHidden && mHiding < 4000)
                 {
                     if (mHiding == 0)
                     {

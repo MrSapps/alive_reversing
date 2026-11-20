@@ -834,6 +834,8 @@ private:
     bool mWaited = false;
     // Frames spent waiting for a Slig to look the other way
     s32 mHiding = 0;
+    // How long the nearest Slig of his floor has stood with its face to him (the way out of a shadow)
+    s32 mNearStood = 0;
     // A Slig that stands (where, and the way it faces): the frame it was first seen to, and the last it was
     struct Stood final
     {
