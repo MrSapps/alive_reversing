@@ -2538,6 +2538,21 @@ std::vector<PathSummary> GameView::ReadLevel(BaseMap& map)
             {
                 summary.mExits.push_back({f.mDestLevel, f.mDestPath});
             }
+            // (a well that a switch sends to another path: that way out too. Bonewerkz' path 2, whose only way on
+            // to path 3 is the well at 1651,720 once switch 145 is set: without it no way to the level's end was
+            // known from paths 1, 2 and 7, and from the first annex he had no reason to go back out.)
+            if (f.mKind == FeatureKind::eWellExpress && f.mOnDestPath >= 0)
+            {
+                summary.mExits.push_back({f.mOnDestLevel, f.mOnDestPath});
+                if (f.mSwitch > 1)
+                {
+                    PathSummary::Want want;
+                    want.mLevel = f.mOnDestLevel;
+                    want.mPath = f.mOnDestPath;
+                    want.mSwitch = f.mSwitch;
+                    summary.mWants.push_back(want);
+                }
+            }
         }
         World things;
         BuildEntities(*path, things);

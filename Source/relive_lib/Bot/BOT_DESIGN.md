@@ -3307,3 +3307,24 @@ them again lets the nearer one in; left together they have him 15 frames after h
 walkthrough's way is a timed run: over the Paramites, a stop on the first plate by each lock, and to the well
 before them. Not built. AO's `a1`: 21 deaths for 14, ends stuck in the Stock Yards as it did (now by deaths in one
 cell, before by no plan).
+
+**The run from the Mines, 2026-11-20 (late):** reaches Bonewerkz' path 2 at f=155,600 with 8 deaths, and sticks
+there after 19 more. On the way it was stopped and mended at:
+- Necrum's path 3, the bird portal at 2462,980: sent to two cells before the open portal, where the way into it
+  did not begin just then, and back, for good. After two such sends he hops from the cell the way begins in
+  (`mPortalBacks`).
+- Bonewerkz' first annex (path 7) come into from the hub: its one Mudokon shot by the Sligs of its floor as it got
+  up. `Bot::RewindLoss` (`WantLossRewind` from `WorkTogetherTask`): back to before a needed Mudokon died, a little
+  later each time, up to eight times, and what he was at is not counted as failed. A switch planned for forty times
+  and not got is dropped for the path (`mExploreTries`): two levers that count only together were pulled in turn
+  for a million frames, with "0 stuck" (`la/bw1.txt` had shown that all along). A well that a switch sends to
+  another path is an exit in the level's graph (path 2 to 3 by switch 145): without it paths 1, 2 and 7 had no way
+  to the level's end and he explored the annex until he shut himself in.
+- A door is not judged while he is on his way through it (`mDoorWaits`). The other way to a place that rules a
+  hop out after deaths is not one through what a switch or a mine has shut; when no plan is left the ways ruled
+  out in the path are allowed again.
+Not mended, path 2: the Slig that watches Lever#6001 (the take-over by the teleporter's floor goes wrong at
+times, then `walk blocked` rules a walk out and he ends at the door of 1012,1240, which does nothing from that
+side: `la/bw1.txt` shows it in ten minutes); and at Lever#10000 the flying Slig's grenades over the mines (only in
+the long run). The chain from the annex (`la/bw7b.txt`) gets through both with 3 to 5 deaths.
+Check set: all as before; `fc3` now goes on through the annex and paths 2, 3 to 4 (1 death); `bw1` stuck in path 2.
