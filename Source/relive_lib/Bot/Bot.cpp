@@ -250,6 +250,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<VoiceLockTask>(step.mEntity, step.mEdge);
         case StepKind::eSligLever:
             return std::make_unique<SligLeverTask>(step.mEntity, step.mEdge);
+        case StepKind::eSligCall:
+            return std::make_unique<SligCallTask>(step.mEntity, step.mOther, static_cast<u32>(step.mEdge));
         case StepKind::eSorry:
         {
             auto sorry = std::make_unique<RecruitTask>(step.mEntity);
@@ -2052,6 +2054,19 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             {
                 return 20;
             }
+            // (or over a pit with Slogs awake in it, to the ledge of its far side: the other way is down among
+            // them. The brewery's fourth Zulag: "You can jump across the gap by running for the one step you
+            // have, and hoist up without touching the floor". He hopped down to the hoist's foot, twelve times.)
+            if (std::abs(to.mY - from.mY) <= 10)
+            {
+                for (const SlogAt& slog : world->mSlogs)
+                {
+                    if (!slog.mAsleep && slog.mY > from.mY + 20 && slog.mY < from.mY + 250 && std::abs(slog.mX - from.mX) < 700)
+                    {
+                        return 20;
+                    }
+                }
+            }
             for (const ScrabAt& scrab : world->mScrabs)
             {
                 if (!scrab.mPossessed && scrab.mHalf == from.mHalf && std::abs(scrab.mY - from.mY) <= 30 && std::abs(scrab.mX - from.mX) < 700)
@@ -3631,8 +3646,42 @@ bool Bot::SlogRefuge(const SlogAt& slog, s32 from, s32& refuge, bool& left, bool
         return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp || e.mKind == EdgeKind::eTeleport || e.mKind == EdgeKind::eFall ? all(e) : -1;
     };
     std::vector<s32> way;
-    if (!nav.FindPath(from, [graph, floorY](s32 n)
-                      { return std::abs(graph->Nodes()[n].mY - floorY) > 45; }, awayOnly, way) || way.empty())
+    // (a floor with Slogs up on it is no way off: nor is one at this height that a pit is not between. Over a pit
+    // it does not come: it falls in. The brewery's fourth Zulag: "pull the lever to release the Sloggies, then
+    // roll back left and jump across the gap", and the pit under that gap has two Slogs awake in it: he went
+    // down to them.)
+    const s32 fromX0 = at.mX;
+    const bool half = at.mHalf;
+    if (!nav.FindPath(from, [graph, floorY, worldNow, fromX0, half](s32 n)
+                      {
+                          const NavNode& node = graph->Nodes()[n];
+                          if (node.mHalf != half)
+                          {
+                              return false;
+                          }
+                          if (std::abs(node.mY - floorY) <= 45)
+                          {
+                              if (!graph->Input().mIsAe)
+                              {
+                                  return false;
+                              }
+                              const s32 cell = NavGraph::GridStep(half);
+                              s32 missing = 0;
+                              for (s32 x = std::min(node.mX, fromX0) + cell; x < std::max(node.mX, fromX0); x += cell)
+                              {
+                                  missing += graph->NodeAt(x, floorY, half, 45) < 0 ? 1 : 0;
+                              }
+                              return missing >= 3;
+                          }
+                          for (const SlogAt& other : worldNow->mSlogs)
+                          {
+                              if (graph->Input().mIsAe && !other.mAsleep && std::abs(other.mY - node.mY) <= 30 && std::abs(other.mX - node.mX) < 600)
+                              {
+                                  return false;
+                              }
+                          }
+                          return true;
+                      }, awayOnly, way) || way.empty())
     {
         return false;
     }
@@ -3759,7 +3808,8 @@ std::unique_ptr<Task> Bot::MakeFlee()
     // the way out)
     // (nor with a grenade thrown from a shadow: the Slig it is for turns to its noise, and out of the shadow is
     // into its sight. The Barracks' path 7: shot as he left the shadow at 562 for this.)
-    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(mProfile.mLook && mVary == Lookahead::Way::eQuiet) && !dynamic_cast<const GetRocksTask*>(mTask.get()) && !dynamic_cast<const GrenadeSligTask*>(mTask.get()) && !dynamic_cast<const GrenadeOrbTask*>(mTask.get()))
+    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(mProfile.mLook && mVary == Lookahead::Way::eQuiet) && !dynamic_cast<const GetRocksTask*>(mTask.get()) && !dynamic_cast<const GrenadeSligTask*>(mTask.get()) && !dynamic_cast<const GrenadeOrbTask*>(mTask.get()) &&
+        !dynamic_cast<const SligCallTask*>(mTask.get()))
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
@@ -3769,10 +3819,12 @@ std::unique_ptr<Task> Bot::MakeFlee()
         for (const SligAt& slig : mWorld.mSligs)
         {
             const s32 near = mAbe.mHalfScale ? 100 : 200;
-            if (node < 0 || hidden || slig.mAsleep || slig.mPossessed || slig.mHalf != mAbe.mHalfScale || std::abs(slig.mY - mAbe.mY) > 45 || std::abs(slig.mX - mAbe.mX) >= near || nav.CameraOf(slig.mX, slig.mY - 5) != cam)
+            if (node < 0 || hidden || slig.mAsleep || slig.mPossessed || slig.mHalf != mAbe.mHalfScale || std::abs(slig.mY - mAbe.mY) > (mAbe.mHalfScale ? 25 : 45) || std::abs(slig.mX - mAbe.mX) >= near || nav.CameraOf(slig.mX, slig.mY - 5) != cam)
             {
                 continue;
             }
+            // (level with him: on the background a floor 41 under a Slig's is another floor, as 82 is in front. The
+            // brewery's fourth Zulag: the lever's floor at 380 under the Sligs of 339 and 309.)
             // (not one that stands with its back to him: he has come up behind it on purpose, and a run from
             // there is what turns it round. The Barracks' path 7: at the boom machine, 150 behind the Slig that
             // stands at 462 for 120 frames each way.)
@@ -4070,7 +4122,7 @@ std::unique_ptr<Task> Bot::MakeReflex()
     // security orb: one is taken over from where he stands, shoots the rest and bursts. Left alone they shoot
     // out of the screen at him as soon as he is in front of them at full size.
     // (not a Slig he has called for a lock: that one is the task's to take over and keep)
-    if (mPerchKills < 6 && !dynamic_cast<const SligLockTask*>(mTask.get()))
+    if (mPerchKills < 6 && !dynamic_cast<const SligLockTask*>(mTask.get()) && !dynamic_cast<const SligCallTask*>(mTask.get()))
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);

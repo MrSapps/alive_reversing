@@ -1892,6 +1892,43 @@ private:
     TaskStep StepTo(const SligAt& me, s32 x);
 };
 
+// A lever that makes a Slig level with him (StepKind::eSligCall, Domain::SligCallLedge): pulled, then at a run to
+// the foot of the hoist up to the Slig's floor and up to hang there until the Slig has walked off it, up, the
+// Slig taken over, a lever pulled with it if one is given, and burst.
+class SligCallTask final : public Task
+{
+public:
+    SligCallTask(u32 lever, u32 slig, u32 pull)
+        : mLever(lever)
+        , mSlig(slig)
+        , mPullLever(pull)
+    {
+    }
+    ~SligCallTask() override;
+    std::string Name() const override
+    {
+        return "Call Slig#" + std::to_string(mSlig) + " with Lever#" + std::to_string(mLever);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mLever;
+    u32 mSlig;
+    u32 mPullLever;
+    // 0 to the lever, 1 the lever, 2 to the hoist and up to hang, 3 hanging until the Slig is off its floor, 4 up, 5 the chant,
+    // 6 as the Slig, 7 the burst
+    s32 mPhase = 0;
+    s32 mNode = -1;
+    s32 mTries = 0;
+    s32 mWaits = 0;
+    s32 mFrames = 0;
+    s32 mPulls = 0;
+    s32 mPullWait = 0;
+    s32 mShootFrames = 0;
+    bool mTapped = false;
+    std::unique_ptr<GoToTask> mGo;
+};
+
 // Onto a foot switch's cell so that its switch turns over: off it first if he stands on it.
 class StepOnTask final : public Task
 {

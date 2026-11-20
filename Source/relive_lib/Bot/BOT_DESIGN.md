@@ -3253,3 +3253,26 @@ last seen) for the ones that pull a lever in anger, wanted by `Work together` wh
 (`use` drills) are by the Mudokons it takes; `RecruitTask::SetSorryOnly`. Still dies on the first hop over the
 drill tops at 637,380->587,320 (not timed: a hop, not a running jump). Next: Zulag 4 (path 18): the pit of Slogs
 at 1599..1701,720 is to be jumped ("running for the one step you have"), not hopped down into.
+
+**Zulag 4 (2026-11-20):** path 18 done with no deaths (`build-bot/br/z4.txt`), path 19 as far as its last Slig
+(`br/z5.txt` runs 18 then 19; `br/z6.txt` only dumps 19's graph: started there by script he is at full size and
+falls to the wheel). What it took:
+- A running jump to the ledge over a pit with Slogs awake in it is cheap (`EdgeCostFn`); a floor with Slogs up on
+  it is no refuge from a Slog, a floor at the same height over a pit is (`SlogRefuge`); a roll that ends in a
+  running jump is begun crouched, not at a run under a low ceiling.
+- `StepKind::eSligCall` / `SligCallTask` / `Domain::SligCallLedge`: a lever that makes a Slig level with him. Pulled,
+  then off his floor at a run (buttons held: the pilot walks so short a way, and the Slig shoots 22 frames after
+  it is made), up to hang from a hoist under the Slig's floor (or, where the Slig lands on the lever's own
+  platform, from another ledge at that height), up when the Slig has gone down, the Slig taken over, the Greeters
+  of its floor shot, a lever pulled with it if the plan wants one, burst. Replaces the plain `Use` of such a lever.
+  `MakeFlee` and the take-one-over reflex keep out of it.
+- `MarkSpawnTraps`: only a zone at the Slig's own size shuts its beat. A hop down on the background may drop to
+  170 (a fall kills from 180). Hung under a guard whose back is turned, with a Slig on a floor below that sees him
+  hang: up at once (`UpBehind`). On the background a Slig's floor is within 25 of it, not 45 (`MakeFlee`,
+  `Watcher`: other places still use 45).
+- Left in path 19: the Slig that lever 164 calls is to say the code to the voice lock (switch 159), with an orb on
+  the lever's screen: "When he passes right, climb down behind him and run left. He'll chase you, so jump into the
+  well on the next screen. Possess him from the background." No action offers that yet; he goes down to its
+  floor and dies there.
+- Check set of this state: all at baseline but `bw7b`, stuck once in the Executive Offices (12 deaths from a save
+  taken under fire). `la/fe1.txt` alone on the same build was as before (34 deaths, 32 before).
