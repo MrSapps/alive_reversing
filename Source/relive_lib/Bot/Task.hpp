@@ -889,6 +889,8 @@ private:
     s32 mZTo = 0;
     // Chants at a bird portal that has not opened yet
     s32 mPortalChants = 0;
+    // Times he was sent to two cells before an open portal
+    s32 mPortalBacks = 0;
     // Tries at a teleporter that goes off when its plate is stood on
     s32 mPlateSteps = 0;
     // Steps spent waiting for a Slurg to get out of the way
@@ -1026,6 +1028,8 @@ private:
     s32 mSweepWait = 0;
     // Frames waited for a drill in a gap to be clear of a running jump over it
     s32 mJumpDrillWaits = 0;
+    // Frames waited for a door he is on his way through before it is judged
+    s32 mDoorWaits = 0;
     // Pulling the lever that stops the drill in the way
     std::unique_ptr<Task> mStop;
     s32 mStops = 0;

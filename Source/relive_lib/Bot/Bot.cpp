@@ -935,6 +935,14 @@ bool Bot::Replan(BaseMap& map)
                     bestFacts = {fact};
                     mExploring = fact.mKey;
                     plansFound++;
+                    // (planned for forty times over and still not so: it does not come of what is done for it. No
+                    // more of that one here. Bonewerkz' first annex with its Mudokon gone: two levers that count
+                    // only pulled together, pulled in turn by him alone for a million frames.)
+                    if (++mExploreTries[{mAbe.mPath, fact.mKey}] >= 40)
+                    {
+                        Log("switch " + std::to_string(fact.mKey - 1000) + " does not come of what is done for it: no more of it in this path");
+                        mExplored.insert({mAbe.mPath, fact.mKey});
+                    }
                 }
                 else if (!sub.mFound)
                 {
@@ -1073,6 +1081,14 @@ bool Bot::Replan(BaseMap& map)
                         // at one of them with no plan.)
                         const bool forGood = it->first.rfind("Exit ", 0) != 0 && ((deaths != mActionDeaths.end() && deaths->second >= 3) || (total != mFailedTotal.end() && total->second >= 6));
                         it = forGood ? std::next(it) : mFailedActions.erase(it);
+                    }
+                    // (and the ways ruled out in this path: one of them may be the only way there is. Bonewerkz' path
+                    // 2 in the run from the Mines: a hop over its mines ruled out after two deaths by the flying
+                    // Slig's grenades, with another way known then that was no way a moment later.)
+                    if (mKnow && !mKnow->mBannedEdges.empty())
+                    {
+                        Log("no plan: " + std::to_string(mKnow->mBannedEdges.size()) + " ways ruled out here are allowed again");
+                        mKnow->mBannedEdges.clear();
                     }
                     Log("no plan: trying again what failed before");
                     mTask = std::make_unique<GoToTask>("think again", [](s32)
@@ -3191,8 +3207,19 @@ void Bot::OnDeath(BaseMap& map)
             const NavGraph* graph = &mKnow->mNav;
             std::vector<s32> other;
             if (graph->FindPath(dying.mFrom, [dyingTo](s32 n)
-                                { return n == dyingTo; }, [&cost, graph, dyingEdge](const NavEdge& e) -> s32
-                                { return &e == &graph->Edges()[dyingEdge] ? -1 : cost(e); }, other))
+                                { return n == dyingTo; }, [this, &cost, graph, dyingEdge](const NavEdge& e) -> s32
+                                {
+                                    // (not by what a switch has shut: a mine's cell is no other way. Bonewerkz'
+                                    // path 2 in the run from the Mines: the hops over its mines ruled out for the
+                                    // walk through them, which is no way at all.)
+                                    s32 sw = 0;
+                                    s32 open = 0;
+                                    if (graph->Condition(e, &sw, &open) && mWorld.Switch(sw) != open)
+                                    {
+                                        return -1;
+                                    }
+                                    return &e == &graph->Edges()[dyingEdge] ? -1 : cost(e);
+                                }, other))
             {
                 BanEdge(mCurrentEdge);
             }
@@ -3225,8 +3252,19 @@ void Bot::OnDeath(BaseMap& map)
             const NavGraph* graph = &mKnow->mNav;
             std::vector<s32> other;
             const bool another = graph->FindPath(dying.mFrom, [dyingTo](s32 n)
-                                                 { return n == dyingTo; }, [&cost, graph, dyingEdge](const NavEdge& e) -> s32
-                                                 { return &e == &graph->Edges()[dyingEdge] ? -1 : cost(e); }, other);
+                                                 { return n == dyingTo; }, [this, &cost, graph, dyingEdge](const NavEdge& e) -> s32
+                                {
+                                    // (not by what a switch has shut: a mine's cell is no other way. Bonewerkz'
+                                    // path 2 in the run from the Mines: the hops over its mines ruled out for the
+                                    // walk through them, which is no way at all.)
+                                    s32 sw = 0;
+                                    s32 open = 0;
+                                    if (graph->Condition(e, &sw, &open) && mWorld.Switch(sw) != open)
+                                    {
+                                        return -1;
+                                    }
+                                    return &e == &graph->Edges()[dyingEdge] ? -1 : cost(e);
+                                }, other);
             if (another)
             {
                 BanEdge(mCurrentEdge);
@@ -3282,6 +3320,40 @@ void Bot::OnDeath(BaseMap& map)
     // ledge: the Scrab stood under it each of thirteen times, as it never did in a run of the trial alone.)
     // (from the second try on: the first is as it always was, with whatever the death taught)
     mHold = 3 * std::max(0, mAttempt - 1);
+}
+
+// A Mudokon that was to work with him is dead, and he is not: nothing takes that back but the game put back to
+// before it. (Bonewerkz' first annex in the run from the Mines: its one Mudokon, told to follow, was shot by the
+// Sligs of its floor as it got up; with no one for the second lever he pulled the two in turn for good.)
+void Bot::RewindLoss(BaseMap& map)
+{
+    mLossRewind = false;
+    while (mCheckpoints.size() > 1 && mCheckpoints.back().mCheckpoint.mFrame + 20 > mKillFrame)
+    {
+        mCheckpoints.pop_back();
+    }
+    if (mCheckpoints.empty() || mCheckpoints.back().mCheckpoint.mFrame + 20 > mKillFrame || mLossRewinds >= 8)
+    {
+        return;
+    }
+    mLossRewinds++;
+    Saved& saved = mCheckpoints.back();
+    Log("a Mudokon that was needed is dead: back to f=" + std::to_string(saved.mCheckpoint.mFrame) + ", try " + std::to_string(mLossRewinds));
+    mPilotActive = false;
+    mBits = 0;
+    mCurrentEdge = -1;
+    mInputs.resize(saved.mInputCount);
+    saved.mCheckpoint.Load(map);
+    mRestoring = true;
+    mRestores++;
+    mSwitchesPutBack = 60;
+    mLastCheckpointFrame = saved.mCheckpoint.mFrame;
+    // (what he was at has not failed: it is to be done again. Counted as failed twice it was left out of the
+    // plan, which went on to the lever its Sligs watch with both alive.)
+    mFailedActions.erase(mLossAction);
+    mFailedTotal.erase(mLossAction);
+    // (a little later each time: begun on the same frame it is the same try)
+    mHold = 7 * mLossRewinds;
 }
 
 void Bot::RewindMiss(BaseMap& map)
@@ -4289,6 +4361,14 @@ void Bot::Think(BaseMap& map)
             return;
         }
     }
+    if (mLossRewind)
+    {
+        RewindLoss(map);
+        if (mRestoring)
+        {
+            return;
+        }
+    }
 
     mFlierRun = false;
     if (mKnow && mIsAe && !mWorld.mFliers.empty())
@@ -4771,6 +4851,10 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
     if (mWorld.mKilled != mLastKilled || mWorld.mRescued != mLastRescued)
     {
         Log("Mudokons: rescued " + std::to_string(mWorld.mRescued) + " killed " + std::to_string(mWorld.mKilled));
+        if (mWorld.mKilled > mLastKilled)
+        {
+            mKillFrame = mAbe.mFrame;
+        }
         mLastKilled = mWorld.mKilled;
         mLastRescued = mWorld.mRescued;
     }

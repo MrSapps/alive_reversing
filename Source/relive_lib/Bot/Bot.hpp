@@ -69,6 +69,8 @@ struct BotMemory
     std::set<s32> mLevelsBeen;
     // Switches (by path and fact key) that have changed during the run, and the one being tried now
     std::set<std::pair<s32, u32>> mExplored;
+    // How often each was planned for and not got (the path, the key)
+    std::map<std::pair<s32, u32>, s32> mExploreTries;
     // The regions (path, kRegion value) he has stood in, and how often each has been made for
     std::set<std::pair<s32, s32>> mRegionsBeen;
     // The cells (path, node) he has stood on: the region of each counts as been in, whatever it was then (a
@@ -455,6 +457,13 @@ public:
     {
         mMissRewind = true;
     }
+    // A Mudokon the task can't do without has been killed: taken back to before it died, to be gone about a
+    // little later (RewindLoss)
+    void WantLossRewind()
+    {
+        mLossRewind = true;
+        mLossAction = mTaskAction;
+    }
     // It is over with nothing learnt from it
     void ThrowOver()
     {
@@ -596,6 +605,7 @@ private:
     void Think(BaseMap& map);
     void OnDeath(BaseMap& map);
     void RewindMiss(BaseMap& map);
+    void RewindLoss(BaseMap& map);
     void MaybeCheckpoint(BaseMap& map);
     // AE: hurt, between two things to do, and nothing about that could hurt him more where he stands: he waits
     // for his health to come back (180 frames after the last shot) before he goes on. A shot takes a third.
@@ -640,6 +650,12 @@ private:
     u32 mThrowFrame = 0;
     u32 mLastLogFrame = 0;
     bool mMissRewind = false;
+    bool mLossRewind = false;
+    // What he was at when the Mudokon was lost: taken back, it has not failed
+    std::string mLossAction;
+    s32 mLossRewinds = 0;
+    // The frame the count of Mudokons killed last went up
+    u32 mKillFrame = 0;
     s32 mMissRewinds = 0;
     bool mSweepPending = false;
     u32 mSweepFrame = 0;

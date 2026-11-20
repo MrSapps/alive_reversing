@@ -1851,6 +1851,16 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     if (mLastEdge >= 0)
     {
         const NavEdge& e = nav.Edges()[mLastEdge];
+        // (a door he is still on his way through: it has gone nowhere yet, and is not judged until he stands.
+        // Bonewerkz' path 2 in a run from its hub: the door at 1562,1400 was ruled out a frame before it let him
+        // out at 1012,1240, and with it the only way back.)
+        if (cur == mLastFrom && e.mKind == EdgeKind::eDoor && !abe.Settled() && mDoorWaits < 120)
+        {
+            mDoorWaits++;
+            mSteps--;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mDoorWaits = 0;
         if (cur == mLastFrom)
         {
             bot.Log("edge " + std::string(EdgeKindName(e.mKind)) + " from " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY) + " went nowhere" + (lastFailed.empty() ? "" : ": " + lastFailed));
@@ -4479,7 +4489,11 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             if (!open)
             {
-                if (std::abs(abe.mX - px) < 3 * cell + cell / 2)
+                // (a little over three cells will do: a portal whose middle is between two cells has him 87 off
+                // in the cell he is sent to, and with half a cell more asked he was sent there again from the cell
+                // the way to the portal begins in, to and fro for good. The Mudomo trial's last room in the run
+                // from the Mines.)
+                if (std::abs(abe.mX - px) < 3 * cell + cell / 5)
                 {
                     mSteps--;
                     return TaskStep::Do(Prim::MoveTo(px + side * 4 * cell, Gait::eWalk));
@@ -4495,8 +4509,12 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 mSteps--;
                 return TaskStep::Do(Prim::Wait(20, Btn::eChant));
             }
-            if (std::abs(abe.mX - px) > 2 * cell + cell / 2)
+            // (sent there twice and here again, in a cell the way into it begins in: the cell two off has no such
+            // way just now. From here then. Necrum's path 3 in the run from the Mines: to and fro between 2387 and
+            // 2412 before the open portal at 2462 for seventy thousand frames.)
+            if (std::abs(abe.mX - px) > 2 * cell + cell / 2 && (mPortalBacks < 2 || std::abs(abe.mX - px) > 3 * cell + cell / 2))
             {
+                mPortalBacks++;
                 mSteps--;
                 return TaskStep::Do(Prim::MoveTo(px + side * 2 * cell, Gait::eWalk));
             }
@@ -11058,6 +11076,7 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
             const Entity* mud = world.Find(mudId);
             if (!mud || mud->mGone)
             {
+                bot.WantLossRewind();
                 return TaskStep::Failed("lost a Mudokon");
             }
             // The first at each wheel has it
@@ -11335,6 +11354,7 @@ TaskStep WorkTogetherTask::Levers(Bot& bot, const std::string& lastFailed)
         const Entity* mud = world.Find(mTeam.mMuds[i]);
         if (!mud || mud->mGone)
         {
+            bot.WantLossRewind();
             return TaskStep::Failed("lost a Mudokon");
         }
         const s32 stand = standOf(*theirs[i]);
