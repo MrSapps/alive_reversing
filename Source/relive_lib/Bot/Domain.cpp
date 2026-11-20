@@ -3609,6 +3609,8 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 // A Fleech hanging over a lock bites whoever slaps it: it has to be dead first (the walkthrough has
                 // a Scrab do it)
                 std::vector<Goap::Fact> guards;
+                // (the ones of them that are Paramites loose on its floor: see the last resort at the plain use)
+                std::vector<Goap::Fact> packGuards;
                 if (entity.mKind == EntityKind::eSlapLock)
                 {
                     for (const Entity& f : world.mEntities)
@@ -3684,6 +3686,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         for (u32 id : pack)
                         {
                             guards.push_back({Key::Mud(id), 2});
+                            packGuards.push_back({Key::Mud(id), 2});
                         }
                         if (pack.size() == 1)
                         {
@@ -4036,6 +4039,23 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     else
                     {
                         add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, useCost, step);
+                    }
+                    // With Paramites loose on its floor and nothing that rids it of them: all the same, dear, so that
+                    // any other way is taken first. One alone keeps off him until it is cornered, and the tries
+                    // differ. (The second Mudomo vault in the run from the Mines: the second Paramite stayed loose
+                    // on the locks' floor, nothing was offered for it, and there the run ended. For now: the run
+                    // is to get on, its deaths are counted later.)
+                    if (!packGuards.empty() && nav.Input().mIsAe)
+                    {
+                        std::vector<Goap::Fact> bare;
+                        for (const Goap::Fact& f : pre)
+                        {
+                            if (std::find(packGuards.begin(), packGuards.end(), f) == packGuards.end())
+                            {
+                                bare.push_back(f);
+                            }
+                        }
+                        add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on with the Paramites of its floor about", bare, gives, 6000, step);
                     }
                     if (shy)
                     {

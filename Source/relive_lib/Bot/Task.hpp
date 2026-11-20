@@ -2037,6 +2037,8 @@ private:
     s32 mEatTries = 0;
     s32 mHuntLastX = -100000;
     s32 mHuntStill = 0;
+    // Times it went back for a Fleech of its floor that was still alive when it was to be let go
+    s32 mHuntRounds = 0;
     s32 mChaseDx = 0;
     s32 mChaseStill = 0;
     // The frames waited at a gap for a falling rock to go by

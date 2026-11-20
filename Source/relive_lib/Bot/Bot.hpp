@@ -713,6 +713,8 @@ private:
     {
         // The gates taken for gone for good as it was made (World::mGatesGone)
         std::map<s32, s32> mGatesGone;
+        // The slap locks taken for slapped as it was made (World::mLocksSlapped)
+        std::set<u32> mLocksSlapped;
         Checkpoint mCheckpoint;
         // The path it was made in (level x 1000 + path)
         s32 mPathKey = 0;
