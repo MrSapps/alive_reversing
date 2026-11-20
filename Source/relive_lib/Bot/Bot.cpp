@@ -1742,7 +1742,7 @@ bool Bot::ExitAllowed(BaseMap& map, const NavFeature& exit, bool* sideTrip)
 std::string Bot::Report() const
 {
     std::string out = "bot f=" + std::to_string(mAbe.mFrame) + " " + GameView::LevelName(mAbe.mLevel) + "/" + std::to_string(mAbe.mPath) + "/" + std::to_string(mAbe.mCamera) + " profile=" + mProfile.Text()
-                    + " state=" + (mState == BotState::eDone ? "done" : mState == BotState::eStuck ? "stuck" : mState == BotState::eRunning ? "running" : "idle") + " deaths=" + std::to_string(mDeaths) + " restores=" + std::to_string(mRestores) + (mProfile.mLook ? " tries=" + std::to_string(mTries) : "")
+                    + " state=" + (mState == BotState::eDone ? "done" : mState == BotState::eStuck ? "stuck" : mState == BotState::eRunning ? "running" : "idle") + " deaths=" + std::to_string(mDeaths) + " restores=" + std::to_string(mRestores) + (LookNow() ? " tries=" + std::to_string(mTries) : "")
                     + " rescued=" + std::to_string(mWorld.mRescued) + " killed=" + std::to_string(mWorld.mKilled) + "\n";
     if (!mWhy.empty())
     {
@@ -2575,7 +2575,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
 
 s32 Bot::RetryDelay()
 {
-    if (mAttempt <= 0 || mProfile.mLook)
+    if (mAttempt <= 0 || LookNow())
     {
         return 0;
     }
@@ -2678,6 +2678,14 @@ void Bot::EnsureKnowledge(BaseMap& map)
         }
         mLevel.Build(mAbe.mLevel, paths, mLevelsBeen);
         mLevelsBeen.insert(mAbe.mLevel);
+        // (a level he looks ahead in, or the first that he does not: the saves so far were made the other way
+        // and are not gone back to)
+        if (LookNow() != mLooked && mAuto)
+        {
+            Log(std::string(LookNow() ? "looking ahead" : "no more looking ahead") + " from here: the " + std::to_string(mCheckpoints.size()) + " saves so far are let go");
+            mCheckpoints.clear();
+        }
+        mLooked = LookNow();
         Log("level graph:\n" + mLevel.Text());
     }
     if (mErrandPath != mAbe.mPath)
@@ -2721,11 +2729,16 @@ void Bot::EnsureKnowledge(BaseMap& map)
     mKnow = &it->second;
 }
 
+bool Bot::LookNow() const
+{
+    return mProfile.mLook || std::find(mProfile.mLookIn.begin(), mProfile.mLookIn.end(), GameView::LevelName(mAbe.mLevel)) != mProfile.mLookIn.end();
+}
+
 void Bot::Stuck(const std::string& why)
 {
     // Looking ahead, nothing left to do is a try that failed, like one he was hurt in: what led here is taken
     // back and done another way, for as long as there is one
-    if (mAuto && mProfile.mLook && !mCheckpoints.empty() && mState == BotState::eRunning)
+    if (mAuto && LookNow() && !mCheckpoints.empty() && mState == BotState::eRunning)
     {
         Log("this try ends with nothing to do: " + why);
         mTryWhy = "nothing to do";
@@ -2804,7 +2817,7 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     // Standing or crouched only: a save taken hanging from a ledge or holding a lift's rope didn't come back right
     // (looking ahead it is taken hanging too, and with Sligs about: a save nothing gets on from is found out by
     // the tries from it, and the one before it gone back to)
-    const bool look = mAuto && mProfile.mLook;
+    const bool look = mAuto && LookNow();
     const bool hung = look && mAbe.mMove == Move::eHang;
     // In a Glukkon it is the Glukkon that has to stand, with no Slog awake near it and no drill going over its
     // floor: those are clocks that run out on it. (The Executive Office of Bonewerkz: four levers, each with its
@@ -3333,7 +3346,7 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
 
 void Bot::OnDeath(BaseMap& map)
 {
-    const bool look = mAuto && mProfile.mLook;
+    const bool look = mAuto && LookNow();
     if (!look)
     {
         mDeaths++;
@@ -4099,7 +4112,7 @@ std::unique_ptr<Task> Bot::MakeFlee()
     // the way out)
     // (nor with a grenade thrown from a shadow: the Slig it is for turns to its noise, and out of the shadow is
     // into its sight. The Barracks' path 7: shot as he left the shadow at 562 for this.)
-    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(mProfile.mLook && mVary == Lookahead::Way::eQuiet) && !dynamic_cast<const GetRocksTask*>(mTask.get()) && !dynamic_cast<const GrenadeSligTask*>(mTask.get()) && !dynamic_cast<const GrenadeOrbTask*>(mTask.get()) &&
+    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(LookNow() && mVary == Lookahead::Way::eQuiet) && !dynamic_cast<const GetRocksTask*>(mTask.get()) && !dynamic_cast<const GrenadeSligTask*>(mTask.get()) && !dynamic_cast<const GrenadeOrbTask*>(mTask.get()) &&
         !dynamic_cast<const SligCallTask*>(mTask.get()) && !(dynamic_cast<const SligLockTask*>(mTask.get()) && static_cast<const SligLockTask*>(mTask.get())->Luring()))
     {
         const NavGraph& nav = mKnow->mNav;
@@ -4185,7 +4198,7 @@ std::unique_ptr<Task> Bot::MakeFlee()
             // (looking ahead a door is one too: he is gone through it sooner than he is up a hoist, and the
             // tries find the moment. The Barracks' path 1: the door at 2037,380, a cell on from where he ran
             // back from the Slig at 2187 every time.)
-            const bool doors = mProfile.mLook;
+            const bool doors = LookNow();
             // (a step off the end of the floor is the quickest of all: 6 frames and he is falling. Not one that
             // ends hung from a ledge or in a well. The Barracks' path 7: the Slig the lever at 400,860 calls
             // comes down a cell from him, and the walkthrough's "immediately run right to fall to the lower
@@ -4962,7 +4975,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
     }
 
     // Looking ahead, hurt is as good as dead: the try is over
-    if (mAuto && mProfile.mLook && mState == BotState::eRunning && mAbe.mValid)
+    if (mAuto && LookNow() && mState == BotState::eRunning && mAbe.mValid)
     {
         if (mLastHealthFp > 0 && mAbe.mHealthFp > 0 && mAbe.mHealthFp < mLastHealthFp)
         {
@@ -5017,7 +5030,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
     {
         Log("a Mudokon died (killed " + std::to_string(mWorld.mKilled) + ")");
         mLastKilled = mWorld.mKilled;
-        if (mProfile.mLook)
+        if (LookNow())
         {
             TryFailed(map, "a Mudokon died");
             return;
