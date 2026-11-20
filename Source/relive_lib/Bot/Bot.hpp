@@ -88,6 +88,10 @@ struct BotMemory
     s32 mBackFor = -1;
     // How often each path (level, path) has been backed out of
     std::map<std::pair<s32, s32>, s32> mBackOuts;
+    // Times all that failed in a path was allowed once more before the end (the level, the path)
+    std::map<std::pair<s32, s32>, s32> mLastChances;
+    // Times he stood a while with no plan at all before the end (the level, the path)
+    std::map<std::pair<s32, s32>, s32> mNoPlanWaits;
     u32 mRingDueBy = 0;
     bool mInvisSaved = false;
     bool mInvisChantNow = false;
