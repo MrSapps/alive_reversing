@@ -1164,6 +1164,31 @@ std::vector<s32> Domain::SligWay(const NavGraph& nav, s32 from, const std::funct
             {
                 continue;
             }
+            // Where the lifts are now: a lift's stop is floor only with the lift at it, and with the lift there a
+            // walk off the floor's end beside it is a step onto the lift, not a fall past it (Feeco's path 3: the
+            // Slig went back and forth between the floor's end and the lift at 2087 for good)
+            if (world && !gates)
+            {
+                const auto liftAt = [&](s32 n)
+                {
+                    const NavFeature& stop = nav.Input().mFeatures[nodes[n].mLiftStop];
+                    return world->LiftAtStop(stop.mX1, stop.mX2, nodes[n].mY, stop.mA != 0);
+                };
+                if (e.mKind == EdgeKind::eWalk && nodes[e.mTo].mLiftStop >= 0 && nodes[e.mTo].mLiftStop != nodes[at].mLiftStop && !liftAt(e.mTo))
+                {
+                    continue;
+                }
+                bool ontoLift = false;
+                for (s32 j = 0; e.mKind == EdgeKind::eFall && j < nodes[at].mEdgeCount; j++)
+                {
+                    const NavEdge& walk = edges[nodes[at].mFirstEdge + j];
+                    ontoLift = ontoLift || (walk.mKind == EdgeKind::eWalk && walk.mLeft == e.mLeft && nodes[walk.mTo].mLiftStop >= 0 && nodes[walk.mTo].mLiftStop != nodes[at].mLiftStop && liftAt(walk.mTo));
+                }
+                if (ontoLift)
+                {
+                    continue;
+                }
+            }
             s32 extra = 0;
             s32 switchId = 0;
             s32 openValue = 0;
@@ -3940,7 +3965,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         bool boom = false;
                         for (const Entity& machine : world.mEntities)
                         {
-                            boom = boom || (machine.mKind == EntityKind::eRockSack && machine.mInputs[1] == 2 && !machine.mGone);
+                            // (one he can get to as things are, or from the thing: the Barracks' path 1 has its
+                            // machine behind the gate this very lever opens, and the lever was never pulled)
+                            const s32 machineNode = machine.mKind == EntityKind::eRockSack && machine.mInputs[1] == 2 && !machine.mGone ? UseNode(nav, machine, nullptr) : -1;
+                            boom = boom || (machineNode >= 0 && (d.mRegions[machineNode] == d.mRegions[node] || (abeNode >= 0 && d.mRegions[machineNode] == d.mRegions[abeNode]) || world.mRocks > 0));
                         }
                         if (watched && power)
                         {

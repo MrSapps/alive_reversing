@@ -364,6 +364,48 @@ bool Bot::Replan(BaseMap& map)
 {
     const PathKnowledge* know = mKnow;
     const s32 abeNode = AbeNode();
+    // A Slig a grenade is to be thrown at, and no grenade to be had yet: none on him, none had in this path so
+    // far, and its machine further off than the Slig is. Its floor is then a floor like any other, got by as
+    // such Sligs are elsewhere. (The Barracks' path 1 from its first screen: the machine is twelve screens on,
+    // behind the Slig that stands guard at 2137,1739, and with that Slig's floor shut until it was blown up
+    // there was no plan at all. The walkthrough: "roll off the edge to land hanging below the Slig. Once he
+    // turns away from you again, hoist up and quickly run and jump up to the next ledge above him".)
+    if (mIsAe && know)
+    {
+        mWorld.mNoGrenadeFor.clear();
+        const Entity* machine = nullptr;
+        for (const Entity& e : mWorld.mEntities)
+        {
+            if (e.mKind == EntityKind::eRockSack && e.mInputs[1] == 2 && !e.mGone && (!machine || std::abs(e.CentreX() - mAbe.mX) + std::abs(e.mY2 - mAbe.mY) < std::abs(machine->CentreX() - mAbe.mX) + std::abs(machine->mY2 - mAbe.mY)))
+            {
+                machine = &e;
+            }
+        }
+        mWorld.mBoomReached = mWorld.mBoomReached || (machine && mWorld.mRocks > 0);
+        if (machine && !mWorld.mBoomReached)
+        {
+            std::set<u32> flown;
+            for (const Entity& spawner : mWorld.mEntities)
+            {
+                if (spawner.mKind == EntityKind::eFlierSpawner)
+                {
+                    for (const Domain::FlierTarget& target : Domain::FlierTargets(know->mNav.Input(), mWorld, spawner))
+                    {
+                        flown.insert(target.mSlig);
+                    }
+                }
+            }
+            const s32 toMachine = std::abs(machine->CentreX() - mAbe.mX) + std::abs(machine->mY2 - mAbe.mY);
+            for (const Domain::GrenadeTarget& target : Domain::GrenadeTargets(know->mNav.Input(), mWorld))
+            {
+                const Entity* slig = mWorld.Find(target.mSlig);
+                if (slig && slig->mKind == EntityKind::eSlig && flown.count(target.mSlig) == 0 && std::abs(slig->CentreX() - mAbe.mX) + std::abs(slig->mY2 - mAbe.mY) < toMachine)
+                {
+                    mWorld.mNoGrenadeFor.insert(World::HazardSwitch(target.mSlig));
+                }
+            }
+        }
+    }
     // In his trance (Abe's Motion_112_Chant, with nothing held) and what he is in not to be seen: it is on its way
     // somewhere (a Glukkon through a teleporter, to another level's copy of the path). Looked at again shortly.
     if (mIsAe && mAbe.mMotion == 112 && !(mBits & Btn::eChant))
@@ -2839,6 +2881,9 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     saved.mInputCount = mInputs.size();
     saved.mRng = mRng.State();
     saved.mGatesGone = mWorld.mGatesGone;
+    // (the count of runs from a Slig that woke is of one stretch: kept for the whole run, the eight were used up
+    // in the Barracks' first screens and there was none left for the Slig that stands at 1962,1400)
+    mAmbushes = 0;
     saved.mLocksSlapped = mWorld.mLocksSlapped;
     saved.mPathKey = mAbe.mLevel * 1000 + mAbe.mPath;
     if (look)
@@ -4034,7 +4079,12 @@ std::unique_ptr<Task> Bot::MakeFlee()
             // (not one that stands with its back to him: he has come up behind it on purpose, and a run from
             // there is what turns it round. The Barracks' path 7: at the boom machine, 150 behind the Slig that
             // stands at 462 for 120 frames each way.)
-            if (mIsAe && slig.mMotion == 0 && slig.mFacingLeft == (mAbe.mX > slig.mX))
+            // (unless he is in the next cell to it: that is not behind it for long, and his way is on past it. The
+            // Barracks' path 1, the Slig that stands at 1962,1400 between the ledge he comes up at and the well:
+            // sneaked up to from behind and on past its face, he was shot each time; at a run past it and into
+            // the well he is not.)
+            const bool past = std::abs(slig.mX - mAbe.mX) <= 40;
+            if (mIsAe && slig.mMotion == 0 && slig.mFacingLeft == (mAbe.mX > slig.mX) && !past)
             {
                 continue;
             }
@@ -4100,10 +4150,14 @@ std::unique_ptr<Task> Bot::MakeFlee()
             // ends hung from a ledge or in a well. The Barracks' path 7: the Slig the lever at 400,860 calls
             // comes down a cell from him, and the walkthrough's "immediately run right to fall to the lower
             // level".)
-            const auto drop = [](const NavEdge& e)
+            // (nor from the cell behind one that stands with its back to him: he has just come up there to get by
+            // it, and a step back off the floor is where he came from. The Barracks' path 1: up behind the Slig
+            // at 1962,1400 and off the ledge again five times over, with the well three cells on past it.)
+            const bool behind = mIsAe && past && slig.mMotion == 0 && slig.mFacingLeft == (mAbe.mX > slig.mX);
+            const auto drop = [behind](const NavEdge& e)
             {
                 // (nor one down a lift's shaft onto the lift below: that is past the Slig as often as not)
-                return e.mKind == EdgeKind::eFall && !e.mHung && e.mWell < 0 && e.mShaft < 0;
+                return e.mKind == EdgeKind::eFall && !e.mHung && e.mWell < 0 && e.mShaft < 0 && !behind;
             };
             // (and a running jump up a hoist, which is quicker than the hoist: twenty frames from a stand three cells
             // from it. Bonewerkz' path 1: the Slig his landing wakes, and "run and jump to the middle platform".)

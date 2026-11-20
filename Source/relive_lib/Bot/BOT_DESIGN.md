@@ -3376,3 +3376,25 @@ them). Taken to be edges kept to (`KeepTo`) left in force by a task of the path 
 now, with a line in the log, to be seen in the next long run. The waits before the end with no plan are thirty of
 60 frames. In `la/fcb.txt` path 3 goes as far as its second Slig lock and then stands for good with no end
 (the Slig "holds until the 2 Sligs of this floor have come to it"): to be looked at from the long run's state.
+
+**The run from the Mines into the Slig Barracks** (2026-11-20; f=198,052 at the Barracks' door, 30 deaths before).
+What FeeCo's path 3 and the Barracks' first path took, each a rule or a memory that the short scripts never met:
+- Path 3's door: the lifts last seen (`World::mLiftsSeen`) were those of the path before; forgotten at each path.
+  The no-route log names the line of `EdgeCostFn` that refused each edge (`@line`): that is what found it.
+- Path 3's second Slig lock: the Slig's way (`Domain::SligWay`) knew nothing of where the lifts are, and went
+  back and forth for good between a floor's end and the lift level with it (a fall past the lift planned, a step
+  onto it taken). With the world given it goes by `LiftAtStop`. `f4.txt` is path 3 alone: into the Barracks at
+  f=6,398, no death.
+- The Barracks' path 1 (`b1.txt`, `b1l.txt` with a long budget; `bot_wait` counts frames played over too):
+  - a thing a Slig watches under an orb wants the orb blown up only where the boom machine is to be got to (the
+    machine's region is his or the thing's, or he has grenades): the first lever is what opens the way to it;
+  - a Slig is one to throw a grenade at, its floor shut until then, only once a grenade is to be had
+    (`World::mNoGrenadeFor`, set in `Bot::Replan`: none on him, none had in the path, the machine further off than
+    the Slig);
+  - the sortie whose haven is behind the gate its own lever opens is kept (the lever, then the haven), and he
+    waits turned the way he will go: the Slig of the first lever is off its screen for under sixty frames;
+  - the run from a Slig that wakes beside him was counted to eight for the whole run (`mAmbushes`) and then never
+    again: counted from each checkpoint now. It is run from in the cell behind it even with its back turned, and
+    not by a step back off the ledge he came up at: that is the run past the guard at 1962,1400 into the well.
+  With these it is through the door at 2037,380 into the boom machine's rooms at f=15,287, 34 deaths on the way
+  (16 at the hop 2187,860, 11 at Lever#12015): not stuck, far from clean.
