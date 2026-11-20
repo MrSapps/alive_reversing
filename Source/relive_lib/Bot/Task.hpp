@@ -1030,6 +1030,8 @@ private:
     s32 mJumpDrillWaits = 0;
     // Frames waited for a door he is on his way through before it is judged
     s32 mDoorWaits = 0;
+    // Frames a hop or a drop that comes down under a thing that falls was put off for it
+    s32 mHopFallerWaits = 0;
     // Pulling the lever that stops the drill in the way
     std::unique_ptr<Task> mStop;
     s32 mStops = 0;

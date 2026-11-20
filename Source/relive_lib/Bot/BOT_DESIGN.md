@@ -3328,3 +3328,16 @@ times, then `walk blocked` rules a walk out and he ends at the door of 1012,1240
 side: `la/bw1.txt` shows it in ten minutes); and at Lever#10000 the flying Slig's grenades over the mines (only in
 the long run). The chain from the annex (`la/bw7b.txt`) gets through both with 3 to 5 deaths.
 Check set: all as before; `fc3` now goes on through the annex and paths 2, 3 to 4 (1 death); `bw1` stuck in path 2.
+
+**The run from the Mines, 2026-11-20/21:** through Bonewerkz' paths 2 and 3 into path 4 (the boilers), f=167,000,
+23 deaths before the boilers (15 of them in path 2). Added on the way:
+- When no plan at all is left in a path: all that failed there and every way ruled out there once more, four
+  times at most (`mLastChances`), and before the end a dozen short waits where he stands (`mNoPlanWaits`): the
+  fourth boiler's wheel sets a clock that lets its Slogs out, and the end had come a frame before they did.
+- A hop or a drop of 80 or more that comes down under a thing that falls, begun from beside it: after it has just
+  smashed where it is slow to come again (60 frames or more), else so that it smashes while he is in the air
+  (`mHopFallerWaits`). Not from under it already, and not the short drops: those are `Faller`'s (path 3, where
+  two broader forms of this had him crushed twenty times). No holding back after a death while he stands under
+  one (`RetryDelay`).
+Still to be seen in the long run: whether the boilers are passed with that. `la/bw1.txt` (hub, annex, on) goes
+through the boilers and Bonewerkz' Executive Office to FeeCo with 9 to 11 deaths.

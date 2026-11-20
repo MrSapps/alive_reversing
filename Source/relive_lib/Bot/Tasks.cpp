@@ -2833,6 +2833,54 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     // he is past it before it is down to his head: just after it has smashed there is the most of that. Where he
     // is under it already he goes on. (Bonewerkz, path 1: "Hop across the first gap, then the second between
     // falling crates", "After a crate hits, hoist up".)
+    // (a hop or a drop that comes down under one: begun when it has just smashed, so that he is down and off
+    // again before the next. Bonewerkz' fourth boiler in the run from the Mines: the hop from 1587,859 comes down
+    // at 1687,960 under the crate of 1675, and he was crushed there as he landed nineteen times.)
+    if (bot.IsAe() && (first.mKind == EdgeKind::eHop || first.mKind == EdgeKind::eFall) && abe.Settled())
+    {
+        const NavNode& from = nav.Nodes()[cur];
+        const NavNode& to = nav.Nodes()[first.mTo];
+        const s32 scale = to.mHalf ? 2 : 1;
+        bool wait = false;
+        for (const RockAt& r : bot.GetWorld().mFallers)
+        {
+            // (a long way down, under one that is slow to come again: the quick ones over a floor he hops along
+            // are Faller's, which has him over where each comes down between two of them. Bonewerkz' path 3,
+            // the crates every 18 frames: held to this he was under them twenty times.)
+            // (and not from under it already: there he is Faller's, down the ledges the crates of Bonewerkz' path 3
+            // come down on, where this had him crushed twenty times)
+            if (r.mFallIn < 0 || r.mHalf != to.mHalf || (to.mY - from.mY) * scale < 80 || r.mY >= to.mY - 60 / scale || to.mY - r.mY > 700 || std::abs(to.mX - r.mX) > 40 / scale ||
+                std::abs(from.mX - r.mX) <= 40 / scale)
+            {
+                continue;
+            }
+            if (r.mEvery >= 60)
+            {
+                wait = wait || r.mFallIn < std::min(70, std::max(1, r.mEvery - 6));
+                continue;
+            }
+            // (one that comes again sooner than that: begun so that it smashes while he is in the air, 24 frames
+            // from the press to the floor as measured there, and he comes down just after it)
+            s32 fall = 0;
+            for (s32 v = 0, d = 0; d < std::max(0, to.mY - 70 / scale - r.mY); fall++)
+            {
+                v = std::min(20, v + 2);
+                d += v;
+            }
+            const s32 down = r.mFallIn + fall;
+            wait = wait || r.mFallIn <= 0 || down < 10 || down > 22;
+        }
+        if (wait && mHopFallerWaits < 900)
+        {
+            if (mHopFallerWaits++ == 0)
+            {
+                bot.Log("a thing that falls where this comes down, at " + std::to_string(to.mX) + "," + std::to_string(to.mY) + ": begun when it has just smashed");
+            }
+            mSteps--;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mHopFallerWaits = 0;
+    }
     if (bot.IsAe())
     {
         const FallerCall call = Faller(nav, bot.GetWorld(), path, cur, abe.mBoxX1, abe.mBoxX2, abe.Settled(), mFallerLeft, mFallerWaits);

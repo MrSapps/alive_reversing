@@ -1119,6 +1119,23 @@ bool Bot::Replan(BaseMap& map)
                     mTaskAction.clear();
                     return true;
                 }
+                // Before that is the end: all that failed here and every way ruled out here once more, four times
+                // at most in a path. What failed did so in a state that is gone: a Slig that watched then, a way
+                // that was blocked then. (Bonewerkz' path 2 come into from the annex: a walk ruled out while a
+                // Slig stood in it, the lever beyond it given up on, and the end at a door that does nothing.)
+                if (mKnow && mLastChances[{mAbe.mLevel, mAbe.mPath}] < 4 && (!mFailedActions.empty() || !mKnow->mBannedEdges.empty()))
+                {
+                    mLastChances[{mAbe.mLevel, mAbe.mPath}]++;
+                    Log("no plan at all: the " + std::to_string(mFailedActions.size()) + " things that failed and the " + std::to_string(mKnow->mBannedEdges.size()) + " ways ruled out here once more");
+                    mFailedActions.clear();
+                    mKnow->mBannedEdges.clear();
+                    mBackFor = -1;
+                    mForgaveFrame = mAbe.mFrame;
+                    mTask = std::make_unique<GoToTask>("think again", [](s32)
+                                                       { return true; });
+                    mTaskAction.clear();
+                    return true;
+                }
                 // (with Slogs awake on his floor it is theirs to move: a run from them is what comes next, MakeFlee,
                 // as soon as nothing is between them and him. Bonewerkz' Executive Office: through the sensor
                 // that lets three out behind him there is no plan, the floors ahead being theirs, and that was
@@ -1146,6 +1163,22 @@ bool Bot::Replan(BaseMap& map)
                             return true;
                         }
                     }
+                }
+                // And a while longer where he stands, a dozen times in a path: what was just done may not have
+                // done all it does yet. (Bonewerkz' fourth boiler come to from the annex: its wheel sets a clock
+                // of 55 frames going that lets the Slogs out, the run from them by the well is what follows, and
+                // it was the end a frame before they were after him.)
+                if (mNoPlanWaits[{mAbe.mLevel, mAbe.mPath}] < 12)
+                {
+                    if (mNoPlanWaits[{mAbe.mLevel, mAbe.mPath}]++ == 0)
+                    {
+                        Log("no plan at all: a while here before that is the end");
+                    }
+                    mHold = 40;
+                    mTask = std::make_unique<GoToTask>("think again", [](s32)
+                                                       { return true; });
+                    mTaskAction.clear();
+                    return true;
                 }
                 // (what there was to plan with, for whoever reads the log)
                 Log("the actions there were:\n" + domain.Text());
@@ -2444,6 +2477,17 @@ s32 Bot::RetryDelay()
             {
                 return mRng.Range(0, 6);
             }
+        }
+    }
+    // (nor under a thing that falls again and again: there is no standing there. Bonewerkz' fourth boiler in the
+    // run from the Mines: come down at 1687,960 under the crate of 1675 with the next move still to begin, he
+    // held back 27 frames and was crushed, twenty times.)
+    for (const RockAt& r : mWorld.mFallers)
+    {
+        const s32 scale = mAbe.mHalfScale ? 2 : 1;
+        if (r.mFallIn >= 0 && r.mHalf == mAbe.mHalfScale && std::abs(r.mX - mAbe.mX) <= 40 / scale && r.mY < mAbe.mY - 60 / scale && mAbe.mY - r.mY < 700)
+        {
+            return 0;
         }
     }
     // Longer each time, never the same twice
