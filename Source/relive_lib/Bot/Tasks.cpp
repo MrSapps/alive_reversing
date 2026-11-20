@@ -2144,6 +2144,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     why += Domain::SligWatched(nav, w, to.mX, to.mY, to.mHalf) ? " watched" : "";
                     why += nav.Condition(e, &sw, &value) && w.Switch(sw) != value ? " shut by " + std::to_string(sw) : "";
                     why += bot.Banned(static_cast<s32>(&e - nav.Edges().data())) ? " banned" : "";
+                    // (and by which rule of the costs, for one that none of those is: Bot.cpp's line)
+                    all(e);
+                    why += " @" + std::to_string(bot.RefusedAt());
                 }
             }
             why += listed ? ")" : "";
