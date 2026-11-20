@@ -3282,7 +3282,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             const NavNode& onto = nav.Nodes()[e.mTo];
             for (const SlogAt& slog : world.mSlogs)
             {
-                if (!slog.mAsleep && !world.SlogFed(slog) && std::abs(slog.mY - onto.mY) <= 30 && std::abs(slog.mX - onto.mX) < 700 && !WallBetween(nav, slog.mX, onto.mX, onto.mY, onto.mHalf) && !GateBetween(nav, world, slog.mX, onto.mX, onto.mY, onto.mHalf))
+                if (!slog.mAsleep && slog.mChasing && !world.SlogFed(slog) && std::abs(slog.mY - onto.mY) <= 30 && std::abs(slog.mX - onto.mX) < 700 && !WallBetween(nav, slog.mX, onto.mX, onto.mY, onto.mHalf) && !GateBetween(nav, world, slog.mX, onto.mX, onto.mY, onto.mHalf))
                 {
                     slogFloor = 3000;
                 }
@@ -5104,7 +5104,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         add("Exit " + std::to_string(nav.Nodes()[x.mNode].mX) + "," + std::to_string(nav.Nodes()[x.mNode].mY) + " to path " + std::to_string(f.mDestPath), pre, {{Key::kExited, 1}},
             // (one that says it leads to this very path, in another level: dear, the last of the ways out to be tried.
             // Bonewerkz' Executive Office, the door Abe comes out of: it leads back in.)
-            200 + (f.mDestPath >= 0 && f.mDestPath == nav.Input().mPath ? 2000 : 0), step);
+            // (and dearer each time it has been gone for: of the ways to one path the one not tried yet is next.
+            // FeeCo's hub has three doors to its path 9, which are three places: back from Bonewerkz he went
+            // by the one to the ledge with the lever again and again, never by the one to the Barracks' floor.)
+            200 + (f.mDestPath >= 0 && f.mDestPath == nav.Input().mPath ? 2000 : 0) + 700 * std::min(5, world.mExitUses.count(static_cast<s32>(i)) ? world.mExitUses.at(static_cast<s32>(i)) : 0), step);
     }
     // A Slig that walks over a trap door a lever opens: the lever is pulled as it is on the door, and until it
     // has gone down nothing is crossed onto its floor near there (AO's Rupture Farms, path 16: the Slig at
