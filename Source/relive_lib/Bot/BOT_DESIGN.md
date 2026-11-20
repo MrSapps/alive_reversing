@@ -3412,3 +3412,14 @@ What FeeCo's path 3 and the Barracks' first path took, each a rule or a memory t
   its far end and stands) to throw it: 65 deaths, STUCK at f=21,009. `look` found such moments by trying; there
   is no rule for the way back. With `look` the whole path is stuck at the machine too (588 tries). The rooms
   alone (`la/b2n.txt`) are no test without `look`: shot 300 frames in with no save to go back to.
+  What the walkthrough does there, and what was tried for it (kept as `build-bot/barracks_rooms_wip.patch`, not
+  in the tree: its cost for open ground on a Slig's beat took Bonewerkz' `bw1` from 6 deaths to 38):
+  the way to the machine is over the platform at 212..287,1140 ("from the left edge of the upper platform, hop
+  to the Boom Machine when the Sligs are to the right", back "hoist to the upper platform again"), not along
+  the ground under it. The jump and the hop there are made dear by the rule for noisy ways beside a quiet one
+  (FeeCo's Executive Offices); with a drop that lands in a shadow and a running jump out of one let off it, the
+  hop timed to the Sligs' backs and the jump up taken from the shadow at 112, `la/b3n.txt` (the machine's
+  screen alone, from the platform: two minutes) has the grenade and is back at the throw's cell with no death.
+  It is then shot as it throws from 362,1240, which the Slig of 87..187 sees. Next: where the throw is from
+  ("from the shadows on the far left" of the first screen), and a cost that sends him over the platform
+  without touching Bonewerkz.
