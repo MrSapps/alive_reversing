@@ -2638,7 +2638,11 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 // (not ones shut in: Bonewerkz' Executive Office, three behind the slam door at 451,200 by where he
                 // comes down)
-                pack += !slog.mAsleep && !bot.GetWorld().SlogFed(slog) && std::abs(slog.mY - under->mY) <= 30 && std::abs(slog.mX - under->mX) < 700 && !Domain::WallBetween(nav, slog.mX, down.mX, down.mY, down.mHalf) &&
+                // (ones that are after him: one that stirs in its sleep is up for a frame or two and is none.
+                // Bonewerkz' first boiler in the run from the Mines: two of its three were up for a moment as he
+                // came to the ledge, he did not go down, and the wheels were turned in an order that ends under
+                // the crate of 1675.)
+                pack += !slog.mAsleep && slog.mChasing && !bot.GetWorld().SlogFed(slog) && std::abs(slog.mY - under->mY) <= 30 && std::abs(slog.mX - under->mX) < 700 && !Domain::WallBetween(nav, slog.mX, down.mX, down.mY, down.mHalf) &&
                                 !Domain::GateBetween(nav, bot.GetWorld(), slog.mX, down.mX, down.mY, down.mHalf)
                             ? 1
                             : 0;
@@ -16118,6 +16122,7 @@ TaskStep ExitTask::Next(Bot& bot, const std::string& lastFailed)
     {
         mStartPath = abe.mPath;
         mStartLevel = abe.mLevel;
+        bot.ExitTaken(mExit);
     }
     if (abe.mPath != mStartPath || abe.mLevel != mStartLevel)
     {

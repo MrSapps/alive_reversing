@@ -3350,3 +3350,18 @@ and the door 712,720->1837,1240 to the second boiler's wheel (WorkWheel#14001, s
 comes down every 25 frames or so: landing there (10 frames), the turn and the step off it are more than that.
 There is no standing under that crate at all. To do: why those Slogs wake in the long run (or a bone for them),
 so that the order is 133, 134, 132, 135 as in the chain; the way by the ledge should not be planned at all.
+
+**The boilers passed, back in FeeCo (2026-11-21):** the run from the Mines goes through all of Bonewerkz and its
+Executive Office (28 deaths in all) and sticks in FeeCo's hub at f=191,900. What it was in the boilers:
+- `mExplored` (switches tried) was kept by the path's number alone: what was tried in FeeCo's path 4 counted as
+  tried in Bonewerkz' path 4, the second boiler's wheel was left for last and gone for by the ledge under the
+  crate. Now by level and path. The chains never showed it: they begin in Bonewerkz with nothing tried.
+- The Slogs counted "up" under a ledge, and on a floor a crossing or a drop is dear for, are the ones after him
+  (`SlogAt::mChasing`): two of the first boiler's stir as he comes to the ledge.
+Next, FeeCo's hub: the Barracks are still to be done (the walls of 251 and 254 by the doors to path 5 and to the
+Executive Offices come off once the Barracks have been visited: Door.cpp, door 30002/30003). The hub has three
+doors to path 9, which are three places: 2162,900 to the way to Bonewerkz (shut once that is done), 1787,900 to the
+background ledge with Lever#1011 (switch 50, the electric wall at 475,460 of the floor below), 1612,980 to that
+floor, whose door at 437,460 leads on to path 3 and the Barracks. Path 9 counts as been in, so none of the doors
+to it is a way on (`ExitAllowed`), and he backs in and out of the ledge. An exit costs 700 more each time it was
+gone for (`mExitUses`), which decides nothing while they are not offered.

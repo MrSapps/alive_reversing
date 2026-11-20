@@ -726,6 +726,9 @@ struct World final
     // is in it), or -1
     s32 mSoonOn = -1;
     std::set<u32> mLocksSlapped;
+    // How often each way out of the path (an index into the graph's exits) has been gone for: the bot's, for the
+    // planner (see the cost of an exit)
+    std::map<s32, s32> mExitUses;
     // Scrabs (their entities) killed in this path, and where one that was shut in behind a gate was left
     std::set<u32> mScrabsKilled;
     std::map<u32, s32> mScrabParked;

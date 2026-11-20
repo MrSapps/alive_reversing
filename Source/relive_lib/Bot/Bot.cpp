@@ -419,7 +419,7 @@ bool Bot::Replan(BaseMap& map)
         {
             if (e.mKind == EntityKind::eMine && !e.mGone)
             {
-                mExplored.erase({mAbe.mPath, Key::Switch(e.mSwitch)});
+                mExplored.erase({mAbe.mLevel * 1000 + mAbe.mPath, Key::Switch(e.mSwitch)});
             }
         }
     }
@@ -435,11 +435,11 @@ bool Bot::Replan(BaseMap& map)
         {
             if (mSwitchesPutBack > 0)
             {
-                mExplored.erase({mAbe.mPath, Key::Switch(i)});
+                mExplored.erase({mAbe.mLevel * 1000 + mAbe.mPath, Key::Switch(i)});
             }
             else
             {
-                mExplored.insert({mAbe.mPath, Key::Switch(i)});
+                mExplored.insert({mAbe.mLevel * 1000 + mAbe.mPath, Key::Switch(i)});
             }
             mLastSwitches[i] = mWorld.mSwitches[i];
         }
@@ -461,6 +461,7 @@ bool Bot::Replan(BaseMap& map)
         // (onto a floor a loose Scrab can get at him on: Domain::Build wants him unseen for it)
         return true;
     };
+    mWorld.mExitUses = mKnow->mExitUses;
     Domain domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll);
     // A flying Slig that was to be got rid of before its stretch is gone into (FeatureKind::eDanger), with no fart
     // that can be got flown at it: got by as it is after all. The Mines' path 2 has a Brew machine and a flying
@@ -867,7 +868,7 @@ bool Bot::Replan(BaseMap& map)
             std::vector<std::pair<s32, Goap::Fact>> tries;
             for (const Goap::Fact& fact : domain.Reachable())
             {
-                if (fact.mKey < 1000 || fact.mKey >= 1000000 || mExplored.count({mAbe.mPath, fact.mKey}))
+                if (fact.mKey < 1000 || fact.mKey >= 1000000 || mExplored.count({mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey}))
                 {
                     continue;
                 }
@@ -938,10 +939,10 @@ bool Bot::Replan(BaseMap& map)
                     // (planned for forty times over and still not so: it does not come of what is done for it. No
                     // more of that one here. Bonewerkz' first annex with its Mudokon gone: two levers that count
                     // only pulled together, pulled in turn by him alone for a million frames.)
-                    if (++mExploreTries[{mAbe.mPath, fact.mKey}] >= 40)
+                    if (++mExploreTries[{mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey}] >= 40)
                     {
                         Log("switch " + std::to_string(fact.mKey - 1000) + " does not come of what is done for it: no more of it in this path");
-                        mExplored.insert({mAbe.mPath, fact.mKey});
+                        mExplored.insert({mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey});
                     }
                 }
                 else if (!sub.mFound)
@@ -2375,7 +2376,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         {
             for (const SlogAt& slog : world->mSlogs)
             {
-                if (!slog.mAsleep && !world->SlogFed(slog) && std::abs(slog.mY - to.mY) <= 30 && std::abs(slog.mX - to.mX) < 700 && !Domain::WallBetween(know->mNav, slog.mX, to.mX, to.mY, to.mHalf) && !Domain::GateBetween(know->mNav, *world, slog.mX, to.mX, to.mY, to.mHalf))
+                if (!slog.mAsleep && slog.mChasing && !world->SlogFed(slog) && std::abs(slog.mY - to.mY) <= 30 && std::abs(slog.mX - to.mX) < 700 && !Domain::WallBetween(know->mNav, slog.mX, to.mX, to.mY, to.mHalf) && !Domain::GateBetween(know->mNav, *world, slog.mX, to.mX, to.mY, to.mHalf))
                 {
                     return e.mCost + 3000;
                 }
@@ -4710,7 +4711,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         // (not when a checkpoint has just put it back)
         if (mSwitchesPutBack == 0 && mExploring >= 1000 && mExploring < 1256 && mWorld.mSwitches[mExploring - 1000] != mLastSwitches[mExploring - 1000])
         {
-            mExplored.insert({mAbe.mPath, mExploring});
+            mExplored.insert({mAbe.mLevel * 1000 + mAbe.mPath, mExploring});
         }
         // On the floor of a Scrab that waits before it strikes, with nothing between: it has seen him
         if (mSeenByScrabAt > mAbe.mFrame)

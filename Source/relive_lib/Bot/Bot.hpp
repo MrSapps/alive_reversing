@@ -30,6 +30,8 @@ struct PathKnowledge final
 {
     NavGraph mNav;
     std::set<s32> mBannedEdges;
+    // How often each way out (an index into the graph's exits) has been gone for
+    std::map<s32, s32> mExitUses;
     // Throws at a mine (its id, the cell thrown from, how) that missed or killed Abe: not tried again
     std::set<std::tuple<u32, s32, s32>> mBadThrows;
 };
@@ -68,6 +70,8 @@ struct BotMemory
     // The levels he has been in: going back to one is not getting on
     std::set<s32> mLevelsBeen;
     // Switches (by path and fact key) that have changed during the run, and the one being tried now
+    // (the level and the path, level x 1000 + path: by the path alone, what was tried in FeeCo's path 4 was taken
+    // for tried in Bonewerkz' path 4, whose second boiler was left for last in the run from the Mines)
     std::set<std::pair<s32, u32>> mExplored;
     // How often each was planned for and not got (the path, the key)
     std::map<std::pair<s32, u32>, s32> mExploreTries;
@@ -463,6 +467,14 @@ public:
     }
     // A Mudokon the task can't do without has been killed: taken back to before it died, to be gone about a
     // little later (RewindLoss)
+    // A way out of the path is being gone for (ExitTask)
+    void ExitTaken(s32 exit)
+    {
+        if (mKnow)
+        {
+            mKnow->mExitUses[exit]++;
+        }
+    }
     void WantLossRewind()
     {
         mLossRewind = true;
