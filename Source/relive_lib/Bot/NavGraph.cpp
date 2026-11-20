@@ -1701,7 +1701,10 @@ void NavGraph::Build(const NavInput& input)
                         // takes him: the Mudanchee vault's path 5, off the platform at 312,620 into the well at 212)
                         s32 to = NodeAt(x, gy, n.mHalf, 4);
                         const s32 well = WellInFall(x, n.mY, gy + 30 / scale, n.mHalf);
-                        if (k >= kDropFloor && well < 0)
+                        // (onto a floor that far down too, on the background in AE: a fall kills from 180 at
+                        // full size, 90 on the background (Abe.cpp, Motion_3_Fall). The brewery's fourth Zulag,
+                        // "hop over to their area": off 2102,309 to the floor at 380, the only way on.)
+                        if (k >= kDropFloor && well < 0 && !(mInput.mIsAe && n.mHalf && (gy - n.mY) * scale < 170))
                         {
                             break;
                         }

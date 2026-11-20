@@ -1219,6 +1219,62 @@ std::vector<s32> Domain::SligWay(const NavGraph& nav, s32 from, const std::funct
     return way;
 }
 
+s32 Domain::SligCallLedge(const NavGraph& nav, const World& world, const Entity& lever, u32* slig)
+{
+    if (!nav.Input().mIsAe || lever.mKind != EntityKind::eLever || lever.mSwitch <= 1)
+    {
+        return -1;
+    }
+    const s32 node = UseNode(nav, lever, nullptr);
+    if (node < 0)
+    {
+        return -1;
+    }
+    const NavNode& at = nav.Nodes()[node];
+    for (const Entity& made : world.mEntities)
+    {
+        if (made.mKind != EntityKind::eSlig || made.mGone || made.mSwitch != lever.mSwitch || made.mHalf != lever.mHalf)
+        {
+            continue;
+        }
+        const s32 lands = SligNode(nav, made);
+        if (lands < 0)
+        {
+            continue;
+        }
+        const NavNode& there = nav.Nodes()[lands];
+        // (it comes down level with him and on his screen: it sees him as it lands)
+        if (std::abs(there.mY - at.mY) > 30 || nav.CameraOf(there.mX, there.mY - 5) != nav.CameraOf(at.mX, at.mY - 5))
+        {
+            continue;
+        }
+        // The ledge to hang from: of the floor it comes down on, where that is not the lever's; where it is
+        // (the brewery's fourth Zulag, the platform between the Greeters: "pull the lever and run left. Hang
+        // from the left ledge, and hoist up as the Slig jumps down"), of another floor at that height on its
+        // screen.
+        const bool own = there.mLine == at.mLine;
+        s32 best = -1;
+        for (const NavEdge& e : nav.Edges())
+        {
+            const NavNode& up = nav.Nodes()[e.mTo];
+            const bool fits = own ? up.mLine != there.mLine && up.mHalf == there.mHalf && std::abs(up.mY - there.mY) <= 30 && nav.CameraOf(up.mX, up.mY - 5) == nav.CameraOf(there.mX, there.mY - 5) : up.mLine == there.mLine;
+            if (e.mKind == EdgeKind::eHoistUp && fits && (best < 0 || std::abs(nav.Nodes()[e.mFrom].mX - at.mX) < std::abs(nav.Nodes()[best].mX - at.mX)))
+            {
+                best = e.mFrom;
+            }
+        }
+        if (best >= 0)
+        {
+            if (slig)
+            {
+                *slig = made.mId;
+            }
+            return best;
+        }
+    }
+    return -1;
+}
+
 s32 Domain::SligNode(const NavGraph& nav, const Entity& slig)
 {
     s32 best = -1;
@@ -3883,7 +3939,56 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         }
                         useCost += glukkon && sligs ? 2000 : 0;
                     }
-                    add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, useCost, step);
+                    // A lever that makes a Slig level with him on a floor of its own: pulled, then at a run off his
+                    // floor to the hoist up to the Slig's and up to hang from it, unseen, until the Slig has walked
+                    // off that floor; then it is taken over from above, has a lever of the floor it went down to
+                    // pulled if one is wanted, and is burst. Pulled and stood by, it shoots 22 frames after it is made. (The brewery's fourth Zulag: "pull the next lever up top on
+                    // the right, immediately running forward as the Slig appears. Pull up to the ledge as he walks
+                    // off of it ... Possess the Slig. Position yourself to the right of the lever ... pull the lever".)
+                    u32 called = 0;
+                    const s32 ledge = entity.mKind == EntityKind::eLever && world.Switch(entity.mSwitch) == 0 ? SligCallLedge(nav, world, entity, &called) : -1;
+                    if (ledge >= 0)
+                    {
+                        const Entity* made = world.Find(called);
+                        const s32 lands = SligNode(nav, *made);
+                        DomainStep call;
+                        call.mKind = StepKind::eSligCall;
+                        call.mEntity = entity.mId;
+                        call.mOther = called;
+                        call.mEdge = 0;
+                        std::vector<Goap::Fact> callGives = gives;
+                        callGives.push_back({Key::Mud(called), 2});
+                        add("Call Slig#" + std::to_string(called) + " with " + name + " sw" + std::to_string(entity.mSwitch) + " hung under its floor until it walks off, take it over and burst it", pre, callGives, 700, call);
+                        for (const Entity& other : world.mEntities)
+                        {
+                            if (other.mKind != EntityKind::eLever || other.mId == entity.mId || other.mSwitch <= 1 || other.mHalf != entity.mHalf || world.Switch(other.mSwitch) != 0 || std::abs(other.mY2 - entity.mY2) <= 45)
+                            {
+                                continue;
+                            }
+                            const s32 by = UseNode(nav, other, nullptr);
+                            if (by < 0)
+                            {
+                                continue;
+                            }
+                            const s32 line = nav.Nodes()[by].mLine;
+                            std::vector<Goap::Fact> gates;
+                            const std::vector<s32> way = SligWay(nav, lands, [&](s32 n)
+                                                                 { return nav.Nodes()[n].mLine == line && std::abs(nav.Nodes()[n].mX - other.CentreX()) <= 3 * NavGraph::GridStep(other.mHalf); }, &gates, nullptr);
+                            if (way.empty() || !gates.empty())
+                            {
+                                continue;
+                            }
+                            DomainStep both = call;
+                            both.mEdge = static_cast<s32>(other.mId);
+                            std::vector<Goap::Fact> bothGives = callGives;
+                            bothGives.push_back({Key::Switch(other.mSwitch), 1});
+                            add("Call Slig#" + std::to_string(called) + " with " + name + " sw" + std::to_string(entity.mSwitch) + " hung under its floor until it walks off, take it over, have it pull Lever#" + std::to_string(other.mId) + " sw" + std::to_string(other.mSwitch) + " and burst it", pre, bothGives, 750, both);
+                        }
+                    }
+                    else
+                    {
+                        add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, useCost, step);
+                    }
                     if (shy)
                     {
                         add("Throw meat for Paramite#" + std::to_string(shy) + " and use " + name + " sw" + std::to_string(entity.mSwitch) + " on", withMeat(pre), gives, 300, meatStep);

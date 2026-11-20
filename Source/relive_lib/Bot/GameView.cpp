@@ -1616,7 +1616,12 @@ static void MarkSpawnTraps(NavInput& in, const World& world)
         bool zone = false;
         for (const NavFeature& z : in.mFeatures)
         {
-            zone = zone || (z.mKind == FeatureKind::eSwitchZone && z.mSwitch == spawner.mSwitch && z.mA == 0);
+            // (a zone he sets off at the size the Slig is: one for the foreground that lets Sligs loose on the
+            // background is no trap of their floor. He is not on it when they come, and until then it is a floor
+            // like another. The brewery's fourth Zulag: the Greeters' platform at 1183..1391,349 is the beat of
+            // the Sligs that the zone at the door of 1350,460 sets on him as he runs by in front, and nothing got
+            // rid of them: the platform was shut for good.)
+            zone = zone || (z.mKind == FeatureKind::eSwitchZone && z.mSwitch == spawner.mSwitch && z.mA == 0 && (z.mAnyScale || z.mHalf == spawner.mHalf));
         }
         const s32 boundId = static_cast<const relive::Path_Slig*>(pTlv)->mSligBoundId;
         const relive::Path_TLV* pLeft = nullptr;

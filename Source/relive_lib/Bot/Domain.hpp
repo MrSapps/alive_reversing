@@ -116,6 +116,9 @@ enum class StepKind : u8
     eCrawlerButton, // from the cell mEdge take over a naked Slig and press the button mEntity with it
     eSligLever,     // the Glukkon he is in goes to the cell mEdge and has a Slig it calls pull the lever mEntity
     eDrillSlogs,    // pull the lever mEntity to set its drills on the Slogs asleep under them, and again once those are dead
+    eSligCall,      // pull lever mEntity, which makes Slig mOther level with him on a floor of its own; at a run to the
+                    // foot of the hoist up to that floor and up to hang there unseen until the Slig has walked off
+                    // it, up, take it over, have it pull lever mEdge (an entity id, 0: none) and burst it
     eSorry,         // say sorry to the Mudokon mEntity that works a lever in anger, so that it leaves it be
     ePantsSlig,     // kill Slig mEntity with the Slig a Glukkon calls: hello from node mEdge, the gate's lever mOther
     eTimedDoor,     // use the lever mEntity (to the value mOther) and at once cross the edge mEdge, which a trap door
@@ -510,6 +513,9 @@ struct Domain final
     static std::vector<s32> SligWay(const NavGraph& nav, s32 from, const std::function<bool(s32)>& goal, std::vector<Goap::Fact>* gates, const World* world);
     // The cell a Slig (or one a spawner makes) is on where the map puts it: the floor under it. -1 if none.
     static s32 SligNode(const NavGraph& nav, const Entity& slig);
+    // A lever that makes a Slig level with him on its screen, on a floor of its own that a hoist goes up to: the
+    // foot of that hoist and the Slig, or -1 (StepKind::eSligCall)
+    static s32 SligCallLedge(const NavGraph& nav, const World& world, const Entity& lever, u32* slig);
     // The cells a Slig can say a Slig lock's code from
     static bool AtSligLock(const NavGraph& nav, const Entity& lock, s32 node);
     // The Sligs (entities) a Slig on the cells of a way walks into: those on the same stretches of floor, with
