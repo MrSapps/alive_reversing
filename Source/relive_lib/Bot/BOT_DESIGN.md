@@ -3341,3 +3341,12 @@ Check set: all as before; `fc3` now goes on through the annex and paths 2, 3 to 
   one (`RetryDelay`).
 Still to be seen in the long run: whether the boilers are passed with that. `la/bw1.txt` (hub, annex, on) goes
 through the boilers and Bonewerkz' Executive Office to FeeCo with 9 to 11 deaths.
+
+**The boilers in the run from the Mines (2026-11-21), not passed:** stuck at f=204,700, crushed twenty times at
+1687,960. What is known: in the first boiler (PullRing#10002, WorkWheel#10008, floor 1760) the three Slogs wake as
+he passes (f=167,909; in `la/bw7b.txt` and `la/bw1.txt` they do not), a Slog is loose from then on (`kSlogLoose`),
+and the door 712,720->1837,1240 to the second boiler's wheel (WorkWheel#14001, switch 134) wants none loose. So
+134 is left for last and gone for from above, by the ledge at 1662..1700,960 under the crate of 1675, which
+comes down every 25 frames or so: landing there (10 frames), the turn and the step off it are more than that.
+There is no standing under that crate at all. To do: why those Slogs wake in the long run (or a bone for them),
+so that the order is 133, 134, 132, 135 as in the chain; the way by the ledge should not be planned at all.
