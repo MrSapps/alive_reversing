@@ -2311,6 +2311,23 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 }
             }
         }
+        // (a far hop down, NavGraph::kFarHop, never onto a floor a Slig walks)
+        if (e.mKind == EdgeKind::eHop && e.mCost >= NavGraph::kFarHop && Domain::SligBeat(know->mNav, *world, e.mTo) >= 0)
+        {
+            return -1;
+        }
+        // Down onto a floor with Slogs up on it: dear (see Domain's crossings: the pit of the brewery's fourth
+        // Zulag, gone down into by the hoist at its side with five Slogs awake in it)
+        if (know->mNav.Input().mIsAe && !world->mFleeing && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eHop) && to.mY > from.mY + 20)
+        {
+            for (const SlogAt& slog : world->mSlogs)
+            {
+                if (!slog.mAsleep && !world->SlogFed(slog) && std::abs(slog.mY - to.mY) <= 30 && std::abs(slog.mX - to.mX) < 700 && !Domain::WallBetween(know->mNav, slog.mX, to.mX, to.mY, to.mHalf) && !Domain::GateBetween(know->mNav, *world, slog.mX, to.mX, to.mY, to.mHalf))
+                {
+                    return e.mCost + 3000;
+                }
+            }
+        }
         // Coming down from a fall is heard (Abe::Motion_16_LandSoft: not after letting go of a ledge), and a Fleech
         // asleep close by wakes at it
         if (!world->mInvisible && (e.mKind == EdgeKind::eFall || (e.mKind == EdgeKind::eHop && to.mY > from.mY + 20)))
@@ -2394,6 +2411,20 @@ s32 Bot::RetryDelay()
     if (mAttempt <= 0 || mProfile.mLook)
     {
         return 0;
+    }
+    // (not with a flying Slig on his screen: that one is no patrol, it comes for him, and to stand is to be
+    // bombed. FeeCo's Executive Offices in the run from Bonewerkz: a save at 680,408 with one on its way, from
+    // which the fifth try on stood 84 frames and died there, twelve times over.)
+    if (mKnow)
+    {
+        const s32 cam = mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5);
+        for (const FlierAt& flier : mWorld.mFliers)
+        {
+            if (flier.mHalf == mAbe.mHalfScale && mKnow->mNav.CameraOf(flier.mX, flier.mY) == cam)
+            {
+                return mRng.Range(0, 6);
+            }
+        }
     }
     // Longer each time, never the same twice
     return mAttempt * 17 + mRng.Range(0, 12);
@@ -3143,9 +3174,23 @@ void Bot::OnDeath(BaseMap& map)
     if (deathsHere == 6 || deathsHere == 12)
     {
         // The same place again and again: what he was doing there doesn't work
+        // (where there is another way to where it goes, as below: the only way ruled out leaves no plan. FeeCo's
+        // Executive Offices in the run from Bonewerkz: the walk at 1209,369, the one way back along that ledge,
+        // ruled out after six deaths by its flying Slig.)
         if (mCurrentEdge >= 0 && mKnow)
         {
-            BanEdge(mCurrentEdge);
+            const NavEdge& dying = mKnow->mNav.Edges()[mCurrentEdge];
+            const s32 dyingEdge = mCurrentEdge;
+            const s32 dyingTo = dying.mTo;
+            const NavGraph::EdgeCost cost = EdgeCostFn();
+            const NavGraph* graph = &mKnow->mNav;
+            std::vector<s32> other;
+            if (graph->FindPath(dying.mFrom, [dyingTo](s32 n)
+                                { return n == dyingTo; }, [&cost, graph, dyingEdge](const NavEdge& e) -> s32
+                                { return &e == &graph->Edges()[dyingEdge] ? -1 : cost(e); }, other))
+            {
+                BanEdge(mCurrentEdge);
+            }
         }
         if (mTask && !mTaskAction.empty())
         {
@@ -3809,7 +3854,7 @@ std::unique_ptr<Task> Bot::MakeFlee()
     // (nor with a grenade thrown from a shadow: the Slig it is for turns to its noise, and out of the shadow is
     // into its sight. The Barracks' path 7: shot as he left the shadow at 562 for this.)
     if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(mProfile.mLook && mVary == Lookahead::Way::eQuiet) && !dynamic_cast<const GetRocksTask*>(mTask.get()) && !dynamic_cast<const GrenadeSligTask*>(mTask.get()) && !dynamic_cast<const GrenadeOrbTask*>(mTask.get()) &&
-        !dynamic_cast<const SligCallTask*>(mTask.get()))
+        !dynamic_cast<const SligCallTask*>(mTask.get()) && !(dynamic_cast<const SligLockTask*>(mTask.get()) && static_cast<const SligLockTask*>(mTask.get())->Luring()))
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);

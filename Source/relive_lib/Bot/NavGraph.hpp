@@ -270,6 +270,8 @@ public:
     // names where there is another (Domain).
     static const s32 kStandJumpCost = 401;
     // A running jump off a floor's end down to a floor under it: dear, the way only at a run from Slogs
+    // What a hop down further than the measured ones costs on top (AE's background: NavGraph.cpp, kDropFloor)
+    static const s32 kFarHop = 4000;
     static constexpr s32 kRunDownCost = 3400;
     s32 CameraOf(s32 x, s32 y) const;
     // His box (from x + lo to x + hi, `tall` up from the floor at y) is wholly inside a Z cover

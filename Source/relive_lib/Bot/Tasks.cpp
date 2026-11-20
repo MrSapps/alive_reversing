@@ -2617,6 +2617,36 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 under = &slog;
             }
         }
+        // (two or more of them: there is no leaving as one leaps. A while here, where the ones level with him over
+        // a pit come for him and fall in, and then the plan again: by then the way over the pit may be free. The
+        // brewery's fourth Zulag, back at 1587,620 from its Sloggies with one still on the ledge over the pit:
+        // the jump to that ledge was barred, the pit was the way left, and he went down to five of them.)
+        if (under && nav.Input().mIsAe && !mHurry)
+        {
+            s32 pack = 0;
+            for (const SlogAt& slog : bot.GetWorld().mSlogs)
+            {
+                // (not ones shut in: Bonewerkz' Executive Office, three behind the slam door at 451,200 by where he
+                // comes down)
+                pack += !slog.mAsleep && !bot.GetWorld().SlogFed(slog) && std::abs(slog.mY - under->mY) <= 30 && std::abs(slog.mX - under->mX) < 700 && !Domain::WallBetween(nav, slog.mX, down.mX, down.mY, down.mHalf) &&
+                                !Domain::GateBetween(nav, bot.GetWorld(), slog.mX, down.mX, down.mY, down.mHalf)
+                            ? 1
+                            : 0;
+            }
+            if (pack >= 2)
+            {
+                if (mSlogWaits++ == 0)
+                {
+                    bot.Log(std::to_string(pack) + " Slogs awake under this ledge: not down among them");
+                }
+                if (mSlogWaits > 90)
+                {
+                    return TaskStep::Failed("Slogs awake on the floor under the ledge");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
         if (under && mSlogWaits < 400)
         {
             // (Motion_19_JumpUpwards)
@@ -13811,6 +13841,36 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
             }
             mPull.reset();
             mPhase = 1;
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        // With an orb on the lever's screen: off to where it is taken over from, at a run along its floor so
+        // that it comes after him
+        if (mPhase == 1 && !mLured && world.Switch(slig->mSwitch))
+        {
+            bool orb = false;
+            for (const Entity& e : world.mEntities)
+            {
+                orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5));
+            }
+            const s32 perch = orb ? Domain::SligLockPerch(nav, world, *lock, *slig) : -1;
+            mLured = true;
+            if (perch >= 0)
+            {
+                bot.Log("an orb on this screen: to " + std::to_string(nav.Nodes()[perch].mX) + "," + std::to_string(nav.Nodes()[perch].mY) + " along the Slig's floor, to take it over from there when it has come after him");
+                mLure = std::make_unique<GoToTask>("to where the Slig is taken over from", [perch](s32 n)
+                                                   { return n == perch; });
+                mLure->SetHurry(true);
+                mWaits = -900;
+            }
+        }
+        if (mLure)
+        {
+            const TaskStep step = mLure->Next(bot, lastFailed);
+            if (step.mKind == TaskStep::Kind::ePrim || step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            mLure.reset();
             return TaskStep::Do(Prim::Wait(2));
         }
         // (the chant takes one on his screen)

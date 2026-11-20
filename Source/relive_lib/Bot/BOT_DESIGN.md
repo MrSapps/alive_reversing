@@ -3276,3 +3276,19 @@ falls to the wheel). What it took:
   floor and dies there.
 - Check set of this state: all at baseline but `bw7b`, stuck once in the Executive Offices (12 deaths from a save
   taken under fire). `la/fe1.txt` alone on the same build was as before (34 deaths, 32 before).
+
+**Zulag 4 done (2026-11-20, later):** paths 18 and 19 and back to the hub, 0 to 2 deaths (`br/z5.txt`); from Zulag
+3's door through both and into Zulag 1 (`br/hub2.txt`: 4 deaths in Zulag 3, none in 4). Zulag 1 (path 1) is next:
+nothing built for it yet. What was added since the note above:
+- The voice lock of path 19: `Domain::SligLockPerch` and `SligLockTask::mLure`. With an orb on the screen of the
+  lever that calls the Slig, he goes at a run along the Slig's floor to out of a well on the lock's screen and
+  takes it over there (`MakeFlee` keeps out while `Luring()`).
+- Slogs: a crossing onto a floor with Slogs up on it costs 3000 more, as does a drop onto one (`EdgeCostFn`); with
+  two or more awake under a ledge the way down fails after 90 frames, to be planned again (the way over the pit may
+  be free by then). Slogs behind a wall or a shut gate do not count (Bonewerkz' Executive Office).
+- The far hop down of the background costs `NavGraph::kFarHop` more and is never taken onto a floor a Slig walks.
+- Retries: no holding back after a death with a flying Slig on his screen (`RetryDelay`); an edge is ruled out
+  after six deaths in one cell only if another way goes where it goes. Both from FeeCo's Executive Offices in the
+  run from Bonewerkz, which stuck there twice over while this was being built (first read as chance: it was not).
+- Check set of this state: `bw7b` 26 deaths and not stuck, the rest as before but AO's `a1`, 21 deaths for 14
+  (not looked into).

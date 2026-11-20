@@ -1743,7 +1743,11 @@ void NavGraph::Build(const NavInput& input)
                         // hop sent the plan in the Mines' path 4 after mines in an order that left it stuck.)
                         if (to >= 0 && to != from && gy - n.mY >= 20 / scale && (!mNodes[to].mHazard || (mInput.mBrew && mNodes[to].mClear >= 0)) && !mNodes[to].mLow && !drill)
                         {
-                            AddEdge(edges, from, to, EdgeKind::eHop, kHopCost + 10, -1, left);
+                            // (the far ones onto a floor are dear, kFarHop: a way taken where there is no other, and
+                            // never down onto a floor a Slig walks, Bot::EdgeCostFn. They were new ways down to the
+                            // Sligs in the background of FeeCo's Executive Offices, and the run from Bonewerkz got
+                            // stuck there.)
+                            AddEdge(edges, from, to, EdgeKind::eHop, kHopCost + 10 + (k >= kDropFloor && well < 0 ? kFarHop : 0), -1, left);
                             // (the well he falls into, if it is one)
                             edges.back().mWell = well;
                             // (and a running jump off the same end, where the floor behind is a run-up: further
