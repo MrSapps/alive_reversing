@@ -1067,7 +1067,11 @@ bool Bot::Replan(BaseMap& map)
                     {
                         const auto deaths = mActionDeaths.find(it->first);
                         const auto total = mFailedTotal.find(it->first);
-                        const bool forGood = (deaths != mActionDeaths.end() && deaths->second >= 3) || (total != mFailedTotal.end() && total->second >= 6);
+                        // (a way out of the path is never ruled out for good: there is no going on without one. What
+                        // ends that is the same cell killing him twenty times. The second Mudomo vault in the run
+                        // from the Mines: both its exits given up on with its Paramites after him, and he stood
+                        // at one of them with no plan.)
+                        const bool forGood = it->first.rfind("Exit ", 0) != 0 && ((deaths != mActionDeaths.end() && deaths->second >= 3) || (total != mFailedTotal.end() && total->second >= 6));
                         it = forGood ? std::next(it) : mFailedActions.erase(it);
                     }
                     Log("no plan: trying again what failed before");
@@ -2735,6 +2739,7 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     saved.mInputCount = mInputs.size();
     saved.mRng = mRng.State();
     saved.mGatesGone = mWorld.mGatesGone;
+    saved.mLocksSlapped = mWorld.mLocksSlapped;
     saved.mPathKey = mAbe.mLevel * 1000 + mAbe.mPath;
     if (look)
     {
@@ -4475,6 +4480,9 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         // Executive Offices: all of them forgotten, the lever whose switch puts itself back was pulled again
         // after every death.)
         mWorld.mGatesGone = mCheckpoints.back().mGatesGone;
+        // (and the slap locks taken for slapped: one slapped after the save is whole again. The second Mudomo
+        // vault: back before its two locks, he went to the door they open and stood there for good.)
+        mWorld.mLocksSlapped = mCheckpoints.back().mLocksSlapped;
         // The task starts over from the world as it was
         mPilotActive = false;
         mReflex.reset();

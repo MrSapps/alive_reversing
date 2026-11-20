@@ -3292,3 +3292,18 @@ nothing built for it yet. What was added since the note above:
   run from Bonewerkz, which stuck there twice over while this was being built (first read as chance: it was not).
 - Check set of this state: `bw7b` 26 deaths and not stuck, the rest as before but AO's `a1`, 21 deaths for 14
   (not looked into).
+
+**The second Mudomo vault again (2026-11-20):** not through from `build-bot/pv/c4_29.txt` (stuck after some 28
+deaths); `c4_7`, `c4_17`, `c4_41` pass it with none, the second Paramite never coming near. Kept from the tries:
+- The slap locks taken for slapped go back with a save (`Saved::mLocksSlapped`): slapped after the save, they were
+  still believed done, and he stood at the door they open.
+- A way out of the path is never ruled out for good (`Replan`, "trying again what failed before").
+- The Paramite he is in goes back for a Fleech of its floor that is still alive, up to four times, before it is let
+  go; it is left at the end away from a well of its floor, and calls no other to it on such a floor.
+- `Use ... with the Paramites of its floor about` (cost 6000): the lock all the same when nothing rids its floor of
+  them.
+What kills him there: the two follow him apart and wait outside each lock's shut gates, and the plate that opens
+them again lets the nearer one in; left together they have him 15 frames after he comes down by them. The
+walkthrough's way is a timed run: over the Paramites, a stop on the first plate by each lock, and to the well
+before them. Not built. AO's `a1`: 21 deaths for 14, ends stuck in the Stock Yards as it did (now by deaths in one
+cell, before by no plan).

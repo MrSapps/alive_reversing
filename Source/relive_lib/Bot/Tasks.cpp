@@ -14812,7 +14812,16 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                         }
                     }
                     // Then the other Paramites of these floors: up to each, hello, come on
-                    if (next < 0)
+                    // (not on a floor he leaves by a well: he is on that floor from end to end then, and two
+                    // together come for him where one alone keeps off. The second Mudomo vault in the run from the
+                    // Mines: the two left together had him wherever he came down, twenty times; in the runs
+                    // where the second was never met he walked past each.)
+                    bool byWell = false;
+                    for (const NavEdge& e : nav.Edges())
+                    {
+                        byWell = byWell || (e.mKind == EdgeKind::eWell && nav.Nodes()[e.mFrom].mLine == nav.Nodes()[at].mLine);
+                    }
+                    if (next < 0 && !byWell)
                     {
                         for (const Entity& p : world.mEntities)
                         {
@@ -14859,6 +14868,30 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                             break;
                         }
                     }
+                    // (not while a Fleech of its floor is still alive: to where that one is now, a few times over.
+                    // Been to where each is kept is not eaten. The second Mudomo vault in the run from the Mines:
+                    // let go with Fleeches left, which were counted eaten and had Abe by the well.)
+                    if (next < 0 && mHuntRounds < 4)
+                    {
+                        const RockAt* left = nullptr;
+                        for (const std::vector<RockAt>* list : {&world.mFleechesAwake, &world.mFleechesAsleep})
+                        {
+                            for (const RockAt& f : *list)
+                            {
+                                if (f.mHalf == me->mHalf && std::abs(f.mY - me->mY) <= 20 && !Domain::WallBetween(nav, me->mX, f.mX, me->mY, me->mHalf) && (!left || std::abs(f.mX - me->mX) < std::abs(left->mX - me->mX)))
+                                {
+                                    left = &f;
+                                }
+                            }
+                        }
+                        const s32 to = left ? Domain::ParamiteFloor(nav, world, left->mX, me->mY, me->mHalf) : -1;
+                        if (to >= 0 && to != at)
+                        {
+                            mHuntRounds++;
+                            bot.Log("a Fleech of its floor is still alive at " + std::to_string(left->mX) + ": after it again");
+                            next = to;
+                        }
+                    }
                     // Then to the end of the floor away from the way out, and stay
                     if (next < 0)
                     {
@@ -14879,6 +14912,16 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                         for (const NavExit& x : nav.Exits())
                         {
                             out = x.mNode >= 0 ? nav.Nodes()[x.mNode].mX : out;
+                        }
+                        // (a well of this floor is his way off it, whatever exit that leads to: away from that. The
+                        // second Mudomo vault: "bring it back right, release", the well out is at 562 and both were
+                        // left at 412 beside it, where he died twenty times.)
+                        for (const NavEdge& e : nav.Edges())
+                        {
+                            if (e.mKind == EdgeKind::eWell && nav.Nodes()[e.mFrom].mLine == nav.Nodes()[at].mLine)
+                            {
+                                out = nav.Nodes()[e.mFrom].mX;
+                            }
                         }
                         const s32 park = std::abs(nav.Nodes()[ends[0]].mX - out) > std::abs(nav.Nodes()[ends[1]].mX - out) ? ends[0] : ends[1];
                         if (std::abs(nav.Nodes()[park].mX - me->mX) <= 2 * cell)
