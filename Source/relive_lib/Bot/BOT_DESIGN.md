@@ -3423,3 +3423,16 @@ What FeeCo's path 3 and the Barracks' first path took, each a rule or a memory t
   It is then shot as it throws from 362,1240, which the Slig of 87..187 sees. Next: where the throw is from
   ("from the shadows on the far left" of the first screen), and a cost that sends him over the platform
   without touching Bonewerkz.
+
+**Looking ahead in the Barracks only** (2026-11-20). The boom machine's rooms of the Barracks' path 1 were built
+with `look` and passed with it until 16 November (`git bisect` with `build-bot/bisect_run.sh` over
+`la/b2l.txt`: first bad c59756d10). What that commit did to them: a thing a Slig watches under an orb, in a path
+with a boom machine, waited for the orb to be blown up; the wheel at the top is watched by the Slig the second
+grenade is for, so the plan threw a third grenade at the orb, which missed every time. Now, where each such
+Slig is one a grenade is thrown at (`Domain::GrenadeTargets`), the thing waits for those Sligs to be dead
+instead. With `look`, `la/b2l.txt` is through the rooms, path 13 and the hub into block 1 again (130 tries).
+The run from the Mines with `look` everywhere is stuck in Necrum's path 1 (f=58,572, no plan: with `look` that
+is a failed try and then the end, without it there are the waits and second chances), which the run without it
+passes. So the profile has `look=<level>` (`Profile::mLookIn`, `Bot::LookNow`): looking ahead in the levels
+named and not elsewhere; at the change the saves so far are let go, since they were made the other way.
+`la/fulllook.txt` is the run from the Mines with `look=barracks`.

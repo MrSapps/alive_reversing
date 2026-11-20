@@ -3900,12 +3900,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         const NavNode& at = nav.Nodes()[node];
                         bool watched = false;
                         std::set<u32> orbs;
+                        std::vector<std::pair<s32, s32>> watchers;
                         for (const SligAt& slig : world.Threats())
                         {
                             if (slig.mAsleep || slig.mPossessed || slig.mHalf != at.mHalf || std::abs(slig.mY - at.mY) > 45 || std::abs(slig.mX - at.mX) >= 450)
                             {
                                 continue;
                             }
+                            watchers.push_back({slig.mX, slig.mY});
                             for (const Entity& orb : world.mEntities)
                             {
                                 if (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone &&
@@ -3977,9 +3979,39 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         }
                         else if (watched && boom)
                         {
+                            // (or, where each of those Sligs is one a grenade is thrown at, with them dead: that is
+                            // what the grenades are for, and the orb is nothing to him then. The Barracks' path 1:
+                            // the wheel at the top, watched by the Slig the second grenade is for, had the plan
+                            // throw a third at the orb, which missed every time.)
+                            std::vector<Goap::Fact> dead;
+                            const std::vector<GrenadeTarget> targets = GrenadeTargets(nav.Input(), world);
+                            for (const auto& w : watchers)
+                            {
+                                const GrenadeTarget* is = nullptr;
+                                for (const GrenadeTarget& t : targets)
+                                {
+                                    if (!is && std::abs(t.mFloorY - w.second) <= 10 && w.first >= t.mLineX1 - 30 && w.first <= t.mLineX2 + 30)
+                                    {
+                                        is = &t;
+                                    }
+                                }
+                                if (!is)
+                                {
+                                    dead.clear();
+                                    break;
+                                }
+                                dead.push_back({Key::Switch(World::HazardSwitch(is->mSlig)), 1});
+                            }
+                            if (!dead.empty())
+                            {
+                                pre.insert(pre.end(), dead.begin(), dead.end());
+                            }
                             for (u32 orb : orbs)
                             {
-                                pre.push_back({Key::Switch(World::HazardSwitch(orb)), 1});
+                                if (dead.empty())
+                                {
+                                    pre.push_back({Key::Switch(World::HazardSwitch(orb)), 1});
+                                }
                             }
                         }
                     }

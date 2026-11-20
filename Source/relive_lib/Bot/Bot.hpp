@@ -689,6 +689,9 @@ private:
     // Where the rock thrown last was on each frame
     std::vector<ThrowArc::Point> mThrowSeen;
     s32 mCurrentEdge = -1;
+    // Looking ahead as the profile has it, for all levels or for the one he is in
+    bool LookNow() const;
+    bool mLooked = false;
     std::map<s32, s32> mEdgeDeaths;
     // Whether the run may take an exit to that path now
     bool ExitAllowed(BaseMap& map, const NavFeature& exit, bool* sideTrip);

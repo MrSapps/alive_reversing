@@ -53,13 +53,17 @@ bool Profile::Parse(const std::string& text, Profile& profile, std::string& erro
         {
             profile.mSeed = std::stoull(word.substr(5));
         }
+        else if (word.rfind("look=", 0) == 0 && word.size() > 5)
+        {
+            profile.mLookIn.push_back(word.substr(5));
+        }
         else if (word.rfind("been=", 0) == 0 && word.size() > 5)
         {
             profile.mBeen.push_back(word.substr(5));
         }
         else
         {
-            error = "unknown profile option '" + word + "' (seed=<n>, human, been=<level>)";
+            error = "unknown profile option '" + word + "' (seed=<n>, human, look, look=<level>, been=<level>)";
             return false;
         }
     }
