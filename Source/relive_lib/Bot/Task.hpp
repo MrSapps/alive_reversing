@@ -1854,6 +1854,11 @@ public:
     // Whether a Slig may walk off a floor's end down to (x, y), going left or right: every other Slig on that
     // floor and on the screen it lands on is ahead of it there and walks away
     static bool DropClear(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, bool left);
+    // On his way along the Slig's floor to where it is taken over from: it is meant to see him and come after
+    bool Luring() const
+    {
+        return mLure != nullptr;
+    }
     // The game's number for a Slig that walks (Slig.hpp: Motion_2_Walking)
     static const s32 kSligWalking = 2;
 
@@ -1864,6 +1869,9 @@ private:
     u32 mSlig;
     u32 mLever;
     std::unique_ptr<UseTask> mPull;
+    // The way to where it is taken over from, when that is not by the lever (Domain::SligLockPerch)
+    std::unique_ptr<GoToTask> mLure;
+    bool mLured = false;
     // 0 the lever, 1 the chant, 2 as the Slig
     s32 mPhase = 0;
     s32 mFrames = 0;

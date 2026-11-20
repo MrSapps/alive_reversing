@@ -518,6 +518,10 @@ struct Domain final
     static s32 SligCallLedge(const NavGraph& nav, const World& world, const Entity& lever, u32* slig);
     // The cells a Slig can say a Slig lock's code from
     static bool AtSligLock(const NavGraph& nav, const Entity& lock, s32 node);
+    // With an orb on the screen of the lever that calls the Slig for a lock: where to take it over from instead.
+    // Out of a well of the Slig's floor on the lock's screen, on another level there, with no orb on that screen
+    // (the Slig comes after him to the well). Or -1.
+    static s32 SligLockPerch(const NavGraph& nav, const World& world, const Entity& lock, const Entity& slig);
     // The Sligs (entities) a Slig on the cells of a way walks into: those on the same stretches of floor, with
     // no gate or wall between
     static std::vector<u32> SligsMet(const NavGraph& nav, const World& world, s32 from, const std::vector<s32>& way, u32 self);

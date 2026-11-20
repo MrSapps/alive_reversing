@@ -1299,6 +1299,39 @@ s32 Domain::SligNode(const NavGraph& nav, const Entity& slig)
     return best;
 }
 
+s32 Domain::SligLockPerch(const NavGraph& nav, const World& world, const Entity& lock, const Entity& slig)
+{
+    const s32 start = SligNode(nav, slig);
+    if (!nav.Input().mIsAe || start < 0)
+    {
+        return -1;
+    }
+    const s32 cam = nav.CameraOf(lock.CentreX(), lock.mY2 - 5);
+    for (const Entity& e : world.mEntities)
+    {
+        if (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam)
+        {
+            return -1;
+        }
+    }
+    const NavNode& floor = nav.Nodes()[start];
+    s32 best = -1;
+    for (const NavEdge& e : nav.Edges())
+    {
+        const NavNode& in = nav.Nodes()[e.mFrom];
+        const NavNode& out = nav.Nodes()[e.mTo];
+        if (e.mKind != EdgeKind::eWell || in.mLine != floor.mLine || nav.CameraOf(in.mX, in.mY - 5) != cam || nav.CameraOf(out.mX, out.mY - 5) != cam || (out.mHalf == floor.mHalf && std::abs(out.mY - floor.mY) <= 45))
+        {
+            continue;
+        }
+        if (best < 0 || std::abs(in.mX - floor.mX) < std::abs(nav.Nodes()[nav.Edges()[best].mFrom].mX - floor.mX))
+        {
+            best = static_cast<s32>(&e - nav.Edges().data());
+        }
+    }
+    return best >= 0 ? nav.Edges()[best].mTo : -1;
+}
+
 bool Domain::AtSligLock(const NavGraph& nav, const Entity& lock, s32 node)
 {
     // (SecurityDoor::IsPlayerNear: whoever is controlled, inside its box)
@@ -3240,7 +3273,22 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
         // (onto the floor a Slig walks, from off it: dearer, so that a way round it is taken where there is one)
         const s32 beatTo = sligFloor ? -1 : SligBeat(nav, world, e.mTo);
-        const s32 beat = beatTo >= 0 && beatTo != SligBeat(nav, world, e.mFrom) ? kSligBeatCost : 0;
+        // (and onto a floor with Slogs up on it: dear, so that a way over it is taken where there is one. The
+        // brewery's fourth Zulag: back from the far side of the pit at 1599..1701,720 the plan went by the pit's
+        // floor, with five Slogs awake on it, and not by the jump over it.)
+        s32 slogFloor = 0;
+        if (nav.Input().mIsAe)
+        {
+            const NavNode& onto = nav.Nodes()[e.mTo];
+            for (const SlogAt& slog : world.mSlogs)
+            {
+                if (!slog.mAsleep && !world.SlogFed(slog) && std::abs(slog.mY - onto.mY) <= 30 && std::abs(slog.mX - onto.mX) < 700 && !WallBetween(nav, slog.mX, onto.mX, onto.mY, onto.mHalf) && !GateBetween(nav, world, slog.mX, onto.mX, onto.mY, onto.mHalf))
+                {
+                    slogFloor = 3000;
+                }
+            }
+        }
+        const s32 beat = (beatTo >= 0 && beatTo != SligBeat(nav, world, e.mFrom) ? kSligBeatCost : 0) + slogFloor;
         if (!zapped.empty())
         {
             std::vector<Goap::Fact> gone = pre;
@@ -6414,7 +6462,11 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 {
                     orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
                 }
-                if (orb || nav.CameraOf(nav.Nodes()[start].mX, nav.Nodes()[start].mY - 5) != cam)
+                // (with an orb there: taken over from out of a well on the lock's screen, where it comes after him.
+                // The brewery's fourth Zulag: "Pull the lever to summon a Slig. When he passes right, climb down
+                // behind him and run left. He'll chase you, so jump into the well on the next screen. Possess
+                // him from the background.")
+                if ((orb && SligLockPerch(nav, world, lock, slig) < 0) || nav.CameraOf(nav.Nodes()[start].mX, nav.Nodes()[start].mY - 5) != cam)
                 {
                     continue;
                 }
@@ -6425,8 +6477,9 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 {
                     continue;
                 }
-                // (what it opens itself is no gate on its way)
+                // (what it opens itself is no gate on its way, nor what the lever that calls it opens)
                 pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(lock.mSwitch), 1}), pre.end());
+                pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(lever.mSwitch), 1}), pre.end());
                 std::vector<Goap::Fact> gives{{Key::Switch(lock.mSwitch), 1}};
                 // (the naked Sligs and the armed ones on the floor it walks it shoots: the floor by a locker
                 // for guns that its way goes along is clear after)
