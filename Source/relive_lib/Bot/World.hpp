@@ -835,6 +835,11 @@ struct World final
     // seen at the value that opens them: counted as still at it whatever the switch does after. The Mudomo
     // trial's three under the ring, whose switch a self-closing trap door sets back twenty frames later.
     std::map<s32, s32> mGatesGone;
+    // The Sligs a grenade is to be thrown at (Domain::GrenadeTargets) with no grenade to be had yet: their switch
+    // (HazardSwitch) counts as on, so that their floors are floors like any other until there is one (Bot::Replan)
+    std::set<s32> mNoGrenadeFor;
+    // (he has had a grenade in this path: its machine is one he gets to)
+    bool mBoomReached = false;
     // real: as the game has it now, without counting a slapped lock's switch as on already
     // Whether a Slog is one of a stretch of floor with a bone on it (EntityKind::eSlog): it has eyes for the bone
     // only
@@ -941,6 +946,10 @@ struct World final
             if (gone != mGatesGone.end())
             {
                 return gone->second;
+            }
+            if (mNoGrenadeFor.count(id) != 0)
+            {
+                return 1;
             }
         }
         if (id >= 256)

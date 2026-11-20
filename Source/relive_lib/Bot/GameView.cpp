@@ -790,6 +790,8 @@ static void BuildEntities(BinaryPath& path, World& world)
     // this path, standing at a height it has no stop at, and there was no stepping onto this one. FeeCo's path 3
     // in the run from the Mines: no way from its door, by the lift at 2012.)
     world.mLiftsSeen.clear();
+    world.mNoGrenadeFor.clear();
+    world.mBoomReached = false;
     world.mScrabParked.clear();
     world.mScrabBoundsLeft.clear();
     world.mScrabBoundsRight.clear();

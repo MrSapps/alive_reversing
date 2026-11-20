@@ -2431,6 +2431,12 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 bot.Log("hidden at " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + " with the Slig at " + std::to_string(hush->mX) + " on his level: a roll of two cells each time it has just turned its back");
                 mHushLogged = true;
             }
+            // (turned the way he will go while he waits: the turn is some ten frames, and the Slig of the
+            // Barracks' first path is off its screen for under sixty)
+            if (abe.mMove == Move::eCrouch && abe.mFacingLeft != first.mLeft)
+            {
+                return TaskStep::Do(Prim::Wait(2, first.mLeft ? Btn::eLeft : Btn::eRight));
+            }
             return TaskStep::Do(Prim::Wait(4));
         }
         std::size_t last = 0;
@@ -3169,6 +3175,12 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     }
                     mHiding++;
                     mSteps--;
+                    // (turned the way he will go while he waits: the turn is some ten frames, and the Slig of the
+                    // Barracks' first path is off its screen for under sixty)
+                    if (bot.Abe().mMove == Move::eCrouch && bot.Abe().mFacingLeft != first.mLeft)
+                    {
+                        return TaskStep::Do(Prim::Wait(2, first.mLeft ? Btn::eLeft : Btn::eRight));
+                    }
                     return TaskStep::Do(Prim::Wait(1));
                 }
                 // A sortie with the Slig just gone: rolled on along the floor, which is as fast as a run and
@@ -9240,6 +9252,15 @@ TaskStep ClearSligTask::Sortie(Bot& bot, const std::string& lastFailed, s32 x, s
         }
         if (step.mKind == TaskStep::Kind::eFailed)
         {
+            // (no way there as things are, found only on the way: as above. The Barracks' first path, whose
+            // ledge over the lever is behind the gate the lever opens: given up, he went out at a sneak.)
+            if (step.mWhy.rfind("no route", 0) == 0)
+            {
+                mSortie = 3;
+                mGo.reset();
+                mInner = mMake();
+                return Sortie(bot, "", x, y, half);
+            }
             return giveUp(step.mWhy);
         }
         mSortie = 2;
