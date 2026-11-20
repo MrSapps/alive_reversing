@@ -386,6 +386,11 @@ public:
     // The cell Abe stands in, or -1
     s32 AbeNode() const;
     void BanEdge(s32 edge);
+    // The line of EdgeCostFn that ruled the last edge out (for the log)
+    s32 RefusedAt() const
+    {
+        return mRefusedAt;
+    }
     // The edges a way has to keep to for now, and no others (empty: any). For a stretch that was timed edge by edge.
     void KeepTo(const std::set<s32>& edges)
     {
@@ -813,6 +818,7 @@ private:
     std::string mTraceMove;
     std::string mLog;
     std::set<s32> mOnlyEdges;
+    mutable s32 mRefusedAt = 0;
 };
 
 } // namespace Bot

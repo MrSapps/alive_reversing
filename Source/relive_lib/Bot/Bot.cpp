@@ -1855,11 +1855,14 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             flierBoxes.push_back({x1, y1, x2, y2, spawner.mHalf ? 1 : 0});
         }
     }
-    const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge, dangerLet, abeX](const NavEdge& e) -> s32
+    // (which of the reasons below ruled the last edge out, by its line here: for the log of a way not found)
+    s32* refused = &mRefusedAt;
+    const auto base = [refused, know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge, dangerLet, abeX](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
         if (know->mBannedEdges.count(idx))
         {
+            *refused = __LINE__;
             return -1;
         }
         // (the jump at a hoist a run from a Slog was sent to, MakeSlogFlee: before all that follows, which is for
@@ -1900,6 +1903,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         }
         if (!only->empty() && !only->count(idx))
         {
+            *refused = __LINE__;
             return -1;
         }
         // A jump or a drop that ends on a screen where a Slig is awake under a security orb (it is not
@@ -2033,6 +2037,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             }
             if (!flier)
             {
+                *refused = __LINE__;
                 return -1;
             }
         }
@@ -2060,6 +2065,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             }
             if (asleep && !awake)
             {
+                *refused = __LINE__;
                 return -1;
             }
         }
@@ -2068,6 +2074,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         s32 condValue = 0;
         if (know->mNav.Condition(e, &condSwitch, &condValue) && world->Switch(condSwitch) != condValue && !(condSwitch == dangerLet && dangerLet != 0))
         {
+            *refused = __LINE__;
             return -1;
         }
         // Onto a lift's platform, or riding it: only where the lift is now
@@ -2077,6 +2084,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         // (not on a stretch that was timed against where the Scrab is, nor when such a stretch is looked for)
         if (!pastScrabs && only->empty() && Domain::ScrabReaches(know->mNav, *world, to.mX, to.mY, to.mHalf, charged) && !Domain::ScrabReaches(know->mNav, *world, from.mX, from.mY, from.mHalf, charged))
         {
+            *refused = __LINE__;
             return -1;
         }
         // Onto a floor Sligs watch with no shadow to go by (Domain::SligWatched): only unseen
@@ -2085,6 +2093,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         const bool unseenNow = world->mInvisible || world->mInvisCharge || world->mInvisComing || chanted;
         if (only->empty() && !unseenNow && powerFirst && Domain::SligWatched(know->mNav, *world, to.mX, to.mY, to.mHalf) && !Domain::SligWatched(know->mNav, *world, from.mX, from.mY, from.mHalf))
         {
+            *refused = __LINE__;
             return -1;
         }
         // (a climb by a flying Slig's track, see flierBoxes: before the ways a jump up a hoist is the quick one)
@@ -2186,6 +2195,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             const NavFeature& at = know->mNav.Input().mFeatures[stop->mLiftStop];
             if (!world->LiftAtStop(at.mX1, at.mX2, stop->mY, at.mA != 0))
             {
+                *refused = __LINE__;
                 return -1;
             }
         }
@@ -2195,6 +2205,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             const NavFeature& shaft = know->mNav.Input().mFeatures[e.mShaft];
             if (world->LiftAtStop(shaft.mX1, shaft.mX2, shaft.mY1, shaft.mA != 0))
             {
+                *refused = __LINE__;
                 return -1;
             }
         }
@@ -2238,6 +2249,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                         (void) timedDrill;
                         continue;
                     }
+                    *refused = __LINE__;
                     return -1;
                 }
             }
@@ -2250,6 +2262,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 // (a cell of floor he runs or lands on: a drill down in a gap he jumps is under him)
                 if (know->mNav.NodeAt(x, from.mY, from.mHalf, 10) >= 0 && world->SweepOver(x, from.mY, from.mHalf))
                 {
+                    *refused = __LINE__;
                     return -1;
                 }
             }
@@ -2364,6 +2377,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 }
                 if (!slig.mAsleep && off < 250 && (to.mX < slig.mX) == slig.mFacingLeft)
                 {
+                    *refused = __LINE__;
                     return -1;
                 }
             }
@@ -2384,6 +2398,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         // (a far hop down, NavGraph::kFarHop, never onto a floor a Slig walks)
         if (e.mKind == EdgeKind::eHop && e.mCost >= NavGraph::kFarHop && Domain::SligBeat(know->mNav, *world, e.mTo) >= 0)
         {
+            *refused = __LINE__;
             return -1;
         }
         // Down onto a floor with Slogs up on it: dear (see Domain's crossings: the pit of the brewery's fourth
