@@ -583,7 +583,13 @@ bool Bot::Replan(BaseMap& map)
                 for (const NavExit& x : mKnow->mNav.Exits())
                 {
                     const NavFeature& g = mKnow->mNav.Input().mFeatures[x.mFeature];
-                    other = other || (g.mDestLevel == f.mDestLevel && g.mDestPath == f.mDestPath && mDeadExits.count({mAbe.mLevel, mAbe.mPath, x.mFeature}) == 0);
+                    // (one not gone for yet: once each of the others has been tried the dead one is a way again. What
+                    // shut the place it leads to may have been opened from one of the others: FeeCo's hub, the
+                    // door to the floor of its path 9 whose electric wall is worked from the ledge another of
+                    // its doors leads to.)
+                    const s32 idx = static_cast<s32>(&x - mKnow->mNav.Exits().data());
+                    const bool tried = mKnow->mExitUses.count(idx) != 0 && mKnow->mExitUses.at(idx) > 0;
+                    other = other || (g.mDestLevel == f.mDestLevel && g.mDestPath == f.mDestPath && mDeadExits.count({mAbe.mLevel, mAbe.mPath, x.mFeature}) == 0 && !tried);
                 }
                 if (other)
                 {
@@ -1169,13 +1175,15 @@ bool Bot::Replan(BaseMap& map)
                 // done all it does yet. (Bonewerkz' fourth boiler come to from the annex: its wheel sets a clock
                 // of 55 frames going that lets the Slogs out, the run from them by the well is what follows, and
                 // it was the end a frame before they were after him.)
-                if (mNoPlanWaits[{mAbe.mLevel, mAbe.mPath}] < 12)
+                // (thirty of them, a minute in all: Sligs that watch the only way on walk their beats. FeeCo's path 3
+                // in the run from the Mines: no way to its first door as he came in, and the end 900 frames on.)
+                if (mNoPlanWaits[{mAbe.mLevel, mAbe.mPath}] < 30)
                 {
                     if (mNoPlanWaits[{mAbe.mLevel, mAbe.mPath}]++ == 0)
                     {
                         Log("no plan at all: a while here before that is the end");
                     }
-                    mHold = 40;
+                    mHold = 60;
                     mTask = std::make_unique<GoToTask>("think again", [](s32)
                                                        { return true; });
                     mTaskAction.clear();
@@ -1634,6 +1642,14 @@ bool Bot::ExitAllowed(BaseMap& map, const NavFeature& exit, bool* sideTrip)
         return false;
     }
     if (mNewPathFor == mAbe.mPath && mVisitedPaths.count({destLevel, destPath}) == 0)
+    {
+        return true;
+    }
+    // (or one he has been in that leads on to one he has not: a path may be several places, each with its own
+    // door from here, and the planner takes the door least gone for. FeeCo's hub back from Bonewerkz: the
+    // Barracks are by way of its path 9, been in three times over by two other doors.)
+    if (mNewPathFor == mAbe.mPath && mIsAe && mLevel.LeadsToNew(destPath, mAbe.mPath, [this, destLevel](s32 path)
+                                                                 { return mVisitedPaths.count({destLevel, path}) != 0; }))
     {
         return true;
     }
@@ -2580,6 +2596,14 @@ void Bot::EnsureKnowledge(BaseMap& map)
         // (an edge of the path before is none of this one's: the jump a run from Slogs was sent to in the Executive
         // Office's path 14 made a jump of Phleg's office, 150 frames on, the way off a woken Slig's floor)
         mFleeEdge = -1;
+        // (nor are the edges a task had him keep to: left in force by one that ended with the path, they are
+        // numbers of the path before, and next to nothing of this one is among them. FeeCo's path 3 in the run
+        // from the Mines: no way to its first door, by a walk and a hop nothing else speaks against.)
+        if (!mOnlyEdges.empty())
+        {
+            Log("the " + std::to_string(mOnlyEdges.size()) + " edges kept to in the path before are let go");
+            mOnlyEdges.clear();
+        }
         mErrandPath = mAbe.mPath;
     }
     const std::pair<s32, s32> key{mAbe.mLevel, mAbe.mPath};

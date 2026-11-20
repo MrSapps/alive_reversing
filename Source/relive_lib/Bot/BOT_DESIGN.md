@@ -3365,3 +3365,14 @@ background ledge with Lever#1011 (switch 50, the electric wall at 475,460 of the
 floor, whose door at 437,460 leads on to path 3 and the Barracks. Path 9 counts as been in, so none of the doors
 to it is a way on (`ExitAllowed`), and he backs in and out of the ledge. An exit costs 700 more each time it was
 gone for (`mExitUses`), which decides nothing while they are not offered.
+
+**FeeCo's hub passed (2026-11-21):** in the run from the Mines he pulls Lever#1011 on the ledge, takes the door of
+1612,980, crosses path 9's floor and is in path 3 at f=191,700 (28 deaths). `ExitAllowed`: a way to a path he has
+been in is a way on where that path leads to one he has not (`LevelGraph::LeadsToNew`); a dead exit is taken
+again once each other exit to the same path has been gone for. `la/fcb.txt` shows the hub in three minutes (FeeCo
+2 with Bonewerkz visited).
+Path 3, at its door: a plan, and no way for its first step (a walk and a hop refused with nothing known against
+them). Taken to be edges kept to (`KeepTo`) left in force by a task of the path before: let go at each new path
+now, with a line in the log, to be seen in the next long run. The waits before the end with no plan are thirty of
+60 frames. In `la/fcb.txt` path 3 goes as far as its second Slig lock and then stands for good with no end
+(the Slig "holds until the 2 Sligs of this floor have come to it"): to be looked at from the long run's state.

@@ -57,6 +57,9 @@ public:
     // The switches of `path` that Wanted is about for some other path
     std::vector<s32> Errands(s32 path) const;
     std::string Text() const;
+    // Whether a path that `seen` does not hold can be got to from `from` through the level's paths, not by way
+    // of `avoid`
+    bool LeadsToNew(s32 from, s32 avoid, const std::function<bool(s32 path)>& seen) const;
 
 private:
     void Measure();
