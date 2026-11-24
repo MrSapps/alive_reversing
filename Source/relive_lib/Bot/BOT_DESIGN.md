@@ -2391,31 +2391,36 @@ The run also ends on success (`done`: every profile goal met) and writes the sam
 
 ## Code layout
 
+As built (2026-11-24); the plan's layout is below it in git history.
+
 ```
 Source/relive_lib/Bot/
-  Bot.hpp/.cpp             the object in Game_Loop: profile, budgets, goal loop, retry, logs, report
-  BotOptions.hpp/.cpp      profile and command line parsing
-  BotRng.hpp
-  WorldModel.hpp/.cpp      Observe, entities, facts, Text()
-  Checkpoint.hpp/.cpp      snapshot stack over QuikSave / AO::QuikSave
-  NavGraph.hpp/.cpp        per-path graph from lines + TLVs, A*, text dump
-  LevelGraph.hpp/.cpp      rooms and transitions
-  Goap/WorldState.hpp/.cpp facts
-  Goap/Action.hpp          templates: preconditions, effects, cost, executor factory
-  Goap/Planner.hpp/.cpp    regressive A*
-  Goap/Goals.hpp/.cpp      profile -> goals
-  Actions/*.cpp            one executor per action
-  BotLog.hpp/.cpp          inputs, decisions, report
-Source/Tools/bot_runs/     regression scripts (per game, level, profile) + expected results
+  GameView.cpp/.hpp       the only code that knows the games' classes: Abe, the world, the path's lines and TLVs
+  World.hpp               what the bot sees (entities, Sligs, Slogs, Scrabs, Fleeches, lifts...) and small queries
+  NavGraph.cpp/.hpp       cells and edges of a path, FindPath, Regions; learnt edges (Learnt/PutLearnt); the
+                          path's throw flights, worked out once (Throws)
+  LevelGraph.cpp/.hpp     which path leads to which
+  Domain.cpp/.hpp         the planning problem of a path: Domain::Build -> Domain::Builder, one function per
+                          part (Start, Crossings, Entities -> UseThing/MineThing/MudokonThing..., Exits, Farts,
+                          Grenades, VoiceLocks, SlogPens, Fliers, SligLocks, BrewMachines, Scrabs...)
+  Goap.cpp/.hpp           the planner
+  Bot.cpp/.hpp            the object in Game_Loop: Update -> Think -> Replan (NoteGrenadeTargets, BuildDomain,
+                          UsableActions, KeptPlan, NoWayOut -> NoPlanAtAll) -> MakeTask; reflexes; checkpoints and
+                          the rewinds (RewindTo, OnDeath, RewindLoss, RewindMiss, RewindStuck); look-ahead
+                          (TryFailed, Lookahead.cpp); EdgeCostFn (the costs and refusals of edges: one lambda of
+                          rules, the next thing to split)
+  Task.hpp, Tasks.cpp     one task per action; GoToTask::Next -> RollStep, RunJumpStep, WalkStep (the gait and its
+                          threats: the next thing to split), FallStep, HopStep, ClimbStep, HoistDownStep,
+                          PortalStep, TeleportStep
+  Pilot.cpp/.hpp          prims -> buttons, frame by frame
+  ThrowArc, FartFlight, FlierFlight, BombCycle, SligCycle   measured physics and patrol cycles
+  Checkpoint, Profile, BotRng
+Source/Tools/bot_runs/    run scripts; ae_mines_to_brewery.txt is the standing full run
 ```
 
-Game-specific reads (`Slig`, `Mudokon`, `Abe` fields) are confined to `WorldModel.cpp` and the
-executors, the way `Automation.cpp` already includes both games' headers. Everything above
-`WorldModel` is game-neutral.
-
-Hot reloading the bot as a shared library was considered and dropped: the stuck report plus
-`quickload_file` gets a repro in seconds, and an in-tree static lib keeps one build, one ABI, and
-ASan/UBSan on the bot code.
+A refactor that is meant to change nothing is checked by running `ae_mines_to_brewery.txt` and AO's Rupture Farms
+before and after: the bot is deterministic, so the logs must be the same line for line (strip the `@<line>` the
+no-route message prints). On an optimised build that is six minutes.
 
 ## Implementation plan
 
