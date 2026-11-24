@@ -2773,23 +2773,96 @@ static const s32 kFartSligZone = 300;
 // The games' line type of a floor a mine car runs on
 static const s32 kMineCarFloor = 11;
 
-Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const std::function<bool(s32 edge)>& edgeUsable, bool kills)
+// Domain::Build's working: what it has worked out so far, shared between the parts of the path it goes through
+struct Domain::Builder final
 {
-    Domain d;
-    s32 regionCount = 0;
-    d.mRegions = nav.Regions(&regionCount);
-
-    // Switches that go on and off with another (a timer trigger's outputs): whatever sets the one sets them
-    std::vector<std::pair<s32, s32>> follows;
-    for (const Entity& e : world.mEntities)
+    Builder(const NavGraph& navIn, const World& worldIn, s32 abeNodeIn, const std::function<bool(s32 edge)>& edgeUsableIn, bool killsIn)
+        : mNav(navIn)
+        , mWorld(worldIn)
+        , mAbeNode(abeNodeIn)
+        , mEdgeUsable(edgeUsableIn)
+        , mKills(killsIn)
+        , mEdges(navIn.Edges())
     {
-        if (e.mKind == EntityKind::eSwitchLogic && e.mHoldOnly && e.mInputs[0] > 1 && e.mSwitch > 1)
-        {
-            follows.push_back({e.mInputs[0], e.mSwitch});
-        }
     }
-    const auto add = [&d, &follows, &world](std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step)
+
+    Domain Run();
+    // What can be done with one thing of the path, by its kind (Entities)
+    void UseThing(const Entity& entity, const std::string& name, DomainStep& step);
+    void ScrabThing(const Entity& entity, const std::string& name, DomainStep& step);
+    void FleechThing(const Entity& entity, const std::string& name, DomainStep& step);
+    void SwitchLogicThing(const Entity& entity, const std::string& name, DomainStep& step);
+    void MineCarThing(const Entity& entity, const std::string& name, DomainStep& step);
+    void RockSackThing(const Entity& entity, const std::string& name, DomainStep& step);
+    void PantsLockerThing(const Entity& entity, const std::string& name, DomainStep& step);
+    void UxbThing(const Entity& entity, const std::string& name, DomainStep& step);
+    void MineThing(const Entity& entity, const std::string& name, DomainStep& step);
+    void MudokonThing(const Entity& entity, const std::string& name, DomainStep& step);
+    // The parts of the path's problem, in the order Run works them out
+    void Start();
+    void Crossings();
+    void FleechLocks();
+    void FleechScrabs();
+    void Entities();
+    void ParamitePacks();
+    void Exits();
+    void TrapDoorSligs();
+    void Farts();
+    void Grenades();
+    void NakedSligButtons();
+    void VoiceLocks();
+    void TimedTrapDoors();
+    void SlogPens();
+    void GlukkonCalls();
+    void DrillSlogs();
+    void Orbs();
+    void Fliers();
+    void SligLocks();
+    void BrewMachines();
+    void PantsSligs();
+    void Zones();
+    void FootSwitchGates();
+    void ParamiteFleeches();
+    void Scrabs();
+
+    // An action for the planner, and the step it is
+    void add(std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step);
+    // Being in the region of a cell
+    Goap::Fact regionFact(s32 node) const
     {
+        return Goap::Fact{Key::kRegion, mD.mRegions[node] + 1};
+    }
+    // Whether Paramites about (packAt) bar him from the region of a cell
+    bool packBars(s32 target) const;
+
+    const NavGraph& mNav;
+    const World& mWorld;
+    s32 mAbeNode;
+    const std::function<bool(s32 edge)>& mEdgeUsable;
+    bool mKills;
+    const std::vector<NavEdge>& mEdges;
+    Domain mD;
+    s32 mRegionCount = 0;
+    // Switches that go on and off with another (a timer trigger's outputs): whatever sets the one sets them
+    std::vector<std::pair<s32, s32>> mFollows;
+    std::map<std::tuple<s32, s32, s32>, std::pair<s32, std::size_t>> mCheapest;
+    std::set<s32> mLooseLines;
+    std::map<s32, std::vector<u32>> mZapLines;
+    std::map<u32, FleechLure> mLures;
+    std::set<s32> mLetOut;
+    std::set<u32> mHuntable;
+    std::set<s32> mHuntGates;
+    std::vector<char> mPackAt;
+    std::vector<GrenadeTarget> mGrenadeTargets;
+    std::vector<Goap::Fact> mEatenAll;
+    std::set<s32> mLinesAll;
+};
+
+void Domain::Builder::add(std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step)
+{
+    const World& world = mWorld;
+    Domain& d = mD;
+    std::vector<std::pair<s32, s32>>& follows = mFollows;
         // (a switch as it is when the action is done: what the action itself wants of it, or of the output of a
         // logic it is an input of, which is on with its inputs on; else as it is now. An action that is planned
         // for later is planned in the state the ones before it leave.)
@@ -2873,11 +2946,105 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         a.mTag = static_cast<s32>(d.mSteps.size());
         d.mSteps.push_back(step);
         d.mActions.push_back(std::move(a));
-    };
-    const auto regionFact = [&](s32 node)
+}
+
+bool Domain::Builder::packBars(s32 target) const
+{
+    const NavGraph& nav = mNav;
+    const s32 abeNode = mAbeNode;
+    const Domain& d = mD;
+    const std::vector<char>& packAt = mPackAt;
+        if (packAt.empty())
+        {
+            return false;
+        }
+        const s32 region = d.mRegions[target];
+        std::vector<char> ok(nav.Nodes().size(), 0);
+        ok[target] = 1;
+        for (bool changed = true; changed;)
+        {
+            changed = false;
+            for (const NavEdge& e : nav.Edges())
+            {
+                if (ok[e.mTo] && !ok[e.mFrom] && !packAt[e.mFrom] && d.mRegions[e.mFrom] == region)
+                {
+                    ok[e.mFrom] = 1;
+                    changed = true;
+                }
+            }
+        }
+        if (abeNode >= 0 && d.mRegions[abeNode] == region)
+        {
+            return !ok[abeNode];
+        }
+        bool entries = false;
+        bool open = false;
+        for (const NavEdge& e : nav.Edges())
+        {
+            if (d.mRegions[e.mTo] == region && d.mRegions[e.mFrom] != region)
+            {
+                entries = true;
+                open = open || ok[e.mTo];
+            }
+        }
+        return entries && !open;
+}
+
+Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const std::function<bool(s32 edge)>& edgeUsable, bool kills)
+{
+    Builder b(nav, world, abeNode, edgeUsable, kills);
+    return b.Run();
+}
+
+Domain Domain::Builder::Run()
+{
+    Start();
+    Crossings();
+    FleechLocks();
+    FleechScrabs();
+    Entities();
+    ParamitePacks();
+    Exits();
+    TrapDoorSligs();
+    Farts();
+    Grenades();
+    NakedSligButtons();
+    VoiceLocks();
+    TimedTrapDoors();
+    SlogPens();
+    GlukkonCalls();
+    DrillSlogs();
+    Orbs();
+    Fliers();
+    SligLocks();
+    BrewMachines();
+    PantsSligs();
+    Zones();
+    FootSwitchGates();
+    ParamiteFleeches();
+    Scrabs();
+    return mD;
+}
+
+// The start state: the regions, the switches, where he is, what he has
+void Domain::Builder::Start()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    s32& abeNode = mAbeNode;
+    Domain& d = mD;
+    s32& regionCount = mRegionCount;
+    std::vector<std::pair<s32, s32>>& follows = mFollows;
+    d.mRegions = nav.Regions(&regionCount);
+
+    // Switches that go on and off with another (a timer trigger's outputs): whatever sets the one sets them
+    for (const Entity& e : world.mEntities)
     {
-        return Goap::Fact{Key::kRegion, d.mRegions[node] + 1};
-    };
+        if (e.mKind == EntityKind::eSwitchLogic && e.mHoldOnly && e.mInputs[0] > 1 && e.mSwitch > 1)
+        {
+            follows.push_back({e.mInputs[0], e.mSwitch});
+        }
+    }
 
     for (s32 i = 0; i < 256; i++)
     {
@@ -2893,14 +3060,24 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     d.mStart.Set(world.CarriesMeat() ? Key::kMeat : Key::kRocks, world.mRocks);
     d.mStart.Set(Key::kInvis, world.mInvisEver ? 1 : 0);
     d.mStart.Set(Key::kInvisNow, world.mInvisCharge || world.mInvisible || world.mInvisComing ? 1 : 0);
+}
 
+// From region to region: the crossings of the nav graph, with what each needs
+void Domain::Builder::Crossings()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    const std::function<bool(s32 edge)>& edgeUsable = mEdgeUsable;
+    const std::vector<NavEdge>& edges = mEdges;
+    Domain& d = mD;
+    std::map<std::tuple<s32, s32, s32>, std::pair<s32, std::size_t>>& cheapest = mCheapest;
+    std::set<s32>& looseLines = mLooseLines;
+    std::map<s32, std::vector<u32>>& zapLines = mZapLines;
     // From region to region
     // (one way for each pair of regions and each thing that shuts it: the first there is, but one that does not
     // come onto a floor a Slig walks before one that does. The Barracks' path 7: of the ways up from 862,200 the
     // first in the list was a running jump onto the ledge the Slig walks, and the hoist beside it onto the
     // other ledge was never looked at.)
-    const std::vector<NavEdge>& edges = nav.Edges();
-    std::map<std::tuple<s32, s32, s32>, std::pair<s32, std::size_t>> cheapest;
     // Electric walls that are off, across a floor a Slig of the map walks: on, they get it as it walks its beat
     // (ElectricWall.cpp: what is within four pixels of the beam). Nothing is crossed onto that floor until they
     // have: the path has put the way to be rid of those Sligs there. (Bonewerkz' first annex: "say Work and pull
@@ -2909,7 +3086,6 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     // And where a thing falls over and over on to such a floor, a bone thrown under it puts the Slog there for
     // as long as it eats. (Bonewerkz' first annex: "Hit the bone sack, pick up the bone and throw it so that the
     // Slog gets crushed by the falling boxes".)
-    std::set<s32> looseLines;
     for (const SlogAt& slog : world.mSlogs)
     {
         const s32 at = slog.mChasing && !slog.mAsleep && !world.SlogFed(slog) ? nav.NodeAt(slog.mX, slog.mY, false, 30) : -1;
@@ -2985,7 +3161,6 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             d.mActions.back().mSpend = {Key::kRocks, 1};
         }
     }
-    std::map<s32, std::vector<u32>> zapLines;
     {
         std::set<std::pair<u32, s32>> done;
         for (const NavFeature& wall : nav.Input().mFeatures)
@@ -3409,11 +3584,17 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+}
 
+// The locks Fleeches guard that can be got at by leading them off
+void Domain::Builder::FleechLocks()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    std::map<u32, FleechLure>& lures = mLures;
+    std::set<s32>& letOut = mLetOut;
     // The locks Fleeches guard that can be got at by leading them off, worked out first: a lever that lets them
     // out for that may be pulled with them awake behind its gate
-    std::map<u32, FleechLure> lures;
-    std::set<s32> letOut;
     for (const Entity& entity : world.mEntities)
     {
         const s32 node = entity.mKind == EntityKind::eSlapLock && !entity.mGone && world.mLocksSlapped.count(entity.mId) == 0 ? UseNode(nav, entity, nullptr) : -1;
@@ -3488,13 +3669,20 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+}
 
+// The Fleeches a Scrab can be taken over and walked to
+void Domain::Builder::FleechScrabs()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    std::set<u32>& huntable = mHuntable;
+    std::set<s32>& huntGates = mHuntGates;
     // The Fleeches a Scrab can be taken over and walked to: the ones on the floor of its floor, with every gate
     // between open (the walkthrough's way with the Mudanchee vault's fifth: "possess the Scrab in the background.
     // Have him go right, kill the Fleeches, then return all the way to the left"). Chanted for from a place on its
     // screen that no Scrab gets to. Not where foot switches make a trap of the floor: that is the rampage's.
-    std::set<u32> huntable;
-    std::set<s32> huntGates;
     for (const Entity& scrab : world.mEntities)
     {
         if (scrab.mKind != EntityKind::eScrab || scrab.mGone || world.mScrabsKilled.count(scrab.mId) != 0)
@@ -3607,7 +3795,21 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             huntGates.insert(ways.begin(), ways.end());
         }
     }
+}
 
+// What can be done with each thing of the path: levers, locks, wheels, Mudokons, mines...
+void Domain::Builder::Entities()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    s32& abeNode = mAbeNode;
+    bool& kills = mKills;
+    Domain& d = mD;
+    std::vector<std::pair<s32, s32>>& follows = mFollows;
+    std::map<u32, FleechLure>& lures = mLures;
+    std::set<s32>& letOut = mLetOut;
+    std::set<u32>& huntable = mHuntable;
+    std::set<s32>& huntGates = mHuntGates;
     for (const Entity& entity : world.mEntities)
     {
         DomainStep step;
@@ -3620,1414 +3822,1477 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             case EntityKind::eWorkWheel:
             case EntityKind::eHandStone:
             case EntityKind::eSlapLock:
-            {
-                // (a lock that has been slapped is done: its switch is as good as on)
-                if (entity.mKind == EntityKind::eSlapLock && world.mLocksSlapped.count(entity.mId) != 0)
-                {
-                    if (entity.mSwitch > 1)
-                    {
-                        d.mStart.Set(Key::Switch(entity.mSwitch), 1);
-                    }
-                    break;
-                }
-                const s32 node = UseNode(nav, entity, nullptr);
-                // A Fleech hanging over a lock bites whoever slaps it: it has to be dead first (the walkthrough has
-                // a Scrab do it)
-                std::vector<Goap::Fact> guards;
-                // (the ones of them that are Paramites loose on its floor: see the last resort at the plain use)
-                std::vector<Goap::Fact> packGuards;
-                if (entity.mKind == EntityKind::eSlapLock)
-                {
-                    for (const Entity& f : world.mEntities)
-                    {
-                        if (f.mKind == EntityKind::eFleech && f.mHalf == entity.mHalf && std::abs(f.CentreX() - entity.CentreX()) <= 40 && std::abs(f.mY2 - entity.mY2) <= 120)
-                        {
-                            // (nor one asleep on the floor by a lock that gives the power to go unseen: the slap
-                            // wakes it, and he is off and unseen before it strikes. The walkthrough's way with
-                            // the fifth of the Mudanchee vaults: "sneak up to the Ghost Lock and slap it. Run
-                            // back to the right and climb up. Turn invisible")
-                            // (unless a Scrab can be had to kill it first: then that is the way, and the power is
-                            // kept for something else)
-                            if (f.mInputs[0] != 0 && f.mInputs[1] == 0 && entity.mInputs[0] > 0 && huntable.count(f.mId) == 0)
-                            {
-                                continue;
-                            }
-                            // (nor one that is under the lock's floor altogether: on the floor below, or hung
-                            // from the underside of this one. The Mudomo vault's path 12)
-                            if (node >= 0 && f.mY1 >= nav.Nodes()[node].mY - 5)
-                            {
-                                continue;
-                            }
-                            // (not one with a floor between it and the lock: it hangs over that floor)
-                            bool floorBetween = false;
-                            for (const NavNode& n : nav.Nodes())
-                            {
-                                floorBetween = floorBetween || (n.mHalf == f.mHalf && std::abs(n.mX - f.CentreX()) <= 13 && n.mY >= f.mY2 && n.mY < entity.mY2 - 20);
-                            }
-                            if (!floorBetween)
-                            {
-                                guards.push_back({Key::Mud(f.mId), 2});
-                            }
-                        }
-                    }
-                }
-                // Paramites on the floor it is used from, with no wall between. Two or more hunt him along it: only
-                // unseen then (the Mudomo vaults' path 10: "turn invisible and run past the Paramites ... quickly
-                // go down and slap the Ghost Lock, then get back up before the invisibility wears off"). One alone
-                // keeps off him until it is cornered, and near it he corners it: that one is drawn off with meat
-                // ("throw some meat behind you to get rid of the Paramite, then slap the Ghost Lock").
-                u32 shy = 0;
-                Goap::Fact shyFact{0, 0};
-                if ((entity.mKind == EntityKind::eSlapLock || entity.mKind == EntityKind::eLever) && node >= 0)
-                {
-                    const NavNode& at = nav.Nodes()[node];
-                    std::vector<u32> pack;
-                    s32 nearest = 100000;
-                    for (const Entity& para : world.mEntities)
-                    {
-                        if (para.mKind != EntityKind::eParamite || para.mGone || para.mHalf != at.mHalf || para.mInputs[0] != 0)
-                        {
-                            continue;
-                        }
-                        s32 px = para.CentreX();
-                        s32 py = para.mY2;
-                        for (const ParamiteAt& live : world.mParamites)
-                        {
-                            if (live.mId == para.mId)
-                            {
-                                px = live.mX;
-                                py = live.mY;
-                            }
-                        }
-                        const s32 on = nav.NodeAt(px, py, para.mHalf, 30);
-                        if (on >= 0 && nav.Nodes()[on].mLine == at.mLine && !WallBetween(nav, px, at.mX, at.mY, at.mHalf) && !GateBetween(nav, world, px, at.mX, at.mY, at.mHalf))
-                        {
-                            pack.push_back(para.mId);
-                            nearest = std::min(nearest, std::abs(px - at.mX));
-                        }
-                    }
-                    if (pack.size() >= 2 || (pack.size() == 1 && nearest <= 250))
-                    {
-                        for (u32 id : pack)
-                        {
-                            guards.push_back({Key::Mud(id), 2});
-                            packGuards.push_back({Key::Mud(id), 2});
-                        }
-                        if (pack.size() == 1)
-                        {
-                            shy = pack[0];
-                            shyFact = {Key::Mud(shy), 2};
-                        }
-                    }
-                }
-                // (what it takes with the meat thrown: everything but that Paramite out of the way)
-                const auto withMeat = [&shyFact](std::vector<Goap::Fact> pre)
-                {
-                    pre.erase(std::remove(pre.begin(), pre.end(), shyFact), pre.end());
-                    return pre;
-                };
-                DomainStep meatStep;
-                meatStep.mKind = StepKind::eMeatUse;
-                meatStep.mEntity = entity.mId;
-                meatStep.mOther = shy;
-                // Or led off: got to follow him away from it and come back to by another way (the walkthrough's
-                // way with the first of the Mudanchee vaults)
-                const FleechLure lure = lures.count(entity.mId) ? lures[entity.mId] : FleechLure();
-                if (entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0 && node >= 0 && !world.mInvisEver && entity.mSwitch <= 1)
-                {
-                    step.mKind = StepKind::eUse;
-                    std::vector<Goap::Fact> pre{regionFact(node), {Key::kInvis, 0}};
-                    pre.insert(pre.end(), guards.begin(), guards.end());
-                    add("Get invisibility from " + name, pre, {{Key::kInvis, 1}, {Key::kInvisNow, 1}}, 150, step);
-                    if (shy)
-                    {
-                        add("Throw meat for Paramite#" + std::to_string(shy) + " and get invisibility from " + name, withMeat(pre), {{Key::kInvis, 1}, {Key::kInvisNow, 1}}, 300, meatStep);
-                        d.mActions.back().mSpend = {Key::kMeat, 1};
-                    }
-                }
-                if (node < 0 || entity.mHoldOnly || entity.mSwitch <= 1)
-                {
-                    break;
-                }
-                const u32 key = Key::Switch(entity.mSwitch);
-                if (entity.mKind == EntityKind::eWorkWheel)
-                {
-                    // A blind Mudokon on the wheel's floor can be called to it from anywhere on its screen that
-                    // is on the wheel's side of it: it walks until the wheel stops it
-                    for (const Entity& mud : world.mEntities)
-                    {
-                        if (mud.mKind != EntityKind::eMudokon || !mud.mBlind || mud.mGone || mud.mHalf != entity.mHalf)
-                        {
-                            continue;
-                        }
-                        const s32 mudNode = UseNode(nav, mud, nullptr);
-                        bool gets = mudNode >= 0 && nav.Nodes()[mudNode].mLine == nav.Nodes()[node].mLine;
-                        for (s32 cur = mudNode; gets && cur != node;)
-                        {
-                            const NavNode& n = nav.Nodes()[cur];
-                            s32 next = -1;
-                            for (s32 i = n.mFirstEdge; i < n.mFirstEdge + n.mEdgeCount && next < 0; i++)
-                            {
-                                const NavEdge& e = nav.Edges()[i];
-                                const NavNode& to = nav.Nodes()[e.mTo];
-                                if (e.mKind == EdgeKind::eWalk && to.mLine == n.mLine && (to.mX - n.mX) * (nav.Nodes()[node].mX - n.mX) > 0 && !to.mHazard && to.mSweep < 0 && to.mSweepHigh < 0 && !nav.Condition(e, nullptr, nullptr))
-                                {
-                                    next = e.mTo;
-                                }
-                            }
-                            gets = next >= 0;
-                            cur = next;
-                        }
-                        if (!gets || mudNode == node)
-                        {
-                            continue;
-                        }
-                        std::set<s32> from;
-                        for (std::size_t n = 0; n < nav.Nodes().size(); n++)
-                        {
-                            if (CallSpot(nav, mud, entity, static_cast<s32>(n)) && from.insert(d.mRegions[n]).second)
-                            {
-                                DomainStep send;
-                                send.mKind = StepKind::eSend;
-                                send.mEntity = mud.mId;
-                                send.mOther = entity.mId;
-                                add("Send Mudokon#" + std::to_string(mud.mId) + " to " + name + " from " + std::to_string(nav.Nodes()[n].mX) + "," + std::to_string(nav.Nodes()[n].mY), {regionFact(static_cast<s32>(n)), {Key::Mud(mud.mId), 0}, {key, 0}}, {{key, 1}}, 250, send);
-                            }
-                        }
-                    }
-                }
-                step.mKind = StepKind::eUse;
-                // A gate with a Scrab behind it is only opened with the power to go invisible in hand (the
-                // walkthrough's way past the vault's second screen): it is there to keep the Scrab in. Shutting
-                // one is fine.
-                bool freesOn = false;
-                bool freesOff = false;
-                for (const NavFeature& f : nav.Input().mFeatures)
-                {
-                    // (not a gate a Scrab is to be walked through to Fleeches: that one is opened for it)
-                    if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mSwitch != entity.mSwitch || huntGates.count(f.mSwitch) != 0)
-                    {
-                        continue;
-                    }
-                    for (const Entity& scrab : world.mEntities)
-                    {
-                        if (scrab.mKind == EntityKind::eScrab && !scrab.mGone && scrab.mHalf == f.mHalf && std::abs(scrab.mY2 - f.mY2) <= 30 && std::abs(scrab.CentreX() - (f.mX1 + f.mX2) / 2) <= 300)
-                        {
-                            freesOn = freesOn || f.mStartClosed;
-                            freesOff = freesOff || !f.mStartClosed;
-                        }
-                    }
-                }
-                if (entity.mOp == 0 || entity.mOp == 2)
-                {
-                    std::vector<Goap::Fact> pre{regionFact(node), {key, 0}};
-                    pre.insert(pre.end(), guards.begin(), guards.end());
-                    // Nor is a gate opened onto a Fleech that sleeps just behind it: that one is killed first
-                    // (one that is awake there is led off, where that is what the gate is opened for: see the locks.
-                    // And one asleep on the floor sleeps on: a gate makes no noise, and he sneaks by it.)
-                    for (const NavFeature& f : nav.Input().mFeatures)
-                    {
-                        if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mSwitch != entity.mSwitch || !f.mStartClosed)
-                        {
-                            continue;
-                        }
-                        // (pulled from the other layer than its gate is in, what the gate lets out does not
-                        // get at him: the second Mudomo vault, whose levers are in the background)
-                        if (node >= 0 && nav.Nodes()[node].mHalf != f.mHalf)
-                        {
-                            continue;
-                        }
-                        for (const Entity& fl : world.mEntities)
-                        {
-                            const Goap::Fact dead{Key::Mud(fl.mId), 2};
-                            if (fl.mKind == EntityKind::eFleech && (fl.mInputs[1] != 0 || (fl.mInputs[0] == 0 && letOut.count(entity.mSwitch) == 0)) && fl.mHalf == f.mHalf && std::abs(fl.CentreX() - (f.mX1 + f.mX2) / 2) <= 80 && fl.mY2 <= f.mY2 + 10 && fl.mY2 >= f.mY2 - 120 && std::find(pre.begin(), pre.end(), dead) == pre.end())
-                            {
-                                // (unless this lever is the one the Scrab is let through by)
-                                bool scrabGate = false;
-                                for (const Entity& scrab : world.mEntities)
-                                {
-                                    scrabGate = scrabGate || (scrab.mKind == EntityKind::eScrab && std::abs(scrab.mY2 - f.mY2) <= 30 && std::abs(scrab.CentreX() - (f.mX1 + f.mX2) / 2) <= 300);
-                                }
-                                if (!scrabGate)
-                                {
-                                    pre.push_back(dead);
-                                }
-                            }
-                        }
-                    }
-                    if (freesOn)
-                    {
-                        pre.push_back({Key::kInvisNow, 1});
-                    }
-                    // On the floor of a Scrab that no gate can be shut on (there is none along that floor), in reach
-                    // of it, and got to from cells it does not get to with no crossing between that would ask for
-                    // it (a ledge over its floor):
-                    // unseen (the walkthrough's sixth Mudanchee vault: "use your invisibility power to slap that
-                    // other Ghost Lock, then jump back into the well")
-                    if (!freesOn && node >= 0)
-                    {
-                        const NavNode& at = nav.Nodes()[node];
-                        bool canShut = true;
-                        std::vector<Goap::Fact> shut;
-                        // (not on a floor with a gate anywhere along it: there the Scrabs are shut in behind it
-                        // first, or lured off, and the steps for that say so)
-                        bool gated = false;
-                        for (const NavFeature& f : nav.Input().mFeatures)
-                        {
-                            const s32 by = f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == at.mHalf ? nav.NodeAt((f.mX1 + f.mX2) / 2, f.mY2, f.mHalf, 30) : -1;
-                            gated = gated || (by >= 0 && nav.Nodes()[by].mLine == at.mLine);
-                        }
-                        if (!gated && ScrabReaches(nav, world, at.mX, at.mY, at.mHalf, false, nullptr, &shut, &canShut) && !canShut)
-                        {
-                            bool mixed = false;
-                            for (std::size_t n = 0; n < nav.Nodes().size() && !mixed; n++)
-                            {
-                                const NavNode& other = nav.Nodes()[n];
-                                mixed = d.mRegions[n] == d.mRegions[node] && !ScrabReaches(nav, world, other.mX, other.mY, other.mHalf, false);
-                            }
-                            if (mixed)
-                            {
-                                pre.push_back({Key::kInvisNow, 1});
-                            }
-                        }
-                    }
-                    bool watchedOrb = false;
-                    // At a place a Slig watches, a security orb on its screen (no chant there, so it is not taken
-                    // over): unseen (the Mudanchee trial: "turn invisible and climb up. Go right and slap the 2
-                    // Ghost Locks")
-                    if (node >= 0 && std::find(pre.begin(), pre.end(), Goap::Fact{Key::kInvisNow, 1}) == pre.end() && !(entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0))
-                    {
-                        const NavNode& at = nav.Nodes()[node];
-                        bool watched = false;
-                        std::set<u32> orbs;
-                        std::vector<std::pair<s32, s32>> watchers;
-                        for (const SligAt& slig : world.Threats())
-                        {
-                            if (slig.mAsleep || slig.mPossessed || slig.mHalf != at.mHalf || std::abs(slig.mY - at.mY) > 45 || std::abs(slig.mX - at.mX) >= 450)
-                            {
-                                continue;
-                            }
-                            watchers.push_back({slig.mX, slig.mY});
-                            for (const Entity& orb : world.mEntities)
-                            {
-                                if (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone &&
-                                    (nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(slig.mX, slig.mY - 5) || nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(at.mX, at.mY - 5)))
-                                {
-                                    orbs.insert(orb.mId);
-                                }
-                                // (its screen or the thing's: its beat may cross both)
-                                watched = watched || (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone &&
-                                                      (nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(slig.mX, slig.mY - 5) || nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(at.mX, at.mY - 5)));
-                            }
-                        }
-                        // (taking it over from the next screen, which has no orb, was tried: its beat has it
-                        // there some 50 frames at a time, and a chant needs more)
-                        // (only where the power to go unseen is to be had: in a path with no lock that gives it
-                        // there is nothing to wait for, and the thing is used as it always was. The Mines' path
-                        // 10: the Slig by the well at 1404,339 wakes as he lands, and with this asked for the
-                        // levers there were never pulled.)
-                        bool power = world.mInvisCharge || world.mInvisible || world.mInvisComing;
-                        for (const Entity& lock : world.mEntities)
-                        {
-                            // (one there is a way to from where he is, shut or not: FeeCo's Executive Offices, whose one
-                            // lock is a well back from the lever a Slig watches under an orb, and wells go one way)
-                            if (lock.mKind != EntityKind::eSlapLock || lock.mInputs[0] <= 0 || power)
-                            {
-                                continue;
-                            }
-                            const s32 lockNode = UseNode(nav, lock, nullptr);
-                            if (abeNode < 0 || lockNode < 0)
-                            {
-                                power = true;
-                                continue;
-                            }
-                            std::vector<char> seen(nav.Nodes().size(), 0);
-                            std::vector<s32> open{abeNode};
-                            seen[abeNode] = 1;
-                            while (!open.empty() && !power)
-                            {
-                                const s32 cur = open.back();
-                                open.pop_back();
-                                power = cur == lockNode;
-                                for (s32 k = 0; k < nav.Nodes()[cur].mEdgeCount; k++)
-                                {
-                                    const s32 to = nav.Edges()[nav.Nodes()[cur].mFirstEdge + k].mTo;
-                                    if (!seen[to])
-                                    {
-                                        seen[to] = 1;
-                                        open.push_back(to);
-                                    }
-                                }
-                            }
-                        }
-                        // (or, in a path with a boom machine, with that orb blown up first: then the Sligs are taken
-                        // over as anywhere. The walkthrough of the Barracks' Slig bunks: "throw the grenade forward on
-                        // the fifth beep to blow up the Chant Protector along with the Slig. Possess and kill the
-                        // bottom Sligs, then go down to pull the lever".)
-                        bool boom = false;
-                        for (const Entity& machine : world.mEntities)
-                        {
-                            // (one he can get to as things are, or from the thing: the Barracks' path 1 has its
-                            // machine behind the gate this very lever opens, and the lever was never pulled)
-                            const s32 machineNode = machine.mKind == EntityKind::eRockSack && machine.mInputs[1] == 2 && !machine.mGone ? UseNode(nav, machine, nullptr) : -1;
-                            boom = boom || (machineNode >= 0 && (d.mRegions[machineNode] == d.mRegions[node] || (abeNode >= 0 && d.mRegions[machineNode] == d.mRegions[abeNode]) || world.mRocks > 0));
-                        }
-                        if (watched && power)
-                        {
-                            pre.push_back({Key::kInvisNow, 1});
-                            watchedOrb = true;
-                        }
-                        else if (watched && boom)
-                        {
-                            // (or, where each of those Sligs is one a grenade is thrown at, with them dead: that is
-                            // what the grenades are for, and the orb is nothing to him then. The Barracks' path 1:
-                            // the wheel at the top, watched by the Slig the second grenade is for, had the plan
-                            // throw a third at the orb, which missed every time.)
-                            std::vector<Goap::Fact> dead;
-                            const std::vector<GrenadeTarget> targets = GrenadeTargets(nav.Input(), world);
-                            for (const auto& w : watchers)
-                            {
-                                const GrenadeTarget* is = nullptr;
-                                for (const GrenadeTarget& t : targets)
-                                {
-                                    if (!is && std::abs(t.mFloorY - w.second) <= 10 && w.first >= t.mLineX1 - 30 && w.first <= t.mLineX2 + 30)
-                                    {
-                                        is = &t;
-                                    }
-                                }
-                                if (!is)
-                                {
-                                    dead.clear();
-                                    break;
-                                }
-                                dead.push_back({Key::Switch(World::HazardSwitch(is->mSlig)), 1});
-                            }
-                            if (!dead.empty())
-                            {
-                                pre.insert(pre.end(), dead.begin(), dead.end());
-                            }
-                            for (u32 orb : orbs)
-                            {
-                                if (dead.empty())
-                                {
-                                    pre.push_back({Key::Switch(World::HazardSwitch(orb)), 1});
-                                }
-                            }
-                        }
-                    }
-                    // (one that opens such a gate by way of something else, a timer in the Mudanchee vault's path 4,
-                    // is not held back: the crossings onto that Scrab's floor want its gate shut or him unseen)
-                    for (s32 first : PulledFirst(nav, world, entity))
-                    {
-                        pre.push_back({Key::Switch(first), 1});
-                    }
-                    std::vector<Goap::Fact> gives{{key, 1}};
-                    if (entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0)
-                    {
-                        gives.push_back({Key::kInvis, 1});
-                        gives.push_back({Key::kInvisNow, 1});
-                    }
-                    // (dear on a floor a Glukkon stands on with Sligs awake on its screen: that lever is the Glukkon's to
-                    // have pulled, by one of them. The Executive Office of Bonewerkz: gone for by Abe, he was shot.)
-                    s32 useCost = 150;
-                    if (node >= 0)
-                    {
-                        const NavNode& at = nav.Nodes()[node];
-                        bool glukkon = false;
-                        bool sligs = false;
-                        for (const GlukkonAt& g : world.mGlukkons)
-                        {
-                            glukkon = glukkon || (g.mHalf == at.mHalf && std::abs(g.mY - at.mY) <= 30 && nav.CameraOf(g.mX, g.mY - 5) == nav.CameraOf(at.mX, at.mY - 5));
-                        }
-                        for (const SligAt& slig : world.mSligs)
-                        {
-                            sligs = sligs || (!slig.mAsleep && !slig.mPossessed && slig.mHalf == at.mHalf && nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(at.mX, at.mY - 5));
-                        }
-                        // (or with Sligs the map puts on that screen: they drop in as he comes)
-                        for (const Entity& e : world.mEntities)
-                        {
-                            sligs = sligs || (e.mKind == EntityKind::eSlig && !e.mGone && e.mHalf == at.mHalf && nav.CameraOf(e.CentreX(), e.mY2 - 5) == nav.CameraOf(at.mX, at.mY - 5));
-                        }
-                        useCost += glukkon && sligs ? 2000 : 0;
-                    }
-                    // A lever that makes a Slig level with him on a floor of its own: pulled, then at a run off his
-                    // floor to the hoist up to the Slig's and up to hang from it, unseen, until the Slig has walked
-                    // off that floor; then it is taken over from above, has a lever of the floor it went down to
-                    // pulled if one is wanted, and is burst. Pulled and stood by, it shoots 22 frames after it is made. (The brewery's fourth Zulag: "pull the next lever up top on
-                    // the right, immediately running forward as the Slig appears. Pull up to the ledge as he walks
-                    // off of it ... Possess the Slig. Position yourself to the right of the lever ... pull the lever".)
-                    u32 called = 0;
-                    const s32 ledge = entity.mKind == EntityKind::eLever && world.Switch(entity.mSwitch) == 0 ? SligCallLedge(nav, world, entity, &called) : -1;
-                    if (ledge >= 0)
-                    {
-                        const Entity* made = world.Find(called);
-                        const s32 lands = SligNode(nav, *made);
-                        DomainStep call;
-                        call.mKind = StepKind::eSligCall;
-                        call.mEntity = entity.mId;
-                        call.mOther = called;
-                        call.mEdge = 0;
-                        std::vector<Goap::Fact> callGives = gives;
-                        callGives.push_back({Key::Mud(called), 2});
-                        add("Call Slig#" + std::to_string(called) + " with " + name + " sw" + std::to_string(entity.mSwitch) + " hung under its floor until it walks off, take it over and burst it", pre, callGives, 700, call);
-                        for (const Entity& other : world.mEntities)
-                        {
-                            if (other.mKind != EntityKind::eLever || other.mId == entity.mId || other.mSwitch <= 1 || other.mHalf != entity.mHalf || world.Switch(other.mSwitch) != 0 || std::abs(other.mY2 - entity.mY2) <= 45)
-                            {
-                                continue;
-                            }
-                            const s32 by = UseNode(nav, other, nullptr);
-                            if (by < 0)
-                            {
-                                continue;
-                            }
-                            const s32 line = nav.Nodes()[by].mLine;
-                            std::vector<Goap::Fact> gates;
-                            const std::vector<s32> way = SligWay(nav, lands, [&](s32 n)
-                                                                 { return nav.Nodes()[n].mLine == line && std::abs(nav.Nodes()[n].mX - other.CentreX()) <= 3 * NavGraph::GridStep(other.mHalf); }, &gates, nullptr);
-                            if (way.empty() || !gates.empty())
-                            {
-                                continue;
-                            }
-                            DomainStep both = call;
-                            both.mEdge = static_cast<s32>(other.mId);
-                            std::vector<Goap::Fact> bothGives = callGives;
-                            bothGives.push_back({Key::Switch(other.mSwitch), 1});
-                            add("Call Slig#" + std::to_string(called) + " with " + name + " sw" + std::to_string(entity.mSwitch) + " hung under its floor until it walks off, take it over, have it pull Lever#" + std::to_string(other.mId) + " sw" + std::to_string(other.mSwitch) + " and burst it", pre, bothGives, 750, both);
-                        }
-                    }
-                    else
-                    {
-                        add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, useCost, step);
-                    }
-                    // With Paramites loose on its floor and nothing that rids it of them: all the same, dear, so that
-                    // any other way is taken first. One alone keeps off him until it is cornered, and the tries
-                    // differ. (The second Mudomo vault in the run from the Mines: the second Paramite stayed loose
-                    // on the locks' floor, nothing was offered for it, and there the run ended. For now: the run
-                    // is to get on, its deaths are counted later.)
-                    if (!packGuards.empty() && nav.Input().mIsAe)
-                    {
-                        std::vector<Goap::Fact> bare;
-                        for (const Goap::Fact& f : pre)
-                        {
-                            if (std::find(packGuards.begin(), packGuards.end(), f) == packGuards.end())
-                            {
-                                bare.push_back(f);
-                            }
-                        }
-                        add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on with the Paramites of its floor about", bare, gives, 6000, step);
-                    }
-                    if (shy)
-                    {
-                        add("Throw meat for Paramite#" + std::to_string(shy) + " and use " + name + " sw" + std::to_string(entity.mSwitch) + " on", withMeat(pre), gives, 300, meatStep);
-                        d.mActions.back().mSpend = {Key::kMeat, 1};
-                    }
-                    // A lever with a trap door for the cell on its other side: from there too, where that is another
-                    // part of the path (he comes down on it, and what the lever does is open it under him. The
-                    // Mudomo hub at 3187,1140: "immediately pull the lever beside you or you're lunch".)
-                    if (entity.mKind == EntityKind::eLever && node >= 0)
-                    {
-                        s32 penGate = -1;
-                        s32 penOpen = -1;
-                        s32 penShut = -1;
-                        std::vector<u32> penGroup;
-                        if (FleechPen(nav, world, entity, &penGate, &penOpen, &penShut, &penGroup))
-                        {
-                            std::vector<Goap::Fact> penPre;
-                            std::vector<Goap::Fact> penGives = gives;
-                            for (const Goap::Fact& f : pre)
-                            {
-                                bool ofGroup = false;
-                                for (u32 id : penGroup)
-                                {
-                                    ofGroup = ofGroup || (f.mKey == Key::Mud(id) && f.mValue == 2);
-                                }
-                                if (!ofGroup)
-                                {
-                                    penPre.push_back(f);
-                                }
-                            }
-                            for (u32 id : penGroup)
-                            {
-                                penGives.push_back({Key::Mud(id), 2});
-                            }
-                            penGives.push_back(regionFact(penShut));
-                            DomainStep pen;
-                            pen.mKind = StepKind::eFleechPen;
-                            pen.mEntity = entity.mId;
-                            pen.mOther = static_cast<u32>(penGate);
-                            const NavFeature& pg = nav.Input().mFeatures[penGate];
-                            add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on and shut its Fleeches in behind the gate at " + std::to_string((pg.mX1 + pg.mX2) / 2) + "," + std::to_string(pg.mY2), penPre, penGives, 700, pen);
-                        }
-                    }
-                    if (entity.mKind == EntityKind::eLever && node >= 0)
-                    {
-                        const s32 alt = UseNode(nav, entity, nullptr, 1);
-                        if (alt >= 0 && alt != node && nav.Nodes()[alt].mTrapDoor >= 0 && d.mRegions[alt] != d.mRegions[node])
-                        {
-                            std::vector<Goap::Fact> altPre = pre;
-                            altPre[0] = regionFact(alt);
-                            DomainStep other = step;
-                            other.mOther = 1;
-                            add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on from the trap door", altPre, gives, 100, other);
-                        }
-                    }
-                    // A lock Fleeches guard: unseen they do not find him at it. The Mudanchee trial's last: its
-                    // door takes a while to open after the slap, the Fleeches of its room wake as he comes and
-                    // walk their ledges, and take no notice of him unseen, or seen but quiet on the floor below.
-                    // (with enough of the power's time left for the way there, the slap and the way down: some
-                    // 170 frames, measured there)
-                    if (!guards.empty() && !watchedOrb && !(entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0) &&
-                        (world.mInvisCharge || world.mInvisComing || !world.mInvisible || world.mInvisLeft >= kUnseenUse))
-                    {
-                        std::vector<Goap::Fact> unseenPre;
-                        for (const Goap::Fact& f : pre)
-                        {
-                            if (std::find(guards.begin(), guards.end(), f) == guards.end())
-                            {
-                                unseenPre.push_back(f);
-                            }
-                        }
-                        unseenPre.push_back({Key::kInvisNow, 1});
-                        add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on unseen", unseenPre, gives, 450, step);
-                    }
-                    if (lure.mFound)
-                    {
-                        DomainStep lead;
-                        lead.mKind = StepKind::eFleechLure;
-                        lead.mEntity = entity.mId;
-                        std::vector<Goap::Fact> leadPre{regionFact(lure.mBait), {key, 0}};
-                        if (lure.mSwitch > 1)
-                        {
-                            leadPre.push_back({Key::Switch(lure.mSwitch), lure.mValue});
-                        }
-                        for (s32 first : PulledFirst(nav, world, entity))
-                        {
-                            leadPre.push_back({Key::Switch(first), 1});
-                        }
-                        add("Lead the Fleeches off and use " + name, leadPre, gives, 600, lead);
-                    }
-                    // Or what its gate keeps in is led to a Scrab and killed with it
-                    if (entity.mKind == EntityKind::eLever)
-                    {
-                        const FleechLead led = LeadFleeches(nav, world, node, entity.mSwitch);
-                        if (led.mFound)
-                        {
-                            DomainStep lead;
-                            lead.mKind = StepKind::eFleechLead;
-                            lead.mEntity = entity.mId;
-                            // (not with the power to go unseen in hand: the chant for the Scrab would spend it)
-                            std::vector<Goap::Fact> leadPre{regionFact(node), {key, 0}, {Key::kInvisNow, 0}};
-                            for (s32 first : PulledFirst(nav, world, entity))
-                            {
-                                leadPre.push_back({Key::Switch(first), 1});
-                            }
-                            std::vector<Goap::Fact> leadGives{{key, 1}};
-                            for (u32 f : led.mGroup)
-                            {
-                                leadGives.push_back({Key::Mud(f), 2});
-                            }
-                            add("Let the Fleeches out with " + name + " and lead them to Scrab#" + std::to_string(led.mScrab), leadPre, leadGives, 1500, lead);
-                        }
-                    }
-                    // Or a Paramite of the floor under a ring pulls it: taken over from a place on its screen that is
-                    // not on its level (alone it keeps off him, but cornered it strikes), where no orb stops the
-                    // chant. The Mudomo vaults' way with every ring that hangs over a pit.
-                    if (entity.mKind == EntityKind::ePullRing)
-                    {
-                        const NavNode& under = nav.Nodes()[node];
-                        const s32 scale = under.mHalf ? 2 : 1;
-                        for (const Entity& para : world.mEntities)
-                        {
-                            // (one that walks its floor, or one that comes down a web when a switch is set, which
-                            // his coming on its screen does: one that is spawned is not there to be taken over)
-                            if (para.mKind != EntityKind::eParamite || para.mGone || para.mHalf != entity.mHalf || (para.mInputs[0] != 0 && para.mInputs[1] == 0))
-                            {
-                                continue;
-                            }
-                            s32 px = para.CentreX();
-                            s32 py = para.mY2;
-                            bool down = para.mInputs[0] == 0;
-                            for (const ParamiteAt& live : world.mParamites)
-                            {
-                                if (live.mId == para.mId)
-                                {
-                                    px = live.mX;
-                                    py = live.mY;
-                                    down = !live.Hidden();
-                                }
-                            }
-                            s32 at = nav.NodeAt(px, py, para.mHalf, 30);
-                            if (!down)
-                            {
-                                // (up its web still: the floor it comes down on)
-                                at = -1;
-                                for (std::size_t n = 0; n < nav.Nodes().size(); n++)
-                                {
-                                    const NavNode& below = nav.Nodes()[n];
-                                    if (below.mHalf == para.mHalf && below.mY > py - 10 && std::abs(below.mX - px) <= NavGraph::GridStep(para.mHalf) && (at < 0 || below.mY < nav.Nodes()[at].mY))
-                                    {
-                                        at = static_cast<s32>(n);
-                                    }
-                                }
-                            }
-                            if (at < 0)
-                            {
-                                continue;
-                            }
-                            // (the screen it is on is the one he chants on: the ring may be on another, along its
-                            // floor. The Mudomo vaults' path 7: the ring a screen on from the two below the ledge.)
-                            const s32 cam = nav.CameraOf(px, nav.Nodes()[at].mY - 5);
-                            bool watched = false;
-                            for (const Entity& o : world.mEntities)
-                            {
-                                watched = watched || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == cam);
-                            }
-                            if (watched)
-                            {
-                                continue;
-                            }
-                            // (on the ring's floor, or on one with a web up to it)
-                            const bool level = nav.Nodes()[at].mLine == under.mLine && !WallBetween(nav, px, under.mX, under.mY, under.mHalf) && !GateBetween(nav, world, px, under.mX, under.mY, under.mHalf);
-                            // (or one it can be walked to by a longer way: webs down, hops, other screens. Those
-                            // are for the round of all its rings, below.)
-                            const bool routed = !level && !WebUp(nav, at, node, nullptr);
-                            if (routed && !ParamiteRoute(nav, world, at, node, nullptr))
-                            {
-                                continue;
-                            }
-                            // (the chant takes the nearest on his screen, Abe::FindObjectToPossess: from a place
-                            // that this one is the nearest to. The Mudomo vault's path 9, two of them on ledges
-                            // either side of the door: from under the left one the right one's ring was never got)
-                            const auto nearest = [&](const NavNode& spot)
-                            {
-                                const auto far = [&](s32 x, s32 y)
-                                {
-                                    return (x - spot.mX) * (x - spot.mX) + (y - spot.mY) * (y - spot.mY);
-                                };
-                                const s32 own = far(px, py);
-                                for (const Entity& o : world.mEntities)
-                                {
-                                    if (o.mKind != EntityKind::eParamite || o.mGone || o.mId == para.mId || o.mHalf != para.mHalf)
-                                    {
-                                        continue;
-                                    }
-                                    s32 ox = o.CentreX();
-                                    s32 oy = o.mY2;
-                                    for (const ParamiteAt& live : world.mParamites)
-                                    {
-                                        if (live.mId == o.mId)
-                                        {
-                                            ox = live.mX;
-                                            oy = live.mY;
-                                        }
-                                    }
-                                    if (nav.CameraOf(ox, oy - 5) == cam && far(ox, oy) <= own)
-                                    {
-                                        return false;
-                                    }
-                                }
-                                return true;
-                            };
-                            std::set<s32> from;
-                            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
-                            {
-                                const NavNode& spot = nav.Nodes()[n];
-                                if (spot.mLow || spot.mHazard || spot.mHalf || nav.CameraOf(spot.mX, spot.mY - 5) != cam || (!under.mHalf && std::abs(spot.mY - nav.Nodes()[at].mY) * scale <= 45) || !nearest(spot) || !from.insert(d.mRegions[n]).second)
-                                {
-                                    continue;
-                                }
-                                DomainStep pull;
-                                pull.mKind = StepKind::eParamitePull;
-                                pull.mEntity = entity.mId;
-                                pull.mOther = para.mId;
-                                pull.mEdge = static_cast<s32>(n);
-                                // (not with the power to go unseen in hand: the chant would spend it)
-                                std::vector<Goap::Fact> pullPre{regionFact(static_cast<s32>(n)), {key, 0}, {Key::kInvisNow, 0}};
-                                // (more than one that it can be walked to, or one that is not on its own floor's
-                                // way: all of them in one go, and it is left under the last. The walkthrough of the
-                                // first Mudomo vault: "continue left, climb up to the Ghost Lock and pull the ring
-                                // to lower the lift ... climb down the web at the end. Pull the ring above the
-                                // platform on the right")
-                                const std::vector<u32> tour = ParamiteTour(nav, world, at);
-                                if ((tour.size() >= 2 || routed) && !tour.empty() && tour[0] == entity.mId)
-                                {
-                                    std::vector<Goap::Fact> tourPre{regionFact(static_cast<s32>(n)), {Key::kInvisNow, 0}};
-                                    std::vector<Goap::Fact> tourGives;
-                                    std::string names;
-                                    for (u32 id : tour)
-                                    {
-                                        const Entity* r = world.Find(id);
-                                        tourPre.push_back({Key::Switch(r->mSwitch), 0});
-                                        tourGives.push_back({Key::Switch(r->mSwitch), 1});
-                                        names += (names.empty() ? "PullRing#" : ", PullRing#") + std::to_string(id);
-                                    }
-                                    DomainStep all = pull;
-                                    all.mKind = StepKind::eParamiteTour;
-                                    add("Have Paramite#" + std::to_string(para.mId) + " pull " + names + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), tourPre, tourGives, 500 + 100 * static_cast<s32>(tour.size()), all);
-                                    continue;
-                                }
-                                if (routed)
-                                {
-                                    continue;
-                                }
-                                add("Have Paramite#" + std::to_string(para.mId) + " pull " + name + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), pullPre, gives, 700, pull);
-                            }
-                        }
-                    }
-                }
-                if (entity.mOp == 1 || entity.mOp == 2)
-                {
-                    std::vector<Goap::Fact> offPre{regionFact(node), {key, 1}};
-                    if (freesOff)
-                    {
-                        offPre.push_back({Key::kInvisNow, 1});
-                    }
-                    add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " off", offPre, {{key, 0}}, 150, step);
-                }
+                UseThing(entity, name, step);
                 break;
-            }
-
             case EntityKind::eScrab:
-            {
-                if (entity.mGone || world.mScrabsKilled.count(entity.mId) != 0)
-                {
-                    d.mStart.Set(Key::Mud(entity.mId), 2);
-                    break;
-                }
-                if (world.mScrabParked.count(entity.mId) != 0)
-                {
-                    break;
-                }
-                // A floor of Scrabs with gates that foot switches open, and one that a foot switch shuts again:
-                // from a ledge over it one Scrab is taken over, made to kill the rest and the Fleeches down
-                // there, and walked in behind the gate that shuts
-                const s32 under = nav.NodeAt(entity.CentreX(), entity.mY2, entity.mHalf, 30);
-                if (under < 0)
-                {
-                    break;
-                }
-                const s32 line = nav.Nodes()[under].mLine;
-                bool trap = false;
-                for (const Entity& f : world.mEntities)
-                {
-                    const s32 at = f.mKind == EntityKind::eFootSwitch && f.mOp == 1 ? nav.NodeAt(f.CentreX(), f.mY2, f.mHalf, 30) : -1;
-                    trap = trap || (at >= 0 && nav.Nodes()[at].mLine == line);
-                }
-                if (!trap)
-                {
-                    break;
-                }
-                std::vector<Goap::Fact> gives;
-                for (const Entity& other : world.mEntities)
-                {
-                    const s32 at = other.mKind == EntityKind::eScrab || other.mKind == EntityKind::eFleech || other.mKind == EntityKind::eFootSwitch ? nav.NodeAt(other.CentreX(), other.mY2, other.mHalf, 30) : -1;
-                    if (at < 0 || nav.Nodes()[at].mLine != line)
-                    {
-                        continue;
-                    }
-                    if (other.mKind == EntityKind::eFootSwitch)
-                    {
-                        // (the gates that are only ever opened; the trap's ends shut)
-                        bool shutAgain = false;
-                        for (const Entity& off : world.mEntities)
-                        {
-                            shutAgain = shutAgain || (off.mKind == EntityKind::eFootSwitch && off.mSwitch == other.mSwitch && off.mOp == 1);
-                        }
-                        if (other.mOp == 0 && !shutAgain)
-                        {
-                            gives.push_back({Key::Switch(other.mSwitch), 1});
-                        }
-                    }
-                    else
-                    {
-                        gives.push_back({Key::Mud(other.mId), 2});
-                    }
-                }
-                // It has to be one that can get out to the rest: every shut gate between it and another of them
-                // with the foot switch that opens it on this Scrab's side
-                bool getsOut = true;
-                for (const Entity& other : world.mEntities)
-                {
-                    const s32 at = (other.mKind == EntityKind::eScrab || other.mKind == EntityKind::eFleech) && other.mId != entity.mId ? nav.NodeAt(other.CentreX(), other.mY2, other.mHalf, 30) : -1;
-                    if (at < 0 || nav.Nodes()[at].mLine != line)
-                    {
-                        continue;
-                    }
-                    for (const NavFeature& gate : nav.Input().mFeatures)
-                    {
-                        const s32 gx = (gate.mX1 + gate.mX2) / 2;
-                        if (gate.mKind != FeatureKind::eBarrier || !gate.mSolid || std::abs(gate.mY2 - entity.mY2) > 30 || gx <= std::min(entity.CentreX(), other.CentreX()) || gx >= std::max(entity.CentreX(), other.CentreX()) || world.Switch(gate.mSwitch) == (gate.mStartClosed ? 1 : 0))
-                        {
-                            continue;
-                        }
-                        bool opens = false;
-                        for (const Entity& sw : world.mEntities)
-                        {
-                            opens = opens || (sw.mKind == EntityKind::eFootSwitch && sw.mSwitch == gate.mSwitch && sw.mOp == (gate.mStartClosed ? 0 : 1) && (sw.CentreX() < gx) == (entity.CentreX() < gx));
-                        }
-                        getsOut = getsOut && opens;
-                    }
-                }
-                if (!getsOut)
-                {
-                    break;
-                }
-                std::set<s32> from;
-                for (std::size_t n = 0; n < nav.Nodes().size(); n++)
-                {
-                    const NavNode& spot = nav.Nodes()[n];
-                    if (spot.mHalf == entity.mHalf && spot.mY < entity.mY2 - 60 && spot.mY > entity.mY2 - 200 && nav.CameraOf(spot.mX, spot.mY - 5) == nav.CameraOf(entity.CentreX(), entity.mY2 - 5) && from.insert(d.mRegions[n]).second)
-                    {
-                        step.mKind = StepKind::eScrabRampage;
-                        step.mEdge = static_cast<s32>(n);
-                        add("Clear the floor with " + name + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), {regionFact(static_cast<s32>(n))}, gives, 2000, step);
-                    }
-                }
+                ScrabThing(entity, name, step);
                 break;
-            }
-
             case EntityKind::eFleech:
-            {
-                if (entity.mGone || world.mFleechKilled.count(entity.mId) != 0)
-                {
-                    d.mStart.Set(Key::Mud(entity.mId), 2);
-                    break;
-                }
-                // A Scrab on the floor under it, a gate between the two, and that gate's lever on a ledge the
-                // Scrab can't get to: from there the Scrab is taken over and made to kill it
-                s32 floorY = 0;
-                // (it hangs from the underside of a ledge: the floor is the one under that)
-                if (nav.FloorBelow(entity.CentreX(), entity.mY1 + 20, entity.mHalf, &floorY) < 0)
-                {
-                    break;
-                }
-                for (const Entity& scrab : world.mEntities)
-                {
-                    // (the one on that floor a screen or so off, not one that happens to be at the same height elsewhere)
-                    if (scrab.mKind != EntityKind::eScrab || scrab.mGone || scrab.mHalf != entity.mHalf || std::abs(scrab.mY2 - floorY) > 30 || std::abs(scrab.CentreX() - entity.CentreX()) > 500)
-                    {
-                        continue;
-                    }
-                    for (const NavFeature& gate : nav.Input().mFeatures)
-                    {
-                        const s32 gateX = (gate.mX1 + gate.mX2) / 2;
-                        if (gate.mKind != FeatureKind::eBarrier || !gate.mSolid || gate.mHalf != entity.mHalf || std::abs(gate.mY2 - floorY) > 30 || gateX < std::min(scrab.CentreX(), entity.CentreX()) || gateX > std::max(scrab.CentreX(), entity.CentreX()))
-                        {
-                            continue;
-                        }
-                        for (const Entity& lever : world.mEntities)
-                        {
-                            const s32 at = lever.mKind == EntityKind::eLever && lever.mSwitch == gate.mSwitch ? UseNode(nav, lever, nullptr) : -1;
-                            if (at >= 0 && nav.Nodes()[at].mY < floorY - 60)
-                            {
-                                step.mKind = StepKind::eScrabKill;
-                                step.mOther = scrab.mId;
-                                step.mEdge = static_cast<s32>(lever.mId);
-                                add("Have Scrab#" + std::to_string(scrab.mId) + " kill " + name + " from Lever#" + std::to_string(lever.mId), {regionFact(at)}, {{Key::Mud(entity.mId), 2}}, 900, step);
-                            }
-                        }
-                    }
-                }
+                FleechThing(entity, name, step);
                 break;
-            }
-
             case EntityKind::eSwitchLogic:
-            {
-                // Done already: nothing to plan, and the Mudokons it took are free again
-                if (world.Switch(entity.mSwitch) == (entity.mOp == 1 ? 0 : 1))
-                {
-                    // (a tasks door's "all on" is no switch of the game's: it is not among the ones read)
-                    if (entity.mSwitch >= 256)
-                    {
-                        d.mStart.Set(Key::Switch(entity.mSwitch), 1);
-                    }
-                    break;
-                }
-                // (one that only follows another switch is set with it: see add)
-                if (entity.mHoldOnly)
-                {
-                    break;
-                }
-                Team team;
-                std::vector<Goap::Fact> teamPre;
-                if (PlanTogether(nav, world, entity, team, teamPre))
-                {
-                    const Entity* wheel = world.Find(team.mAbeWheel);
-                    teamPre.insert(teamPre.begin(), regionFact(UseNode(nav, *wheel, nullptr)));
-                    // Drills along the floor the Mudokons are brought by, that a lever stops or slows: that first. A
-                    // Mudokon is not timed under a drill as he is. (The brewery's third Zulag: "pulling the levers
-                    // to stop most of the drills ... The drills move slow enough now that you can lead the whole
-                    // group past them". Led back as they ran, the first one was drilled.)
-                    {
-                        s32 x1 = wheel->CentreX();
-                        s32 x2 = wheel->CentreX();
-                        for (u32 id : team.mMuds)
-                        {
-                            if (const Entity* mud = world.Find(id))
-                            {
-                                x1 = std::min(x1, mud->mLive ? mud->mLiveX : mud->CentreX());
-                                x2 = std::max(x2, mud->mLive ? mud->mLiveX : mud->CentreX());
-                            }
-                        }
-                        for (const Entity& drill : world.mEntities)
-                        {
-                            if (drill.mKind != EntityKind::eDrill || drill.mGone || drill.mInputs[0] != 1 || drill.mSwitch <= 1 || drill.mHalf != wheel->mHalf || std::abs(drill.mY2 - wheel->mY2) > 40 ||
-                                drill.CentreX() < x1 || drill.CentreX() > x2)
-                            {
-                                continue;
-                            }
-                            bool lever = false;
-                            for (const Entity& l : world.mEntities)
-                            {
-                                lever = lever || (l.mKind == EntityKind::eLever && l.mSwitch == drill.mSwitch);
-                            }
-                            const Goap::Fact stopped{Key::Switch(drill.mSwitch), drill.mInputs[1] ? 1 : 0};
-                            if (lever && std::find(teamPre.begin(), teamPre.end(), stopped) == teamPre.end())
-                            {
-                                teamPre.push_back(stopped);
-                            }
-                        }
-                        // And the ones by them that come down each time a lever is pulled, with a Mudokon at that
-                        // lever pulling it in anger: sorry to him first ("hop across and say Sorry to each of the top
-                        // Mudokons": the Mudokons of that Zulag sit between two pairs of such drills, and Abe was
-                        // drilled talking to them).
-                        for (const Entity& drill : world.mEntities)
-                        {
-                            if (drill.mKind != EntityKind::eDrill || drill.mGone || drill.mInputs[0] != 2 || drill.mSwitch <= 1 || drill.mHalf != wheel->mHalf || std::abs(drill.mY2 - wheel->mY2) > 40 ||
-                                drill.CentreX() < x1 - 100 || drill.CentreX() > x2 + 100)
-                            {
-                                continue;
-                            }
-                            for (const Entity& l : world.mEntities)
-                            {
-                                if (l.mKind != EntityKind::eLever || l.mSwitch != drill.mSwitch)
-                                {
-                                    continue;
-                                }
-                                for (const Entity& mud : world.mEntities)
-                                {
-                                    const Goap::Fact calm{Key::Calm(mud.mId), 1};
-                                    if (AngryWorker(mud) && mud.CentreX() >= l.mX1 - 30 && mud.CentreX() <= l.mX2 + 30 && std::abs(mud.mY2 - l.mY2) < 30 && std::find(teamPre.begin(), teamPre.end(), calm) == teamPre.end())
-                                    {
-                                        teamPre.push_back(calm);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    step.mKind = StepKind::eTogether;
-                    add("Work together " + name + " sw" + std::to_string(entity.mSwitch), teamPre, {{Key::Switch(entity.mSwitch), entity.mOp == 1 ? 0 : 1}}, 600, step);
-                    break;
-                }
-                // Several wheels that only count while they turn have to be turned at once: without Mudokons for
-                // them there's nothing to do. (Ones that stay on are turned one after the other.)
-                s32 wheelInputs = 0;
-                for (s32 input : entity.mInputs)
-                {
-                    for (const Entity& w : world.mEntities)
-                    {
-                        wheelInputs += input > 1 && w.mKind == EntityKind::eWorkWheel && w.mSwitch == input && w.mHoldOnly ? 1 : 0;
-                    }
-                }
-                if (wheelInputs >= 2)
-                {
-                    break;
-                }
-                std::vector<Goap::Fact> pre;
-                for (s32 input : entity.mInputs)
-                {
-                    // 0 is no switch and 1 is the one that is always on
-                    if (input > 1)
-                    {
-                        const Goap::Fact fact{Key::Switch(input), 1};
-                        bool have = false;
-                        for (const Goap::Fact& p : pre)
-                        {
-                            have = have || p == fact;
-                        }
-                        if (!have)
-                        {
-                            pre.push_back(fact);
-                        }
-                    }
-                }
-                step.mKind = StepKind::eLogic;
-                {
-                    std::vector<Goap::Fact> gives{{Key::Switch(entity.mSwitch), entity.mOp == 1 ? 0 : 1}};
-                    // (a tasks door with its hubs all on sets its own switch too: the Barracks' path 14, whose
-                    // door's 218 is what the hub's door to the war room wants of it)
-                    // (only where every hub is a lever's: with that switch in the plan the block is planned as
-                    // one thing, and the blocks whose hubs are wheels and locks were got through one switch at
-                    // a time, in an order the one plan does not keep. The Barracks' path 7 so planned went to
-                    // take its flying Slig over from 1287,620 first, and died there. To be mended there.)
-                    bool levers = true;
-                    for (s32 input : entity.mInputs)
-                    {
-                        bool lever = input <= 1;
-                        for (const Entity& l : world.mEntities)
-                        {
-                            lever = lever || (l.mKind == EntityKind::eLever && l.mSwitch == input);
-                        }
-                        levers = levers && lever;
-                    }
-                    if (levers && entity.mSwitch >= 256 && entity.mState > 1 && entity.mState < 256)
-                    {
-                        gives.push_back({Key::Switch(entity.mState), 1});
-                    }
-                    add(name + " sw" + std::to_string(entity.mSwitch), pre, gives, 1, step);
-                }
+                SwitchLogicThing(entity, name, step);
                 break;
-            }
-
             case EntityKind::eMineCar:
-            {
-                // From where it stands to either end of each of its floors that has a floor to get out on: which
-                // of them it can get to is found by driving
-                const s32 carX = entity.mLive ? entity.mLiveX : entity.CentreX();
-                const s32 carY = entity.mLive ? entity.mLiveY : entity.mY2;
-                const s32 node = nav.NodeAt(carX, carY, entity.mHalf, 30);
-                if (node < 0)
-                {
-                    break;
-                }
-                const s32 cell = NavGraph::GridStep(entity.mHalf);
-                // The slam doors and the like across its floors have to be open
-                std::vector<Goap::Fact> open = {regionFact(node)};
-                for (const NavFeature& f : nav.Input().mFeatures)
-                {
-                    if (f.mKind != FeatureKind::eBarrier || f.mHalf != entity.mHalf || f.mSwitch <= 1)
-                    {
-                        continue;
-                    }
-                    for (const NavLine& line : nav.Input().mLines)
-                    {
-                        if (line.mType == kMineCarFloor && line.mY1 >= f.mY1 && line.mY1 <= f.mY2 && f.mX2 >= std::min(line.mX1, line.mX2) && f.mX1 <= std::max(line.mX1, line.mX2))
-                        {
-                            open.push_back({Key::Switch(f.mSwitch), f.mStartClosed ? 1 : 0});
-                            break;
-                        }
-                    }
-                }
-                std::set<s32> to;
-                for (const NavLine& line : nav.Input().mLines)
-                {
-                    if (line.mType != kMineCarFloor)
-                    {
-                        continue;
-                    }
-                    for (s32 end = 0; end < 2; end++)
-                    {
-                        const s32 x = end == 0 ? std::min(line.mX1, line.mX2) + cell / 2 : std::max(line.mX1, line.mX2) - cell / 2;
-                        const s32 dest = nav.NodeAt(x, line.mY1 + (entity.mHalf ? 10 : 20), entity.mHalf, 12);
-                        if (dest < 0 || nav.Nodes()[dest].mHazard || d.mRegions[dest] == d.mRegions[node] || !to.insert(d.mRegions[dest]).second)
-                        {
-                            continue;
-                        }
-                        step.mKind = StepKind::eRide;
-                        step.mEdge = dest;
-                        add("Ride " + name + " to " + std::to_string(nav.Nodes()[dest].mX) + "," + std::to_string(nav.Nodes()[dest].mY), open, {regionFact(dest)}, 600 + (std::abs(nav.Nodes()[dest].mX - carX) + std::abs(nav.Nodes()[dest].mY - carY)) / 6, step);
-                    }
-                }
+                MineCarThing(entity, name, step);
                 break;
-            }
-
             case EntityKind::eRockSack:
-            {
-                const s32 node = UseNode(nav, entity, nullptr);
-                if (node >= 0)
-                {
-                    step.mKind = StepKind::eRocks;
-                    // (a sack gives nothing to Abe while he has some)
-                    const u32 what = entity.mInputs[1] == 1 ? Key::kMeat : Key::kRocks;
-                    add(std::string(entity.mInputs[1] == 1 ? "Get meat from " : entity.mInputs[1] == 2 ? "Get a grenade from " : entity.mInputs[1] == 3 ? "Get bones from " : "Get rocks from ") + name, {regionFact(node), {what, 0}}, {{what, entity.mInputs[0] > 0 ? entity.mInputs[0] : 5}}, 300, step);
-                }
+                RockSackThing(entity, name, step);
                 break;
-            }
-
             case EntityKind::ePantsLocker:
-                // (the floor by it is clear as things are)
-                if (world.Switch(entity.mSwitch))
-                {
-                    d.mStart.Set(Key::Switch(entity.mSwitch), 1);
-                }
+                PantsLockerThing(entity, name, step);
                 break;
-
             case EntityKind::eUxb:
-            {
-                if (entity.mGone)
-                {
-                    d.mStart.Set(Key::Switch(entity.mSwitch), 1);
-                    break;
-                }
-                // From the cell on either side of it, on its floor. (One with a UXB of its own is stood in once
-                // that is off.)
-                const s32 cell = NavGraph::GridStep(entity.mHalf);
-                const s32 at = nav.NodeAt(entity.CentreX(), entity.mY2, entity.mHalf, 12);
-                for (s32 side = -1; at >= 0 && side <= 1; side += 2)
-                {
-                    const s32 stand = nav.NodeAt(nav.Nodes()[at].mX + side * cell, nav.Nodes()[at].mY, entity.mHalf, 12);
-                    if (stand < 0 || stand == at)
-                    {
-                        continue;
-                    }
-                    const NavNode& on = nav.Nodes()[stand];
-                    if (on.mLow || (on.mHazard && on.mClear < 0) || on.mLine != nav.Nodes()[at].mLine)
-                    {
-                        continue;
-                    }
-                    std::vector<Goap::Fact> pre{regionFact(stand)};
-                    if (on.mClear >= 0)
-                    {
-                        pre.push_back({Key::Switch(nav.Input().mFeatures[on.mClear].mSwitch), 1});
-                    }
-                    step.mKind = StepKind::eDisarm;
-                    step.mEdge = stand;
-                    add("Turn off " + name + " from " + std::to_string(on.mX) + "," + std::to_string(on.mY), pre, {{Key::Switch(entity.mSwitch), 1}}, 260, step);
-                }
+                UxbThing(entity, name, step);
                 break;
-            }
-
             case EntityKind::eMine:
-            {
-                if (entity.mGone)
-                {
-                    d.mStart.Set(Key::Switch(entity.mSwitch), 1);
-                    break;
-                }
-                // From any region there is a place to throw from
-                // A drill that goes where the rock would fly takes most throws: with it stopped first if it can
-                // be, and past it as it runs at a price
-                std::set<std::pair<s32, u32>> from;
-                const std::vector<ThrowSpot> spots = ThrowSpots(nav, entity.CentreX(), entity.mY2, entity.mHalf, &world);
-                for (const ThrowSpot& spot : spots)
-                {
-                    const Entity* drill = spot.mDrill ? world.Find(spot.mDrill) : nullptr;
-                    if (drill && !(drill->mInputs[0] == 1 && drill->mInputs[2] == 0 && drill->mSwitch > 1))
-                    {
-                        drill = nullptr;
-                    }
-                    if (from.insert({d.mRegions[spot.mNode], drill ? drill->mId : 0}).second)
-                    {
-                        step.mKind = StepKind::eBlow;
-                        step.mEdge = spot.mNode;
-                        std::vector<Goap::Fact> pre{regionFact(spot.mNode)};
-                        for (s32 need : spot.mNeeds)
-                        {
-                            pre.push_back({Key::Switch(need), 1});
-                        }
-                        for (const std::pair<s32, s32>& open : spot.mOpen)
-                        {
-                            pre.push_back({Key::Switch(open.first), open.second});
-                        }
-                        // (a throw that may miss is taken back and tried again: dearer)
-                        const s32 cost = spot.mSure ? 300 : 500;
-                        const std::string blow = "Blow up " + name + " from " + std::to_string(nav.Nodes()[spot.mNode].mX) + "," + std::to_string(nav.Nodes()[spot.mNode].mY);
-                        if (drill)
-                        {
-                            add(blow + " past Drill#" + std::to_string(drill->mId), pre, {{Key::Switch(entity.mSwitch), 1}}, cost + kPastDrillCost, step);
-                            d.mActions.back().mSpend = {Key::kRocks, 1};
-                            pre.push_back({Key::Switch(drill->mSwitch), drill->mInputs[1] ? 1 : 0});
-                        }
-                        add(blow, pre, {{Key::Switch(entity.mSwitch), 1}}, cost, step);
-                        d.mActions.back().mSpend = {Key::kRocks, 1};
-                    }
-                }
+                MineThing(entity, name, step);
                 break;
-            }
-
             case EntityKind::eMudokon:
-            {
-                if (entity.mGone)
-                {
-                    d.mStart.Set(Key::Mud(entity.mId), 1);
-                    break;
-                }
-                // (where it is now, once it has been led off from where the map put it)
-                const s32 home = UseNode(nav, entity, nullptr);
-                const s32 led = entity.mLive && (std::abs(entity.mLiveX - entity.CentreX()) > 40 || std::abs(entity.mLiveY - entity.mY2) > 20) ? nav.NodeAt(entity.mLiveX, entity.mLiveY, entity.mHalf, 20) : -1;
-                const s32 node = led >= 0 ? led : home;
-                if (node < 0)
-                {
-                    break;
-                }
-                // One that works a lever in anger: sorry stops it (and what its lever runs: see Work together)
-                if (AngryWorker(entity))
-                {
-                    DomainStep sorry;
-                    sorry.mKind = StepKind::eSorry;
-                    sorry.mEntity = entity.mId;
-                    add("Say sorry to " + name, {regionFact(node), {Key::Calm(entity.mId), 0}}, {{Key::Calm(entity.mId), 1}}, 300, sorry);
-                }
-                else if (entity.mInputs[3] == 1)
-                {
-                    d.mStart.Set(Key::Calm(entity.mId), 1);
-                }
-                if (kills && entity.mMood != MudMood::eSick)
-                {
-                    // Slaps do it, wherever Abe can stand next to it (a sick one doesn't feel them)
-                    DomainStep kill;
-                    kill.mKind = StepKind::eKill;
-                    kill.mEntity = entity.mId;
-                    add("Kill " + name, {regionFact(node), {Key::Mud(entity.mId), 0}}, {{Key::Mud(entity.mId), 2}}, 500, kill);
-                }
-                // The nearest portal it can walk to with Abe: it walks, drops off ends and rides lifts, and climbs nothing
-                std::vector<bool> walks(nav.Nodes().size(), false);
-                walks[node] = true;
-                for (bool more = true; more;)
-                {
-                    more = false;
-                    for (const NavEdge& edge : nav.Edges())
-                    {
-                        // (a hop along one floor is over something lying on it, which can be dealt with: not a gap)
-                        const bool sameFloor = nav.Nodes()[edge.mFrom].mLine == nav.Nodes()[edge.mTo].mLine;
-                        const bool can = edge.mKind == EdgeKind::eWalk || edge.mKind == EdgeKind::eFall || edge.mKind == EdgeKind::eLift || edge.mKind == EdgeKind::eRoll || ((edge.mKind == EdgeKind::eHop || edge.mKind == EdgeKind::eRunJump) && sameFloor);
-                        if (can && walks[edge.mFrom] && !walks[edge.mTo])
-                        {
-                            walks[edge.mTo] = true;
-                            more = true;
-                        }
-                    }
-                }
-                const Entity* best = nullptr;
-                s32 bestDist = 0;
-                std::vector<s32> bestAcross;
-                std::vector<s32> blindWay;
-                for (const Entity& portal : world.mEntities)
-                {
-                    if (portal.mKind != EntityKind::eBirdPortal || !portal.mRescuePortal || portal.mHalf != entity.mHalf)
-                    {
-                        continue;
-                    }
-                    if (entity.mBlind)
-                    {
-                        // It is walked there a stretch at a time, see RescueTask::LeadBlind
-                        std::vector<s32> way;
-                        if (!(portal.mInputs[1] > 1 && world.Switch(portal.mInputs[1])) && BlindWay(nav, world, node, portal, false, way) && (!best || way.size() < blindWay.size()))
-                        {
-                            best = &portal;
-                            blindWay = way;
-                        }
-                        continue;
-                    }
-                    // Gone for good (the switch that does it is often the rescue it was put there for)
-                    if (portal.mInputs[1] > 1 && world.Switch(portal.mInputs[1]))
-                    {
-                        continue;
-                    }
-                    const s32 pnode = UseNode(nav, portal, nullptr);
-                    if (pnode < 0 || !walks[pnode])
-                    {
-                        continue;
-                    }
-                    // (in another region: by a way it walks, with what shuts that way open. Bonewerkz' first annex:
-                    // the trap door the levers shut is its bridge to the portal.)
-                    std::vector<s32> across;
-                    if (d.mRegions[pnode] != d.mRegions[node])
-                    {
-                        const NavGraph::EdgeCost mudCost = [](const NavEdge& e)
-                        {
-                            return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eLift ? e.mCost : -1;
-                        };
-                        if (!nav.FindPath(node, pnode, mudCost, across))
-                        {
-                            continue;
-                        }
-                    }
-                    const s32 dist = std::abs(portal.CentreX() - entity.CentreX()) + std::abs(portal.mY2 - entity.mY2) * 4 + (across.empty() ? 0 : 2000);
-                    if (!best || dist < bestDist)
-                    {
-                        best = &portal;
-                        bestDist = dist;
-                        bestAcross = across;
-                    }
-                }
-                if (!best)
-                {
-                    break;
-                }
-                step.mKind = StepKind::eRescue;
-                step.mOther = best->mId;
-                std::vector<Goap::Fact> effects{{Key::Mud(entity.mId), 1}};
-                if (entity.mSwitch > 1)
-                {
-                    effects.push_back({Key::Switch(entity.mSwitch), 1});
-                }
-                std::vector<Goap::Fact> pre{regionFact(node), {Key::Mud(entity.mId), 0}};
-                if (entity.mBlind && !blindWay.empty())
-                {
-                    // From where it ends up, with its way open and the drills on it stopped
-                    pre[0] = regionFact(nav.Edges()[blindWay.back()].mTo);
-                    const auto need = [&pre](const Goap::Fact& fact)
-                    {
-                        bool have = false;
-                        for (const Goap::Fact& p : pre)
-                        {
-                            have = have || p == fact;
-                        }
-                        if (!have)
-                        {
-                            pre.push_back(fact);
-                        }
-                    };
-                    for (s32 idx : blindWay)
-                    {
-                        const NavEdge& e = nav.Edges()[idx];
-                        s32 condSwitch = 0;
-                        s32 condValue = 0;
-                        const bool drop = e.mKind == EdgeKind::eFall && nav.Nodes()[e.mFrom].mTrapDoor >= 0 && e.mFeature == nav.Nodes()[e.mFrom].mTrapDoor;
-                        if (!drop && nav.Condition(e, &condSwitch, &condValue))
-                        {
-                            need({Key::Switch(condSwitch), condValue});
-                        }
-                        // (a lift that isn't at the stop it is walked onto: the switch that brings it)
-                        const NavNode& onto = nav.Nodes()[e.mTo];
-                        if (onto.mLiftStop >= 0 && nav.Nodes()[e.mFrom].mLiftStop < 0)
-                        {
-                            const NavFeature& stop = nav.Input().mFeatures[onto.mLiftStop];
-                            if (!world.LiftAtStop(stop.mX1, stop.mX2, onto.mY, stop.mA != 0) && stop.mSwitch > 1)
-                            {
-                                need({Key::Switch(stop.mSwitch), 1});
-                            }
-                        }
-                        for (s32 high = 0; high < 2; high++)
-                        {
-                            if (const Entity* drill = DrillAt(nav, world, e.mTo, high != 0))
-                            {
-                                need({Key::Switch(drill->mSwitch), drill->mInputs[1] ? 1 : 0});
-                            }
-                        }
-                    }
-                }
-                if (best->mInputs[0] > 1)
-                {
-                    // The portal isn't there until its switch is on
-                    pre.push_back({Key::Switch(best->mInputs[0]), 1});
-                }
-                for (const s32 idx : bestAcross)
-                {
-                    s32 condSwitch = 0;
-                    s32 condValue = 0;
-                    if (nav.Condition(nav.Edges()[idx], &condSwitch, &condValue) && std::find(pre.begin(), pre.end(), Goap::Fact{Key::Switch(condSwitch), condValue}) == pre.end())
-                    {
-                        pre.push_back({Key::Switch(condSwitch), condValue});
-                    }
-                }
-                add("Rescue " + name + " via BirdPortal#" + std::to_string(best->mId), pre, effects, 400 + bestDist / 4, step);
-                d.mRescuable.push_back(entity.mId);
+                MudokonThing(entity, name, step);
                 break;
-            }
-
             default:
                 break;
         }
     }
+}
 
+void Domain::Builder::UseThing(const Entity& entity, const std::string& name, DomainStep& step)
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    s32& abeNode = mAbeNode;
+    Domain& d = mD;
+    std::map<u32, FleechLure>& lures = mLures;
+    std::set<s32>& letOut = mLetOut;
+    std::set<u32>& huntable = mHuntable;
+    std::set<s32>& huntGates = mHuntGates;
+    // (a lock that has been slapped is done: its switch is as good as on)
+    if (entity.mKind == EntityKind::eSlapLock && world.mLocksSlapped.count(entity.mId) != 0)
+    {
+        if (entity.mSwitch > 1)
+        {
+            d.mStart.Set(Key::Switch(entity.mSwitch), 1);
+        }
+        return;
+    }
+    const s32 node = UseNode(nav, entity, nullptr);
+    // A Fleech hanging over a lock bites whoever slaps it: it has to be dead first (the walkthrough has
+    // a Scrab do it)
+    std::vector<Goap::Fact> guards;
+    // (the ones of them that are Paramites loose on its floor: see the last resort at the plain use)
+    std::vector<Goap::Fact> packGuards;
+    if (entity.mKind == EntityKind::eSlapLock)
+    {
+        for (const Entity& f : world.mEntities)
+        {
+            if (f.mKind == EntityKind::eFleech && f.mHalf == entity.mHalf && std::abs(f.CentreX() - entity.CentreX()) <= 40 && std::abs(f.mY2 - entity.mY2) <= 120)
+            {
+                // (nor one asleep on the floor by a lock that gives the power to go unseen: the slap
+                // wakes it, and he is off and unseen before it strikes. The walkthrough's way with
+                // the fifth of the Mudanchee vaults: "sneak up to the Ghost Lock and slap it. Run
+                // back to the right and climb up. Turn invisible")
+                // (unless a Scrab can be had to kill it first: then that is the way, and the power is
+                // kept for something else)
+                if (f.mInputs[0] != 0 && f.mInputs[1] == 0 && entity.mInputs[0] > 0 && huntable.count(f.mId) == 0)
+                {
+                    continue;
+                }
+                // (nor one that is under the lock's floor altogether: on the floor below, or hung
+                // from the underside of this one. The Mudomo vault's path 12)
+                if (node >= 0 && f.mY1 >= nav.Nodes()[node].mY - 5)
+                {
+                    continue;
+                }
+                // (not one with a floor between it and the lock: it hangs over that floor)
+                bool floorBetween = false;
+                for (const NavNode& n : nav.Nodes())
+                {
+                    floorBetween = floorBetween || (n.mHalf == f.mHalf && std::abs(n.mX - f.CentreX()) <= 13 && n.mY >= f.mY2 && n.mY < entity.mY2 - 20);
+                }
+                if (!floorBetween)
+                {
+                    guards.push_back({Key::Mud(f.mId), 2});
+                }
+            }
+        }
+    }
+    // Paramites on the floor it is used from, with no wall between. Two or more hunt him along it: only
+    // unseen then (the Mudomo vaults' path 10: "turn invisible and run past the Paramites ... quickly
+    // go down and slap the Ghost Lock, then get back up before the invisibility wears off"). One alone
+    // keeps off him until it is cornered, and near it he corners it: that one is drawn off with meat
+    // ("throw some meat behind you to get rid of the Paramite, then slap the Ghost Lock").
+    u32 shy = 0;
+    Goap::Fact shyFact{0, 0};
+    if ((entity.mKind == EntityKind::eSlapLock || entity.mKind == EntityKind::eLever) && node >= 0)
+    {
+        const NavNode& at = nav.Nodes()[node];
+        std::vector<u32> pack;
+        s32 nearest = 100000;
+        for (const Entity& para : world.mEntities)
+        {
+            if (para.mKind != EntityKind::eParamite || para.mGone || para.mHalf != at.mHalf || para.mInputs[0] != 0)
+            {
+                continue;
+            }
+            s32 px = para.CentreX();
+            s32 py = para.mY2;
+            for (const ParamiteAt& live : world.mParamites)
+            {
+                if (live.mId == para.mId)
+                {
+                    px = live.mX;
+                    py = live.mY;
+                }
+            }
+            const s32 on = nav.NodeAt(px, py, para.mHalf, 30);
+            if (on >= 0 && nav.Nodes()[on].mLine == at.mLine && !WallBetween(nav, px, at.mX, at.mY, at.mHalf) && !GateBetween(nav, world, px, at.mX, at.mY, at.mHalf))
+            {
+                pack.push_back(para.mId);
+                nearest = std::min(nearest, std::abs(px - at.mX));
+            }
+        }
+        if (pack.size() >= 2 || (pack.size() == 1 && nearest <= 250))
+        {
+            for (u32 id : pack)
+            {
+                guards.push_back({Key::Mud(id), 2});
+                packGuards.push_back({Key::Mud(id), 2});
+            }
+            if (pack.size() == 1)
+            {
+                shy = pack[0];
+                shyFact = {Key::Mud(shy), 2};
+            }
+        }
+    }
+    // (what it takes with the meat thrown: everything but that Paramite out of the way)
+    const auto withMeat = [&shyFact](std::vector<Goap::Fact> pre)
+    {
+        pre.erase(std::remove(pre.begin(), pre.end(), shyFact), pre.end());
+        return pre;
+    };
+    DomainStep meatStep;
+    meatStep.mKind = StepKind::eMeatUse;
+    meatStep.mEntity = entity.mId;
+    meatStep.mOther = shy;
+    // Or led off: got to follow him away from it and come back to by another way (the walkthrough's
+    // way with the first of the Mudanchee vaults)
+    const FleechLure lure = lures.count(entity.mId) ? lures[entity.mId] : FleechLure();
+    if (entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0 && node >= 0 && !world.mInvisEver && entity.mSwitch <= 1)
+    {
+        step.mKind = StepKind::eUse;
+        std::vector<Goap::Fact> pre{regionFact(node), {Key::kInvis, 0}};
+        pre.insert(pre.end(), guards.begin(), guards.end());
+        add("Get invisibility from " + name, pre, {{Key::kInvis, 1}, {Key::kInvisNow, 1}}, 150, step);
+        if (shy)
+        {
+            add("Throw meat for Paramite#" + std::to_string(shy) + " and get invisibility from " + name, withMeat(pre), {{Key::kInvis, 1}, {Key::kInvisNow, 1}}, 300, meatStep);
+            d.mActions.back().mSpend = {Key::kMeat, 1};
+        }
+    }
+    if (node < 0 || entity.mHoldOnly || entity.mSwitch <= 1)
+    {
+        return;
+    }
+    const u32 key = Key::Switch(entity.mSwitch);
+    if (entity.mKind == EntityKind::eWorkWheel)
+    {
+        // A blind Mudokon on the wheel's floor can be called to it from anywhere on its screen that
+        // is on the wheel's side of it: it walks until the wheel stops it
+        for (const Entity& mud : world.mEntities)
+        {
+            if (mud.mKind != EntityKind::eMudokon || !mud.mBlind || mud.mGone || mud.mHalf != entity.mHalf)
+            {
+                continue;
+            }
+            const s32 mudNode = UseNode(nav, mud, nullptr);
+            bool gets = mudNode >= 0 && nav.Nodes()[mudNode].mLine == nav.Nodes()[node].mLine;
+            for (s32 cur = mudNode; gets && cur != node;)
+            {
+                const NavNode& n = nav.Nodes()[cur];
+                s32 next = -1;
+                for (s32 i = n.mFirstEdge; i < n.mFirstEdge + n.mEdgeCount && next < 0; i++)
+                {
+                    const NavEdge& e = nav.Edges()[i];
+                    const NavNode& to = nav.Nodes()[e.mTo];
+                    if (e.mKind == EdgeKind::eWalk && to.mLine == n.mLine && (to.mX - n.mX) * (nav.Nodes()[node].mX - n.mX) > 0 && !to.mHazard && to.mSweep < 0 && to.mSweepHigh < 0 && !nav.Condition(e, nullptr, nullptr))
+                    {
+                        next = e.mTo;
+                    }
+                }
+                gets = next >= 0;
+                cur = next;
+            }
+            if (!gets || mudNode == node)
+            {
+                continue;
+            }
+            std::set<s32> from;
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                if (CallSpot(nav, mud, entity, static_cast<s32>(n)) && from.insert(d.mRegions[n]).second)
+                {
+                    DomainStep send;
+                    send.mKind = StepKind::eSend;
+                    send.mEntity = mud.mId;
+                    send.mOther = entity.mId;
+                    add("Send Mudokon#" + std::to_string(mud.mId) + " to " + name + " from " + std::to_string(nav.Nodes()[n].mX) + "," + std::to_string(nav.Nodes()[n].mY), {regionFact(static_cast<s32>(n)), {Key::Mud(mud.mId), 0}, {key, 0}}, {{key, 1}}, 250, send);
+                }
+            }
+        }
+    }
+    step.mKind = StepKind::eUse;
+    // A gate with a Scrab behind it is only opened with the power to go invisible in hand (the
+    // walkthrough's way past the vault's second screen): it is there to keep the Scrab in. Shutting
+    // one is fine.
+    bool freesOn = false;
+    bool freesOff = false;
+    for (const NavFeature& f : nav.Input().mFeatures)
+    {
+        // (not a gate a Scrab is to be walked through to Fleeches: that one is opened for it)
+        if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mSwitch != entity.mSwitch || huntGates.count(f.mSwitch) != 0)
+        {
+            continue;
+        }
+        for (const Entity& scrab : world.mEntities)
+        {
+            if (scrab.mKind == EntityKind::eScrab && !scrab.mGone && scrab.mHalf == f.mHalf && std::abs(scrab.mY2 - f.mY2) <= 30 && std::abs(scrab.CentreX() - (f.mX1 + f.mX2) / 2) <= 300)
+            {
+                freesOn = freesOn || f.mStartClosed;
+                freesOff = freesOff || !f.mStartClosed;
+            }
+        }
+    }
+    if (entity.mOp == 0 || entity.mOp == 2)
+    {
+        std::vector<Goap::Fact> pre{regionFact(node), {key, 0}};
+        pre.insert(pre.end(), guards.begin(), guards.end());
+        // Nor is a gate opened onto a Fleech that sleeps just behind it: that one is killed first
+        // (one that is awake there is led off, where that is what the gate is opened for: see the locks.
+        // And one asleep on the floor sleeps on: a gate makes no noise, and he sneaks by it.)
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mSwitch != entity.mSwitch || !f.mStartClosed)
+            {
+                continue;
+            }
+            // (pulled from the other layer than its gate is in, what the gate lets out does not
+            // get at him: the second Mudomo vault, whose levers are in the background)
+            if (node >= 0 && nav.Nodes()[node].mHalf != f.mHalf)
+            {
+                continue;
+            }
+            for (const Entity& fl : world.mEntities)
+            {
+                const Goap::Fact dead{Key::Mud(fl.mId), 2};
+                if (fl.mKind == EntityKind::eFleech && (fl.mInputs[1] != 0 || (fl.mInputs[0] == 0 && letOut.count(entity.mSwitch) == 0)) && fl.mHalf == f.mHalf && std::abs(fl.CentreX() - (f.mX1 + f.mX2) / 2) <= 80 && fl.mY2 <= f.mY2 + 10 && fl.mY2 >= f.mY2 - 120 && std::find(pre.begin(), pre.end(), dead) == pre.end())
+                {
+                    // (unless this lever is the one the Scrab is let through by)
+                    bool scrabGate = false;
+                    for (const Entity& scrab : world.mEntities)
+                    {
+                        scrabGate = scrabGate || (scrab.mKind == EntityKind::eScrab && std::abs(scrab.mY2 - f.mY2) <= 30 && std::abs(scrab.CentreX() - (f.mX1 + f.mX2) / 2) <= 300);
+                    }
+                    if (!scrabGate)
+                    {
+                        pre.push_back(dead);
+                    }
+                }
+            }
+        }
+        if (freesOn)
+        {
+            pre.push_back({Key::kInvisNow, 1});
+        }
+        // On the floor of a Scrab that no gate can be shut on (there is none along that floor), in reach
+        // of it, and got to from cells it does not get to with no crossing between that would ask for
+        // it (a ledge over its floor):
+        // unseen (the walkthrough's sixth Mudanchee vault: "use your invisibility power to slap that
+        // other Ghost Lock, then jump back into the well")
+        if (!freesOn && node >= 0)
+        {
+            const NavNode& at = nav.Nodes()[node];
+            bool canShut = true;
+            std::vector<Goap::Fact> shut;
+            // (not on a floor with a gate anywhere along it: there the Scrabs are shut in behind it
+            // first, or lured off, and the steps for that say so)
+            bool gated = false;
+            for (const NavFeature& f : nav.Input().mFeatures)
+            {
+                const s32 by = f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == at.mHalf ? nav.NodeAt((f.mX1 + f.mX2) / 2, f.mY2, f.mHalf, 30) : -1;
+                gated = gated || (by >= 0 && nav.Nodes()[by].mLine == at.mLine);
+            }
+            if (!gated && ScrabReaches(nav, world, at.mX, at.mY, at.mHalf, false, nullptr, &shut, &canShut) && !canShut)
+            {
+                bool mixed = false;
+                for (std::size_t n = 0; n < nav.Nodes().size() && !mixed; n++)
+                {
+                    const NavNode& other = nav.Nodes()[n];
+                    mixed = d.mRegions[n] == d.mRegions[node] && !ScrabReaches(nav, world, other.mX, other.mY, other.mHalf, false);
+                }
+                if (mixed)
+                {
+                    pre.push_back({Key::kInvisNow, 1});
+                }
+            }
+        }
+        bool watchedOrb = false;
+        // At a place a Slig watches, a security orb on its screen (no chant there, so it is not taken
+        // over): unseen (the Mudanchee trial: "turn invisible and climb up. Go right and slap the 2
+        // Ghost Locks")
+        if (node >= 0 && std::find(pre.begin(), pre.end(), Goap::Fact{Key::kInvisNow, 1}) == pre.end() && !(entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0))
+        {
+            const NavNode& at = nav.Nodes()[node];
+            bool watched = false;
+            std::set<u32> orbs;
+            std::vector<std::pair<s32, s32>> watchers;
+            for (const SligAt& slig : world.Threats())
+            {
+                if (slig.mAsleep || slig.mPossessed || slig.mHalf != at.mHalf || std::abs(slig.mY - at.mY) > 45 || std::abs(slig.mX - at.mX) >= 450)
+                {
+                    continue;
+                }
+                watchers.push_back({slig.mX, slig.mY});
+                for (const Entity& orb : world.mEntities)
+                {
+                    if (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone &&
+                        (nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(slig.mX, slig.mY - 5) || nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(at.mX, at.mY - 5)))
+                    {
+                        orbs.insert(orb.mId);
+                    }
+                    // (its screen or the thing's: its beat may cross both)
+                    watched = watched || (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone &&
+                                          (nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(slig.mX, slig.mY - 5) || nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(at.mX, at.mY - 5)));
+                }
+            }
+            // (taking it over from the next screen, which has no orb, was tried: its beat has it
+            // there some 50 frames at a time, and a chant needs more)
+            // (only where the power to go unseen is to be had: in a path with no lock that gives it
+            // there is nothing to wait for, and the thing is used as it always was. The Mines' path
+            // 10: the Slig by the well at 1404,339 wakes as he lands, and with this asked for the
+            // levers there were never pulled.)
+            bool power = world.mInvisCharge || world.mInvisible || world.mInvisComing;
+            for (const Entity& lock : world.mEntities)
+            {
+                // (one there is a way to from where he is, shut or not: FeeCo's Executive Offices, whose one
+                // lock is a well back from the lever a Slig watches under an orb, and wells go one way)
+                if (lock.mKind != EntityKind::eSlapLock || lock.mInputs[0] <= 0 || power)
+                {
+                    continue;
+                }
+                const s32 lockNode = UseNode(nav, lock, nullptr);
+                if (abeNode < 0 || lockNode < 0)
+                {
+                    power = true;
+                    continue;
+                }
+                std::vector<char> seen(nav.Nodes().size(), 0);
+                std::vector<s32> open{abeNode};
+                seen[abeNode] = 1;
+                while (!open.empty() && !power)
+                {
+                    const s32 cur = open.back();
+                    open.pop_back();
+                    power = cur == lockNode;
+                    for (s32 k = 0; k < nav.Nodes()[cur].mEdgeCount; k++)
+                    {
+                        const s32 to = nav.Edges()[nav.Nodes()[cur].mFirstEdge + k].mTo;
+                        if (!seen[to])
+                        {
+                            seen[to] = 1;
+                            open.push_back(to);
+                        }
+                    }
+                }
+            }
+            // (or, in a path with a boom machine, with that orb blown up first: then the Sligs are taken
+            // over as anywhere. The walkthrough of the Barracks' Slig bunks: "throw the grenade forward on
+            // the fifth beep to blow up the Chant Protector along with the Slig. Possess and kill the
+            // bottom Sligs, then go down to pull the lever".)
+            bool boom = false;
+            for (const Entity& machine : world.mEntities)
+            {
+                // (one he can get to as things are, or from the thing: the Barracks' path 1 has its
+                // machine behind the gate this very lever opens, and the lever was never pulled)
+                const s32 machineNode = machine.mKind == EntityKind::eRockSack && machine.mInputs[1] == 2 && !machine.mGone ? UseNode(nav, machine, nullptr) : -1;
+                boom = boom || (machineNode >= 0 && (d.mRegions[machineNode] == d.mRegions[node] || (abeNode >= 0 && d.mRegions[machineNode] == d.mRegions[abeNode]) || world.mRocks > 0));
+            }
+            if (watched && power)
+            {
+                pre.push_back({Key::kInvisNow, 1});
+                watchedOrb = true;
+            }
+            else if (watched && boom)
+            {
+                // (or, where each of those Sligs is one a grenade is thrown at, with them dead: that is
+                // what the grenades are for, and the orb is nothing to him then. The Barracks' path 1:
+                // the wheel at the top, watched by the Slig the second grenade is for, had the plan
+                // throw a third at the orb, which missed every time.)
+                std::vector<Goap::Fact> dead;
+                const std::vector<GrenadeTarget> targets = GrenadeTargets(nav.Input(), world);
+                for (const auto& w : watchers)
+                {
+                    const GrenadeTarget* is = nullptr;
+                    for (const GrenadeTarget& t : targets)
+                    {
+                        if (!is && std::abs(t.mFloorY - w.second) <= 10 && w.first >= t.mLineX1 - 30 && w.first <= t.mLineX2 + 30)
+                        {
+                            is = &t;
+                        }
+                    }
+                    if (!is)
+                    {
+                        dead.clear();
+                        break;
+                    }
+                    dead.push_back({Key::Switch(World::HazardSwitch(is->mSlig)), 1});
+                }
+                if (!dead.empty())
+                {
+                    pre.insert(pre.end(), dead.begin(), dead.end());
+                }
+                for (u32 orb : orbs)
+                {
+                    if (dead.empty())
+                    {
+                        pre.push_back({Key::Switch(World::HazardSwitch(orb)), 1});
+                    }
+                }
+            }
+        }
+        // (one that opens such a gate by way of something else, a timer in the Mudanchee vault's path 4,
+        // is not held back: the crossings onto that Scrab's floor want its gate shut or him unseen)
+        for (s32 first : PulledFirst(nav, world, entity))
+        {
+            pre.push_back({Key::Switch(first), 1});
+        }
+        std::vector<Goap::Fact> gives{{key, 1}};
+        if (entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0)
+        {
+            gives.push_back({Key::kInvis, 1});
+            gives.push_back({Key::kInvisNow, 1});
+        }
+        // (dear on a floor a Glukkon stands on with Sligs awake on its screen: that lever is the Glukkon's to
+        // have pulled, by one of them. The Executive Office of Bonewerkz: gone for by Abe, he was shot.)
+        s32 useCost = 150;
+        if (node >= 0)
+        {
+            const NavNode& at = nav.Nodes()[node];
+            bool glukkon = false;
+            bool sligs = false;
+            for (const GlukkonAt& g : world.mGlukkons)
+            {
+                glukkon = glukkon || (g.mHalf == at.mHalf && std::abs(g.mY - at.mY) <= 30 && nav.CameraOf(g.mX, g.mY - 5) == nav.CameraOf(at.mX, at.mY - 5));
+            }
+            for (const SligAt& slig : world.mSligs)
+            {
+                sligs = sligs || (!slig.mAsleep && !slig.mPossessed && slig.mHalf == at.mHalf && nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(at.mX, at.mY - 5));
+            }
+            // (or with Sligs the map puts on that screen: they drop in as he comes)
+            for (const Entity& e : world.mEntities)
+            {
+                sligs = sligs || (e.mKind == EntityKind::eSlig && !e.mGone && e.mHalf == at.mHalf && nav.CameraOf(e.CentreX(), e.mY2 - 5) == nav.CameraOf(at.mX, at.mY - 5));
+            }
+            useCost += glukkon && sligs ? 2000 : 0;
+        }
+        // A lever that makes a Slig level with him on a floor of its own: pulled, then at a run off his
+        // floor to the hoist up to the Slig's and up to hang from it, unseen, until the Slig has walked
+        // off that floor; then it is taken over from above, has a lever of the floor it went down to
+        // pulled if one is wanted, and is burst. Pulled and stood by, it shoots 22 frames after it is made. (The brewery's fourth Zulag: "pull the next lever up top on
+        // the right, immediately running forward as the Slig appears. Pull up to the ledge as he walks
+        // off of it ... Possess the Slig. Position yourself to the right of the lever ... pull the lever".)
+        u32 called = 0;
+        const s32 ledge = entity.mKind == EntityKind::eLever && world.Switch(entity.mSwitch) == 0 ? SligCallLedge(nav, world, entity, &called) : -1;
+        if (ledge >= 0)
+        {
+            const Entity* made = world.Find(called);
+            const s32 lands = SligNode(nav, *made);
+            DomainStep call;
+            call.mKind = StepKind::eSligCall;
+            call.mEntity = entity.mId;
+            call.mOther = called;
+            call.mEdge = 0;
+            std::vector<Goap::Fact> callGives = gives;
+            callGives.push_back({Key::Mud(called), 2});
+            add("Call Slig#" + std::to_string(called) + " with " + name + " sw" + std::to_string(entity.mSwitch) + " hung under its floor until it walks off, take it over and burst it", pre, callGives, 700, call);
+            for (const Entity& other : world.mEntities)
+            {
+                if (other.mKind != EntityKind::eLever || other.mId == entity.mId || other.mSwitch <= 1 || other.mHalf != entity.mHalf || world.Switch(other.mSwitch) != 0 || std::abs(other.mY2 - entity.mY2) <= 45)
+                {
+                    continue;
+                }
+                const s32 by = UseNode(nav, other, nullptr);
+                if (by < 0)
+                {
+                    continue;
+                }
+                const s32 line = nav.Nodes()[by].mLine;
+                std::vector<Goap::Fact> gates;
+                const std::vector<s32> way = SligWay(nav, lands, [&](s32 n)
+                                                     { return nav.Nodes()[n].mLine == line && std::abs(nav.Nodes()[n].mX - other.CentreX()) <= 3 * NavGraph::GridStep(other.mHalf); }, &gates, nullptr);
+                if (way.empty() || !gates.empty())
+                {
+                    continue;
+                }
+                DomainStep both = call;
+                both.mEdge = static_cast<s32>(other.mId);
+                std::vector<Goap::Fact> bothGives = callGives;
+                bothGives.push_back({Key::Switch(other.mSwitch), 1});
+                add("Call Slig#" + std::to_string(called) + " with " + name + " sw" + std::to_string(entity.mSwitch) + " hung under its floor until it walks off, take it over, have it pull Lever#" + std::to_string(other.mId) + " sw" + std::to_string(other.mSwitch) + " and burst it", pre, bothGives, 750, both);
+            }
+        }
+        else
+        {
+            add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, useCost, step);
+        }
+        // With Paramites loose on its floor and nothing that rids it of them: all the same, dear, so that
+        // any other way is taken first. One alone keeps off him until it is cornered, and the tries
+        // differ. (The second Mudomo vault in the run from the Mines: the second Paramite stayed loose
+        // on the locks' floor, nothing was offered for it, and there the run ended. For now: the run
+        // is to get on, its deaths are counted later.)
+        if (!packGuards.empty() && nav.Input().mIsAe)
+        {
+            std::vector<Goap::Fact> bare;
+            for (const Goap::Fact& f : pre)
+            {
+                if (std::find(packGuards.begin(), packGuards.end(), f) == packGuards.end())
+                {
+                    bare.push_back(f);
+                }
+            }
+            add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on with the Paramites of its floor about", bare, gives, 6000, step);
+        }
+        if (shy)
+        {
+            add("Throw meat for Paramite#" + std::to_string(shy) + " and use " + name + " sw" + std::to_string(entity.mSwitch) + " on", withMeat(pre), gives, 300, meatStep);
+            d.mActions.back().mSpend = {Key::kMeat, 1};
+        }
+        // A lever with a trap door for the cell on its other side: from there too, where that is another
+        // part of the path (he comes down on it, and what the lever does is open it under him. The
+        // Mudomo hub at 3187,1140: "immediately pull the lever beside you or you're lunch".)
+        if (entity.mKind == EntityKind::eLever && node >= 0)
+        {
+            s32 penGate = -1;
+            s32 penOpen = -1;
+            s32 penShut = -1;
+            std::vector<u32> penGroup;
+            if (FleechPen(nav, world, entity, &penGate, &penOpen, &penShut, &penGroup))
+            {
+                std::vector<Goap::Fact> penPre;
+                std::vector<Goap::Fact> penGives = gives;
+                for (const Goap::Fact& f : pre)
+                {
+                    bool ofGroup = false;
+                    for (u32 id : penGroup)
+                    {
+                        ofGroup = ofGroup || (f.mKey == Key::Mud(id) && f.mValue == 2);
+                    }
+                    if (!ofGroup)
+                    {
+                        penPre.push_back(f);
+                    }
+                }
+                for (u32 id : penGroup)
+                {
+                    penGives.push_back({Key::Mud(id), 2});
+                }
+                penGives.push_back(regionFact(penShut));
+                DomainStep pen;
+                pen.mKind = StepKind::eFleechPen;
+                pen.mEntity = entity.mId;
+                pen.mOther = static_cast<u32>(penGate);
+                const NavFeature& pg = nav.Input().mFeatures[penGate];
+                add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on and shut its Fleeches in behind the gate at " + std::to_string((pg.mX1 + pg.mX2) / 2) + "," + std::to_string(pg.mY2), penPre, penGives, 700, pen);
+            }
+        }
+        if (entity.mKind == EntityKind::eLever && node >= 0)
+        {
+            const s32 alt = UseNode(nav, entity, nullptr, 1);
+            if (alt >= 0 && alt != node && nav.Nodes()[alt].mTrapDoor >= 0 && d.mRegions[alt] != d.mRegions[node])
+            {
+                std::vector<Goap::Fact> altPre = pre;
+                altPre[0] = regionFact(alt);
+                DomainStep other = step;
+                other.mOther = 1;
+                add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on from the trap door", altPre, gives, 100, other);
+            }
+        }
+        // A lock Fleeches guard: unseen they do not find him at it. The Mudanchee trial's last: its
+        // door takes a while to open after the slap, the Fleeches of its room wake as he comes and
+        // walk their ledges, and take no notice of him unseen, or seen but quiet on the floor below.
+        // (with enough of the power's time left for the way there, the slap and the way down: some
+        // 170 frames, measured there)
+        if (!guards.empty() && !watchedOrb && !(entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0) &&
+            (world.mInvisCharge || world.mInvisComing || !world.mInvisible || world.mInvisLeft >= kUnseenUse))
+        {
+            std::vector<Goap::Fact> unseenPre;
+            for (const Goap::Fact& f : pre)
+            {
+                if (std::find(guards.begin(), guards.end(), f) == guards.end())
+                {
+                    unseenPre.push_back(f);
+                }
+            }
+            unseenPre.push_back({Key::kInvisNow, 1});
+            add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on unseen", unseenPre, gives, 450, step);
+        }
+        if (lure.mFound)
+        {
+            DomainStep lead;
+            lead.mKind = StepKind::eFleechLure;
+            lead.mEntity = entity.mId;
+            std::vector<Goap::Fact> leadPre{regionFact(lure.mBait), {key, 0}};
+            if (lure.mSwitch > 1)
+            {
+                leadPre.push_back({Key::Switch(lure.mSwitch), lure.mValue});
+            }
+            for (s32 first : PulledFirst(nav, world, entity))
+            {
+                leadPre.push_back({Key::Switch(first), 1});
+            }
+            add("Lead the Fleeches off and use " + name, leadPre, gives, 600, lead);
+        }
+        // Or what its gate keeps in is led to a Scrab and killed with it
+        if (entity.mKind == EntityKind::eLever)
+        {
+            const FleechLead led = LeadFleeches(nav, world, node, entity.mSwitch);
+            if (led.mFound)
+            {
+                DomainStep lead;
+                lead.mKind = StepKind::eFleechLead;
+                lead.mEntity = entity.mId;
+                // (not with the power to go unseen in hand: the chant for the Scrab would spend it)
+                std::vector<Goap::Fact> leadPre{regionFact(node), {key, 0}, {Key::kInvisNow, 0}};
+                for (s32 first : PulledFirst(nav, world, entity))
+                {
+                    leadPre.push_back({Key::Switch(first), 1});
+                }
+                std::vector<Goap::Fact> leadGives{{key, 1}};
+                for (u32 f : led.mGroup)
+                {
+                    leadGives.push_back({Key::Mud(f), 2});
+                }
+                add("Let the Fleeches out with " + name + " and lead them to Scrab#" + std::to_string(led.mScrab), leadPre, leadGives, 1500, lead);
+            }
+        }
+        // Or a Paramite of the floor under a ring pulls it: taken over from a place on its screen that is
+        // not on its level (alone it keeps off him, but cornered it strikes), where no orb stops the
+        // chant. The Mudomo vaults' way with every ring that hangs over a pit.
+        if (entity.mKind == EntityKind::ePullRing)
+        {
+            const NavNode& under = nav.Nodes()[node];
+            const s32 scale = under.mHalf ? 2 : 1;
+            for (const Entity& para : world.mEntities)
+            {
+                // (one that walks its floor, or one that comes down a web when a switch is set, which
+                // his coming on its screen does: one that is spawned is not there to be taken over)
+                if (para.mKind != EntityKind::eParamite || para.mGone || para.mHalf != entity.mHalf || (para.mInputs[0] != 0 && para.mInputs[1] == 0))
+                {
+                    continue;
+                }
+                s32 px = para.CentreX();
+                s32 py = para.mY2;
+                bool down = para.mInputs[0] == 0;
+                for (const ParamiteAt& live : world.mParamites)
+                {
+                    if (live.mId == para.mId)
+                    {
+                        px = live.mX;
+                        py = live.mY;
+                        down = !live.Hidden();
+                    }
+                }
+                s32 at = nav.NodeAt(px, py, para.mHalf, 30);
+                if (!down)
+                {
+                    // (up its web still: the floor it comes down on)
+                    at = -1;
+                    for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+                    {
+                        const NavNode& below = nav.Nodes()[n];
+                        if (below.mHalf == para.mHalf && below.mY > py - 10 && std::abs(below.mX - px) <= NavGraph::GridStep(para.mHalf) && (at < 0 || below.mY < nav.Nodes()[at].mY))
+                        {
+                            at = static_cast<s32>(n);
+                        }
+                    }
+                }
+                if (at < 0)
+                {
+                    continue;
+                }
+                // (the screen it is on is the one he chants on: the ring may be on another, along its
+                // floor. The Mudomo vaults' path 7: the ring a screen on from the two below the ledge.)
+                const s32 cam = nav.CameraOf(px, nav.Nodes()[at].mY - 5);
+                bool watched = false;
+                for (const Entity& o : world.mEntities)
+                {
+                    watched = watched || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == cam);
+                }
+                if (watched)
+                {
+                    continue;
+                }
+                // (on the ring's floor, or on one with a web up to it)
+                const bool level = nav.Nodes()[at].mLine == under.mLine && !WallBetween(nav, px, under.mX, under.mY, under.mHalf) && !GateBetween(nav, world, px, under.mX, under.mY, under.mHalf);
+                // (or one it can be walked to by a longer way: webs down, hops, other screens. Those
+                // are for the round of all its rings, below.)
+                const bool routed = !level && !WebUp(nav, at, node, nullptr);
+                if (routed && !ParamiteRoute(nav, world, at, node, nullptr))
+                {
+                    continue;
+                }
+                // (the chant takes the nearest on his screen, Abe::FindObjectToPossess: from a place
+                // that this one is the nearest to. The Mudomo vault's path 9, two of them on ledges
+                // either side of the door: from under the left one the right one's ring was never got)
+                const auto nearest = [&](const NavNode& spot)
+                {
+                    const auto far = [&](s32 x, s32 y)
+                    {
+                        return (x - spot.mX) * (x - spot.mX) + (y - spot.mY) * (y - spot.mY);
+                    };
+                    const s32 own = far(px, py);
+                    for (const Entity& o : world.mEntities)
+                    {
+                        if (o.mKind != EntityKind::eParamite || o.mGone || o.mId == para.mId || o.mHalf != para.mHalf)
+                        {
+                            continue;
+                        }
+                        s32 ox = o.CentreX();
+                        s32 oy = o.mY2;
+                        for (const ParamiteAt& live : world.mParamites)
+                        {
+                            if (live.mId == o.mId)
+                            {
+                                ox = live.mX;
+                                oy = live.mY;
+                            }
+                        }
+                        if (nav.CameraOf(ox, oy - 5) == cam && far(ox, oy) <= own)
+                        {
+                            return false;
+                        }
+                    }
+                    return true;
+                };
+                std::set<s32> from;
+                for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+                {
+                    const NavNode& spot = nav.Nodes()[n];
+                    if (spot.mLow || spot.mHazard || spot.mHalf || nav.CameraOf(spot.mX, spot.mY - 5) != cam || (!under.mHalf && std::abs(spot.mY - nav.Nodes()[at].mY) * scale <= 45) || !nearest(spot) || !from.insert(d.mRegions[n]).second)
+                    {
+                        continue;
+                    }
+                    DomainStep pull;
+                    pull.mKind = StepKind::eParamitePull;
+                    pull.mEntity = entity.mId;
+                    pull.mOther = para.mId;
+                    pull.mEdge = static_cast<s32>(n);
+                    // (not with the power to go unseen in hand: the chant would spend it)
+                    std::vector<Goap::Fact> pullPre{regionFact(static_cast<s32>(n)), {key, 0}, {Key::kInvisNow, 0}};
+                    // (more than one that it can be walked to, or one that is not on its own floor's
+                    // way: all of them in one go, and it is left under the last. The walkthrough of the
+                    // first Mudomo vault: "continue left, climb up to the Ghost Lock and pull the ring
+                    // to lower the lift ... climb down the web at the end. Pull the ring above the
+                    // platform on the right")
+                    const std::vector<u32> tour = ParamiteTour(nav, world, at);
+                    if ((tour.size() >= 2 || routed) && !tour.empty() && tour[0] == entity.mId)
+                    {
+                        std::vector<Goap::Fact> tourPre{regionFact(static_cast<s32>(n)), {Key::kInvisNow, 0}};
+                        std::vector<Goap::Fact> tourGives;
+                        std::string names;
+                        for (u32 id : tour)
+                        {
+                            const Entity* r = world.Find(id);
+                            tourPre.push_back({Key::Switch(r->mSwitch), 0});
+                            tourGives.push_back({Key::Switch(r->mSwitch), 1});
+                            names += (names.empty() ? "PullRing#" : ", PullRing#") + std::to_string(id);
+                        }
+                        DomainStep all = pull;
+                        all.mKind = StepKind::eParamiteTour;
+                        add("Have Paramite#" + std::to_string(para.mId) + " pull " + names + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), tourPre, tourGives, 500 + 100 * static_cast<s32>(tour.size()), all);
+                        continue;
+                    }
+                    if (routed)
+                    {
+                        continue;
+                    }
+                    add("Have Paramite#" + std::to_string(para.mId) + " pull " + name + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), pullPre, gives, 700, pull);
+                }
+            }
+        }
+    }
+    if (entity.mOp == 1 || entity.mOp == 2)
+    {
+        std::vector<Goap::Fact> offPre{regionFact(node), {key, 1}};
+        if (freesOff)
+        {
+            offPre.push_back({Key::kInvisNow, 1});
+        }
+        add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " off", offPre, {{key, 0}}, 150, step);
+    }
+}
+
+void Domain::Builder::ScrabThing(const Entity& entity, const std::string& name, DomainStep& step)
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    if (entity.mGone || world.mScrabsKilled.count(entity.mId) != 0)
+    {
+        d.mStart.Set(Key::Mud(entity.mId), 2);
+        return;
+    }
+    if (world.mScrabParked.count(entity.mId) != 0)
+    {
+        return;
+    }
+    // A floor of Scrabs with gates that foot switches open, and one that a foot switch shuts again:
+    // from a ledge over it one Scrab is taken over, made to kill the rest and the Fleeches down
+    // there, and walked in behind the gate that shuts
+    const s32 under = nav.NodeAt(entity.CentreX(), entity.mY2, entity.mHalf, 30);
+    if (under < 0)
+    {
+        return;
+    }
+    const s32 line = nav.Nodes()[under].mLine;
+    bool trap = false;
+    for (const Entity& f : world.mEntities)
+    {
+        const s32 at = f.mKind == EntityKind::eFootSwitch && f.mOp == 1 ? nav.NodeAt(f.CentreX(), f.mY2, f.mHalf, 30) : -1;
+        trap = trap || (at >= 0 && nav.Nodes()[at].mLine == line);
+    }
+    if (!trap)
+    {
+        return;
+    }
+    std::vector<Goap::Fact> gives;
+    for (const Entity& other : world.mEntities)
+    {
+        const s32 at = other.mKind == EntityKind::eScrab || other.mKind == EntityKind::eFleech || other.mKind == EntityKind::eFootSwitch ? nav.NodeAt(other.CentreX(), other.mY2, other.mHalf, 30) : -1;
+        if (at < 0 || nav.Nodes()[at].mLine != line)
+        {
+            continue;
+        }
+        if (other.mKind == EntityKind::eFootSwitch)
+        {
+            // (the gates that are only ever opened; the trap's ends shut)
+            bool shutAgain = false;
+            for (const Entity& off : world.mEntities)
+            {
+                shutAgain = shutAgain || (off.mKind == EntityKind::eFootSwitch && off.mSwitch == other.mSwitch && off.mOp == 1);
+            }
+            if (other.mOp == 0 && !shutAgain)
+            {
+                gives.push_back({Key::Switch(other.mSwitch), 1});
+            }
+        }
+        else
+        {
+            gives.push_back({Key::Mud(other.mId), 2});
+        }
+    }
+    // It has to be one that can get out to the rest: every shut gate between it and another of them
+    // with the foot switch that opens it on this Scrab's side
+    bool getsOut = true;
+    for (const Entity& other : world.mEntities)
+    {
+        const s32 at = (other.mKind == EntityKind::eScrab || other.mKind == EntityKind::eFleech) && other.mId != entity.mId ? nav.NodeAt(other.CentreX(), other.mY2, other.mHalf, 30) : -1;
+        if (at < 0 || nav.Nodes()[at].mLine != line)
+        {
+            continue;
+        }
+        for (const NavFeature& gate : nav.Input().mFeatures)
+        {
+            const s32 gx = (gate.mX1 + gate.mX2) / 2;
+            if (gate.mKind != FeatureKind::eBarrier || !gate.mSolid || std::abs(gate.mY2 - entity.mY2) > 30 || gx <= std::min(entity.CentreX(), other.CentreX()) || gx >= std::max(entity.CentreX(), other.CentreX()) || world.Switch(gate.mSwitch) == (gate.mStartClosed ? 1 : 0))
+            {
+                continue;
+            }
+            bool opens = false;
+            for (const Entity& sw : world.mEntities)
+            {
+                opens = opens || (sw.mKind == EntityKind::eFootSwitch && sw.mSwitch == gate.mSwitch && sw.mOp == (gate.mStartClosed ? 0 : 1) && (sw.CentreX() < gx) == (entity.CentreX() < gx));
+            }
+            getsOut = getsOut && opens;
+        }
+    }
+    if (!getsOut)
+    {
+        return;
+    }
+    std::set<s32> from;
+    for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+    {
+        const NavNode& spot = nav.Nodes()[n];
+        if (spot.mHalf == entity.mHalf && spot.mY < entity.mY2 - 60 && spot.mY > entity.mY2 - 200 && nav.CameraOf(spot.mX, spot.mY - 5) == nav.CameraOf(entity.CentreX(), entity.mY2 - 5) && from.insert(d.mRegions[n]).second)
+        {
+            step.mKind = StepKind::eScrabRampage;
+            step.mEdge = static_cast<s32>(n);
+            add("Clear the floor with " + name + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), {regionFact(static_cast<s32>(n))}, gives, 2000, step);
+        }
+    }
+}
+
+void Domain::Builder::FleechThing(const Entity& entity, const std::string& name, DomainStep& step)
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    if (entity.mGone || world.mFleechKilled.count(entity.mId) != 0)
+    {
+        d.mStart.Set(Key::Mud(entity.mId), 2);
+        return;
+    }
+    // A Scrab on the floor under it, a gate between the two, and that gate's lever on a ledge the
+    // Scrab can't get to: from there the Scrab is taken over and made to kill it
+    s32 floorY = 0;
+    // (it hangs from the underside of a ledge: the floor is the one under that)
+    if (nav.FloorBelow(entity.CentreX(), entity.mY1 + 20, entity.mHalf, &floorY) < 0)
+    {
+        return;
+    }
+    for (const Entity& scrab : world.mEntities)
+    {
+        // (the one on that floor a screen or so off, not one that happens to be at the same height elsewhere)
+        if (scrab.mKind != EntityKind::eScrab || scrab.mGone || scrab.mHalf != entity.mHalf || std::abs(scrab.mY2 - floorY) > 30 || std::abs(scrab.CentreX() - entity.CentreX()) > 500)
+        {
+            continue;
+        }
+        for (const NavFeature& gate : nav.Input().mFeatures)
+        {
+            const s32 gateX = (gate.mX1 + gate.mX2) / 2;
+            if (gate.mKind != FeatureKind::eBarrier || !gate.mSolid || gate.mHalf != entity.mHalf || std::abs(gate.mY2 - floorY) > 30 || gateX < std::min(scrab.CentreX(), entity.CentreX()) || gateX > std::max(scrab.CentreX(), entity.CentreX()))
+            {
+                continue;
+            }
+            for (const Entity& lever : world.mEntities)
+            {
+                const s32 at = lever.mKind == EntityKind::eLever && lever.mSwitch == gate.mSwitch ? UseNode(nav, lever, nullptr) : -1;
+                if (at >= 0 && nav.Nodes()[at].mY < floorY - 60)
+                {
+                    step.mKind = StepKind::eScrabKill;
+                    step.mOther = scrab.mId;
+                    step.mEdge = static_cast<s32>(lever.mId);
+                    add("Have Scrab#" + std::to_string(scrab.mId) + " kill " + name + " from Lever#" + std::to_string(lever.mId), {regionFact(at)}, {{Key::Mud(entity.mId), 2}}, 900, step);
+                }
+            }
+        }
+    }
+}
+
+void Domain::Builder::SwitchLogicThing(const Entity& entity, const std::string& name, DomainStep& step)
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    std::vector<std::pair<s32, s32>>& follows = mFollows;
+    // Done already: nothing to plan, and the Mudokons it took are free again
+    if (world.Switch(entity.mSwitch) == (entity.mOp == 1 ? 0 : 1))
+    {
+        // (a tasks door's "all on" is no switch of the game's: it is not among the ones read)
+        if (entity.mSwitch >= 256)
+        {
+            d.mStart.Set(Key::Switch(entity.mSwitch), 1);
+        }
+        return;
+    }
+    // (one that only follows another switch is set with it: see add)
+    if (entity.mHoldOnly)
+    {
+        return;
+    }
+    Team team;
+    std::vector<Goap::Fact> teamPre;
+    if (PlanTogether(nav, world, entity, team, teamPre))
+    {
+        const Entity* wheel = world.Find(team.mAbeWheel);
+        teamPre.insert(teamPre.begin(), regionFact(UseNode(nav, *wheel, nullptr)));
+        // Drills along the floor the Mudokons are brought by, that a lever stops or slows: that first. A
+        // Mudokon is not timed under a drill as he is. (The brewery's third Zulag: "pulling the levers
+        // to stop most of the drills ... The drills move slow enough now that you can lead the whole
+        // group past them". Led back as they ran, the first one was drilled.)
+        {
+            s32 x1 = wheel->CentreX();
+            s32 x2 = wheel->CentreX();
+            for (u32 id : team.mMuds)
+            {
+                if (const Entity* mud = world.Find(id))
+                {
+                    x1 = std::min(x1, mud->mLive ? mud->mLiveX : mud->CentreX());
+                    x2 = std::max(x2, mud->mLive ? mud->mLiveX : mud->CentreX());
+                }
+            }
+            for (const Entity& drill : world.mEntities)
+            {
+                if (drill.mKind != EntityKind::eDrill || drill.mGone || drill.mInputs[0] != 1 || drill.mSwitch <= 1 || drill.mHalf != wheel->mHalf || std::abs(drill.mY2 - wheel->mY2) > 40 ||
+                    drill.CentreX() < x1 || drill.CentreX() > x2)
+                {
+                    continue;
+                }
+                bool lever = false;
+                for (const Entity& l : world.mEntities)
+                {
+                    lever = lever || (l.mKind == EntityKind::eLever && l.mSwitch == drill.mSwitch);
+                }
+                const Goap::Fact stopped{Key::Switch(drill.mSwitch), drill.mInputs[1] ? 1 : 0};
+                if (lever && std::find(teamPre.begin(), teamPre.end(), stopped) == teamPre.end())
+                {
+                    teamPre.push_back(stopped);
+                }
+            }
+            // And the ones by them that come down each time a lever is pulled, with a Mudokon at that
+            // lever pulling it in anger: sorry to him first ("hop across and say Sorry to each of the top
+            // Mudokons": the Mudokons of that Zulag sit between two pairs of such drills, and Abe was
+            // drilled talking to them).
+            for (const Entity& drill : world.mEntities)
+            {
+                if (drill.mKind != EntityKind::eDrill || drill.mGone || drill.mInputs[0] != 2 || drill.mSwitch <= 1 || drill.mHalf != wheel->mHalf || std::abs(drill.mY2 - wheel->mY2) > 40 ||
+                    drill.CentreX() < x1 - 100 || drill.CentreX() > x2 + 100)
+                {
+                    continue;
+                }
+                for (const Entity& l : world.mEntities)
+                {
+                    if (l.mKind != EntityKind::eLever || l.mSwitch != drill.mSwitch)
+                    {
+                        continue;
+                    }
+                    for (const Entity& mud : world.mEntities)
+                    {
+                        const Goap::Fact calm{Key::Calm(mud.mId), 1};
+                        if (AngryWorker(mud) && mud.CentreX() >= l.mX1 - 30 && mud.CentreX() <= l.mX2 + 30 && std::abs(mud.mY2 - l.mY2) < 30 && std::find(teamPre.begin(), teamPre.end(), calm) == teamPre.end())
+                        {
+                            teamPre.push_back(calm);
+                        }
+                    }
+                }
+            }
+        }
+        step.mKind = StepKind::eTogether;
+        add("Work together " + name + " sw" + std::to_string(entity.mSwitch), teamPre, {{Key::Switch(entity.mSwitch), entity.mOp == 1 ? 0 : 1}}, 600, step);
+        return;
+    }
+    // Several wheels that only count while they turn have to be turned at once: without Mudokons for
+    // them there's nothing to do. (Ones that stay on are turned one after the other.)
+    s32 wheelInputs = 0;
+    for (s32 input : entity.mInputs)
+    {
+        for (const Entity& w : world.mEntities)
+        {
+            wheelInputs += input > 1 && w.mKind == EntityKind::eWorkWheel && w.mSwitch == input && w.mHoldOnly ? 1 : 0;
+        }
+    }
+    if (wheelInputs >= 2)
+    {
+        return;
+    }
+    std::vector<Goap::Fact> pre;
+    for (s32 input : entity.mInputs)
+    {
+        // 0 is no switch and 1 is the one that is always on
+        if (input > 1)
+        {
+            const Goap::Fact fact{Key::Switch(input), 1};
+            bool have = false;
+            for (const Goap::Fact& p : pre)
+            {
+                have = have || p == fact;
+            }
+            if (!have)
+            {
+                pre.push_back(fact);
+            }
+        }
+    }
+    step.mKind = StepKind::eLogic;
+    {
+        std::vector<Goap::Fact> gives{{Key::Switch(entity.mSwitch), entity.mOp == 1 ? 0 : 1}};
+        // (a tasks door with its hubs all on sets its own switch too: the Barracks' path 14, whose
+        // door's 218 is what the hub's door to the war room wants of it)
+        // (only where every hub is a lever's: with that switch in the plan the block is planned as
+        // one thing, and the blocks whose hubs are wheels and locks were got through one switch at
+        // a time, in an order the one plan does not keep. The Barracks' path 7 so planned went to
+        // take its flying Slig over from 1287,620 first, and died there. To be mended there.)
+        bool levers = true;
+        for (s32 input : entity.mInputs)
+        {
+            bool lever = input <= 1;
+            for (const Entity& l : world.mEntities)
+            {
+                lever = lever || (l.mKind == EntityKind::eLever && l.mSwitch == input);
+            }
+            levers = levers && lever;
+        }
+        if (levers && entity.mSwitch >= 256 && entity.mState > 1 && entity.mState < 256)
+        {
+            gives.push_back({Key::Switch(entity.mState), 1});
+        }
+        add(name + " sw" + std::to_string(entity.mSwitch), pre, gives, 1, step);
+    }
+}
+
+void Domain::Builder::MineCarThing(const Entity& entity, const std::string& name, DomainStep& step)
+{
+    const NavGraph& nav = mNav;
+    Domain& d = mD;
+    // From where it stands to either end of each of its floors that has a floor to get out on: which
+    // of them it can get to is found by driving
+    const s32 carX = entity.mLive ? entity.mLiveX : entity.CentreX();
+    const s32 carY = entity.mLive ? entity.mLiveY : entity.mY2;
+    const s32 node = nav.NodeAt(carX, carY, entity.mHalf, 30);
+    if (node < 0)
+    {
+        return;
+    }
+    const s32 cell = NavGraph::GridStep(entity.mHalf);
+    // The slam doors and the like across its floors have to be open
+    std::vector<Goap::Fact> open = {regionFact(node)};
+    for (const NavFeature& f : nav.Input().mFeatures)
+    {
+        if (f.mKind != FeatureKind::eBarrier || f.mHalf != entity.mHalf || f.mSwitch <= 1)
+        {
+            continue;
+        }
+        for (const NavLine& line : nav.Input().mLines)
+        {
+            if (line.mType == kMineCarFloor && line.mY1 >= f.mY1 && line.mY1 <= f.mY2 && f.mX2 >= std::min(line.mX1, line.mX2) && f.mX1 <= std::max(line.mX1, line.mX2))
+            {
+                open.push_back({Key::Switch(f.mSwitch), f.mStartClosed ? 1 : 0});
+                break;
+            }
+        }
+    }
+    std::set<s32> to;
+    for (const NavLine& line : nav.Input().mLines)
+    {
+        if (line.mType != kMineCarFloor)
+        {
+            continue;
+        }
+        for (s32 end = 0; end < 2; end++)
+        {
+            const s32 x = end == 0 ? std::min(line.mX1, line.mX2) + cell / 2 : std::max(line.mX1, line.mX2) - cell / 2;
+            const s32 dest = nav.NodeAt(x, line.mY1 + (entity.mHalf ? 10 : 20), entity.mHalf, 12);
+            if (dest < 0 || nav.Nodes()[dest].mHazard || d.mRegions[dest] == d.mRegions[node] || !to.insert(d.mRegions[dest]).second)
+            {
+                continue;
+            }
+            step.mKind = StepKind::eRide;
+            step.mEdge = dest;
+            add("Ride " + name + " to " + std::to_string(nav.Nodes()[dest].mX) + "," + std::to_string(nav.Nodes()[dest].mY), open, {regionFact(dest)}, 600 + (std::abs(nav.Nodes()[dest].mX - carX) + std::abs(nav.Nodes()[dest].mY - carY)) / 6, step);
+        }
+    }
+}
+
+void Domain::Builder::RockSackThing(const Entity& entity, const std::string& name, DomainStep& step)
+{
+    const NavGraph& nav = mNav;
+    const s32 node = UseNode(nav, entity, nullptr);
+    if (node >= 0)
+    {
+        step.mKind = StepKind::eRocks;
+        // (a sack gives nothing to Abe while he has some)
+        const u32 what = entity.mInputs[1] == 1 ? Key::kMeat : Key::kRocks;
+        add(std::string(entity.mInputs[1] == 1 ? "Get meat from " : entity.mInputs[1] == 2 ? "Get a grenade from " : entity.mInputs[1] == 3 ? "Get bones from " : "Get rocks from ") + name, {regionFact(node), {what, 0}}, {{what, entity.mInputs[0] > 0 ? entity.mInputs[0] : 5}}, 300, step);
+    }
+}
+
+void Domain::Builder::PantsLockerThing(const Entity& entity, const std::string& name, DomainStep& step)
+{
+    const World& world = mWorld;
+    Domain& d = mD;
+    // (the floor by it is clear as things are)
+    if (world.Switch(entity.mSwitch))
+    {
+        d.mStart.Set(Key::Switch(entity.mSwitch), 1);
+    }
+}
+
+void Domain::Builder::UxbThing(const Entity& entity, const std::string& name, DomainStep& step)
+{
+    const NavGraph& nav = mNav;
+    Domain& d = mD;
+    if (entity.mGone)
+    {
+        d.mStart.Set(Key::Switch(entity.mSwitch), 1);
+        return;
+    }
+    // From the cell on either side of it, on its floor. (One with a UXB of its own is stood in once
+    // that is off.)
+    const s32 cell = NavGraph::GridStep(entity.mHalf);
+    const s32 at = nav.NodeAt(entity.CentreX(), entity.mY2, entity.mHalf, 12);
+    for (s32 side = -1; at >= 0 && side <= 1; side += 2)
+    {
+        const s32 stand = nav.NodeAt(nav.Nodes()[at].mX + side * cell, nav.Nodes()[at].mY, entity.mHalf, 12);
+        if (stand < 0 || stand == at)
+        {
+            continue;
+        }
+        const NavNode& on = nav.Nodes()[stand];
+        if (on.mLow || (on.mHazard && on.mClear < 0) || on.mLine != nav.Nodes()[at].mLine)
+        {
+            continue;
+        }
+        std::vector<Goap::Fact> pre{regionFact(stand)};
+        if (on.mClear >= 0)
+        {
+            pre.push_back({Key::Switch(nav.Input().mFeatures[on.mClear].mSwitch), 1});
+        }
+        step.mKind = StepKind::eDisarm;
+        step.mEdge = stand;
+        add("Turn off " + name + " from " + std::to_string(on.mX) + "," + std::to_string(on.mY), pre, {{Key::Switch(entity.mSwitch), 1}}, 260, step);
+    }
+}
+
+void Domain::Builder::MineThing(const Entity& entity, const std::string& name, DomainStep& step)
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    if (entity.mGone)
+    {
+        d.mStart.Set(Key::Switch(entity.mSwitch), 1);
+        return;
+    }
+    // From any region there is a place to throw from
+    // A drill that goes where the rock would fly takes most throws: with it stopped first if it can
+    // be, and past it as it runs at a price
+    std::set<std::pair<s32, u32>> from;
+    const std::vector<ThrowSpot> spots = ThrowSpots(nav, entity.CentreX(), entity.mY2, entity.mHalf, &world);
+    for (const ThrowSpot& spot : spots)
+    {
+        const Entity* drill = spot.mDrill ? world.Find(spot.mDrill) : nullptr;
+        if (drill && !(drill->mInputs[0] == 1 && drill->mInputs[2] == 0 && drill->mSwitch > 1))
+        {
+            drill = nullptr;
+        }
+        if (from.insert({d.mRegions[spot.mNode], drill ? drill->mId : 0}).second)
+        {
+            step.mKind = StepKind::eBlow;
+            step.mEdge = spot.mNode;
+            std::vector<Goap::Fact> pre{regionFact(spot.mNode)};
+            for (s32 need : spot.mNeeds)
+            {
+                pre.push_back({Key::Switch(need), 1});
+            }
+            for (const std::pair<s32, s32>& open : spot.mOpen)
+            {
+                pre.push_back({Key::Switch(open.first), open.second});
+            }
+            // (a throw that may miss is taken back and tried again: dearer)
+            const s32 cost = spot.mSure ? 300 : 500;
+            const std::string blow = "Blow up " + name + " from " + std::to_string(nav.Nodes()[spot.mNode].mX) + "," + std::to_string(nav.Nodes()[spot.mNode].mY);
+            if (drill)
+            {
+                add(blow + " past Drill#" + std::to_string(drill->mId), pre, {{Key::Switch(entity.mSwitch), 1}}, cost + kPastDrillCost, step);
+                d.mActions.back().mSpend = {Key::kRocks, 1};
+                pre.push_back({Key::Switch(drill->mSwitch), drill->mInputs[1] ? 1 : 0});
+            }
+            add(blow, pre, {{Key::Switch(entity.mSwitch), 1}}, cost, step);
+            d.mActions.back().mSpend = {Key::kRocks, 1};
+        }
+    }
+}
+
+void Domain::Builder::MudokonThing(const Entity& entity, const std::string& name, DomainStep& step)
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    bool& kills = mKills;
+    Domain& d = mD;
+    if (entity.mGone)
+    {
+        d.mStart.Set(Key::Mud(entity.mId), 1);
+        return;
+    }
+    // (where it is now, once it has been led off from where the map put it)
+    const s32 home = UseNode(nav, entity, nullptr);
+    const s32 led = entity.mLive && (std::abs(entity.mLiveX - entity.CentreX()) > 40 || std::abs(entity.mLiveY - entity.mY2) > 20) ? nav.NodeAt(entity.mLiveX, entity.mLiveY, entity.mHalf, 20) : -1;
+    const s32 node = led >= 0 ? led : home;
+    if (node < 0)
+    {
+        return;
+    }
+    // One that works a lever in anger: sorry stops it (and what its lever runs: see Work together)
+    if (AngryWorker(entity))
+    {
+        DomainStep sorry;
+        sorry.mKind = StepKind::eSorry;
+        sorry.mEntity = entity.mId;
+        add("Say sorry to " + name, {regionFact(node), {Key::Calm(entity.mId), 0}}, {{Key::Calm(entity.mId), 1}}, 300, sorry);
+    }
+    else if (entity.mInputs[3] == 1)
+    {
+        d.mStart.Set(Key::Calm(entity.mId), 1);
+    }
+    if (kills && entity.mMood != MudMood::eSick)
+    {
+        // Slaps do it, wherever Abe can stand next to it (a sick one doesn't feel them)
+        DomainStep kill;
+        kill.mKind = StepKind::eKill;
+        kill.mEntity = entity.mId;
+        add("Kill " + name, {regionFact(node), {Key::Mud(entity.mId), 0}}, {{Key::Mud(entity.mId), 2}}, 500, kill);
+    }
+    // The nearest portal it can walk to with Abe: it walks, drops off ends and rides lifts, and climbs nothing
+    std::vector<bool> walks(nav.Nodes().size(), false);
+    walks[node] = true;
+    for (bool more = true; more;)
+    {
+        more = false;
+        for (const NavEdge& edge : nav.Edges())
+        {
+            // (a hop along one floor is over something lying on it, which can be dealt with: not a gap)
+            const bool sameFloor = nav.Nodes()[edge.mFrom].mLine == nav.Nodes()[edge.mTo].mLine;
+            const bool can = edge.mKind == EdgeKind::eWalk || edge.mKind == EdgeKind::eFall || edge.mKind == EdgeKind::eLift || edge.mKind == EdgeKind::eRoll || ((edge.mKind == EdgeKind::eHop || edge.mKind == EdgeKind::eRunJump) && sameFloor);
+            if (can && walks[edge.mFrom] && !walks[edge.mTo])
+            {
+                walks[edge.mTo] = true;
+                more = true;
+            }
+        }
+    }
+    const Entity* best = nullptr;
+    s32 bestDist = 0;
+    std::vector<s32> bestAcross;
+    std::vector<s32> blindWay;
+    for (const Entity& portal : world.mEntities)
+    {
+        if (portal.mKind != EntityKind::eBirdPortal || !portal.mRescuePortal || portal.mHalf != entity.mHalf)
+        {
+            continue;
+        }
+        if (entity.mBlind)
+        {
+            // It is walked there a stretch at a time, see RescueTask::LeadBlind
+            std::vector<s32> way;
+            if (!(portal.mInputs[1] > 1 && world.Switch(portal.mInputs[1])) && BlindWay(nav, world, node, portal, false, way) && (!best || way.size() < blindWay.size()))
+            {
+                best = &portal;
+                blindWay = way;
+            }
+            continue;
+        }
+        // Gone for good (the switch that does it is often the rescue it was put there for)
+        if (portal.mInputs[1] > 1 && world.Switch(portal.mInputs[1]))
+        {
+            continue;
+        }
+        const s32 pnode = UseNode(nav, portal, nullptr);
+        if (pnode < 0 || !walks[pnode])
+        {
+            continue;
+        }
+        // (in another region: by a way it walks, with what shuts that way open. Bonewerkz' first annex:
+        // the trap door the levers shut is its bridge to the portal.)
+        std::vector<s32> across;
+        if (d.mRegions[pnode] != d.mRegions[node])
+        {
+            const NavGraph::EdgeCost mudCost = [](const NavEdge& e)
+            {
+                return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eLift ? e.mCost : -1;
+            };
+            if (!nav.FindPath(node, pnode, mudCost, across))
+            {
+                continue;
+            }
+        }
+        const s32 dist = std::abs(portal.CentreX() - entity.CentreX()) + std::abs(portal.mY2 - entity.mY2) * 4 + (across.empty() ? 0 : 2000);
+        if (!best || dist < bestDist)
+        {
+            best = &portal;
+            bestDist = dist;
+            bestAcross = across;
+        }
+    }
+    if (!best)
+    {
+        return;
+    }
+    step.mKind = StepKind::eRescue;
+    step.mOther = best->mId;
+    std::vector<Goap::Fact> effects{{Key::Mud(entity.mId), 1}};
+    if (entity.mSwitch > 1)
+    {
+        effects.push_back({Key::Switch(entity.mSwitch), 1});
+    }
+    std::vector<Goap::Fact> pre{regionFact(node), {Key::Mud(entity.mId), 0}};
+    if (entity.mBlind && !blindWay.empty())
+    {
+        // From where it ends up, with its way open and the drills on it stopped
+        pre[0] = regionFact(nav.Edges()[blindWay.back()].mTo);
+        const auto need = [&pre](const Goap::Fact& fact)
+        {
+            bool have = false;
+            for (const Goap::Fact& p : pre)
+            {
+                have = have || p == fact;
+            }
+            if (!have)
+            {
+                pre.push_back(fact);
+            }
+        };
+        for (s32 idx : blindWay)
+        {
+            const NavEdge& e = nav.Edges()[idx];
+            s32 condSwitch = 0;
+            s32 condValue = 0;
+            const bool drop = e.mKind == EdgeKind::eFall && nav.Nodes()[e.mFrom].mTrapDoor >= 0 && e.mFeature == nav.Nodes()[e.mFrom].mTrapDoor;
+            if (!drop && nav.Condition(e, &condSwitch, &condValue))
+            {
+                need({Key::Switch(condSwitch), condValue});
+            }
+            // (a lift that isn't at the stop it is walked onto: the switch that brings it)
+            const NavNode& onto = nav.Nodes()[e.mTo];
+            if (onto.mLiftStop >= 0 && nav.Nodes()[e.mFrom].mLiftStop < 0)
+            {
+                const NavFeature& stop = nav.Input().mFeatures[onto.mLiftStop];
+                if (!world.LiftAtStop(stop.mX1, stop.mX2, onto.mY, stop.mA != 0) && stop.mSwitch > 1)
+                {
+                    need({Key::Switch(stop.mSwitch), 1});
+                }
+            }
+            for (s32 high = 0; high < 2; high++)
+            {
+                if (const Entity* drill = DrillAt(nav, world, e.mTo, high != 0))
+                {
+                    need({Key::Switch(drill->mSwitch), drill->mInputs[1] ? 1 : 0});
+                }
+            }
+        }
+    }
+    if (best->mInputs[0] > 1)
+    {
+        // The portal isn't there until its switch is on
+        pre.push_back({Key::Switch(best->mInputs[0]), 1});
+    }
+    for (const s32 idx : bestAcross)
+    {
+        s32 condSwitch = 0;
+        s32 condValue = 0;
+        if (nav.Condition(nav.Edges()[idx], &condSwitch, &condValue) && std::find(pre.begin(), pre.end(), Goap::Fact{Key::Switch(condSwitch), condValue}) == pre.end())
+        {
+            pre.push_back({Key::Switch(condSwitch), condValue});
+        }
+    }
+    add("Rescue " + name + " via BirdPortal#" + std::to_string(best->mId), pre, effects, 400 + bestDist / 4, step);
+    d.mRescuable.push_back(entity.mId);
+}
+
+
+// Paramites that team up over the way out
+void Domain::Builder::ParamitePacks()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    s32& abeNode = mAbeNode;
+    Domain& d = mD;
+    std::vector<char>& packAt = mPackAt;
     // Paramites that team up over the way out, in a path that has meat and no lock that makes him invisible: meat
     // is thrown for them first (the walkthrough's way with the fifth Mudomo vault: "At the top, toss the meat up
     // to the right, then climb up left and run to the exit"). The way out is barred when no way to it keeps off
     // their level, from where he is or from where its part of the path is come into.
-    std::vector<char> packAt;
     {
         bool invisLock = false;
         s32 paramites = 0;
@@ -5059,44 +5324,15 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
         d.mStart.Set(Key::kPackFed, meatOut ? 1 : 0);
     }
-    const auto packBars = [&](s32 target) -> bool
-    {
-        if (packAt.empty())
-        {
-            return false;
-        }
-        const s32 region = d.mRegions[target];
-        std::vector<char> ok(nav.Nodes().size(), 0);
-        ok[target] = 1;
-        for (bool changed = true; changed;)
-        {
-            changed = false;
-            for (const NavEdge& e : nav.Edges())
-            {
-                if (ok[e.mTo] && !ok[e.mFrom] && !packAt[e.mFrom] && d.mRegions[e.mFrom] == region)
-                {
-                    ok[e.mFrom] = 1;
-                    changed = true;
-                }
-            }
-        }
-        if (abeNode >= 0 && d.mRegions[abeNode] == region)
-        {
-            return !ok[abeNode];
-        }
-        bool entries = false;
-        bool open = false;
-        for (const NavEdge& e : nav.Edges())
-        {
-            if (d.mRegions[e.mTo] == region && d.mRegions[e.mFrom] != region)
-            {
-                entries = true;
-                open = open || ok[e.mTo];
-            }
-        }
-        return entries && !open;
-    };
+}
 
+// The ways out of the path
+void Domain::Builder::Exits()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    std::set<u32>& huntable = mHuntable;
     for (std::size_t i = 0; i < nav.Exits().size(); i++)
     {
         DomainStep step;
@@ -5169,6 +5405,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             // by the one to the ledge with the lever again and again, never by the one to the Barracks' floor.)
             200 + (f.mDestPath >= 0 && f.mDestPath == nav.Input().mPath ? 2000 : 0) + 700 * std::min(5, world.mExitUses.count(static_cast<s32>(i)) ? world.mExitUses.at(static_cast<s32>(i)) : 0), step);
     }
+}
+
+// A Slig that walks over a trap door a lever opens
+void Domain::Builder::TrapDoorSligs()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
     // A Slig that walks over a trap door a lever opens: the lever is pulled as it is on the door, and until it
     // has gone down nothing is crossed onto its floor near there (AO's Rupture Farms, path 16: the Slig at
     // 3600,313 that walks over the trap door at 3539, and the lever on the ledge over it)
@@ -5260,6 +5504,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+}
+
+// A Brew drunk and its fart taken along: to a flying Slig, by a mine, under a Slig
+void Domain::Builder::Farts()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
     // A Brew can also be drunk and taken along: the fart it gives is then made where a flying Slig can be got at
     // from (the cells he comes into a region at, out of that Slig's own stretch and with no orb on the screen),
     // and until the Slig is dead nothing is crossed into the stretch its track goes along.
@@ -5444,7 +5696,15 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         drop.mEdge = stand;
         add("Leave a fart under Slig#" + std::to_string(slig.mId) + " from " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY), {regionFact(stand), {Key::kBrew, 1}}, {dead, {Key::kBrew, 0}}, 450, drop);
     }
+}
 
+// Sligs a flying Slig or a grenade can get at
+void Domain::Builder::Grenades()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    std::vector<GrenadeTarget>& grenadeTargets = mGrenadeTargets;
     // Sligs he can't take over (a security orb on their screen) that a flying Slig can get at: the one a spawner
     // makes is taken over from a cell of its screen where he isn't seen, flown to a place off each Slig's level
     // and its grenades thrown at them. Until one is dead nothing is crossed onto its floor near it
@@ -5469,7 +5729,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             d.mStart.Set(Key::Switch(World::HazardSwitch(orb.mId)), 1);
         }
     }
-    const std::vector<GrenadeTarget> grenadeTargets = GrenadeTargets(nav.Input(), world);
+    grenadeTargets = GrenadeTargets(nav.Input(), world);
     for (const GrenadeTarget& target : grenadeTargets)
     {
         const Entity* slig = world.Find(target.mSlig);
@@ -5494,6 +5754,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             d.mActions.back().mSpend = {Key::kRocks, 1};
         }
     }
+}
+
+// A button for naked Sligs with one of them on its floor
+void Domain::Builder::NakedSligButtons()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
     // A button for naked Sligs with one of them on its floor: taken over from a cell of its screen that is not
     // on that floor, once no orb is over that screen. (The walkthrough of the Barracks' Slig bunks: "possess a
     // naked Slig, move him in front of the green button controlling the slam doors and hold up".)
@@ -5536,6 +5804,15 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             add("Press SligButton#" + std::to_string(button.mId) + " sw" + std::to_string(button.mSwitch) + " with a naked Slig taken over from " + std::to_string(node.mX) + "," + std::to_string(node.mY), pre, {{Key::Switch(button.mSwitch), after}}, 900, press);
         }
     }
+}
+
+// A voice lock with a Glukkon on its floor
+void Domain::Builder::VoiceLocks()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    s32& abeNode = mAbeNode;
+    Domain& d = mD;
     // A voice lock with a Glukkon on its floor and nothing shut between them: the Glukkon is taken over from a
     // cell of its screen, once no orb is over that screen, walked into the lock's box, and says what the lock
     // wants said. One he is in already goes on to it as it is. (The walkthrough of the Barracks' war room: "possess
@@ -5598,6 +5875,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+}
+
+// A trap door that shuts by itself
+void Domain::Builder::TimedTrapDoors()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
     // A trap door that shuts by itself and puts its switch back (TrapDoor.cpp: open for its stay-open time, 60
     // frames in FeeCo's path 9): what it opens is not a thing to cross some time after its lever, but at once,
     // by the quickest way, as one thing to do. ("Pull the lever before climbing back up. You have to run to make
@@ -5669,6 +5954,15 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+}
+
+// Slogs awake on a stretch of floor, in a level with bones
+void Domain::Builder::SlogPens()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    std::map<u32, FleechLure>& lures = mLures;
     // Slogs that are awake on a stretch of floor, in a level with bones (GameView's MarkSlogPens): a bone thrown
     // onto it from a cell over it. From 50 or more over their floor: a Slog that can't get at him goes for a bone
     // at once, one he stands by has him first. Where the bone comes to lie is known before it is thrown (ThrowArc:
@@ -5997,6 +6291,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             away(floor.mX1, floor.mX2, floor.mFloorY, floor.mHalf, 55, gives, nullptr);
         }
     }
+}
+
+// A lever a Slig comes down to when a Glukkon calls for help
+void Domain::Builder::GlukkonCalls()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    s32& abeNode = mAbeNode;
     // A lever on a floor that a Slig comes down onto when a Glukkon he is in calls for help: the Glukkon goes to
     // the cell a lever is pulled from, calls, has the Slig come to it and says "Do it" (a Slig that listens pulls
     // the lever a cell from it: Slig::Brain_4_ListeningToGlukkon). The walkthrough of the Barracks' war room:
@@ -6092,6 +6394,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+}
+
+// Drills over Slogs asleep
+void Domain::Builder::DrillSlogs()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
     // Drills that a switch sets going, over Slogs the map has put to sleep: on, they kill them where they lie; off
     // again, their cells can be crossed onto (GameView: MarkDrilledSlogs). One thing to do, at the lever of that
     // switch: on, until the Slogs are dead, and off. (Bonewerkz' Executive Office: "Stand beside the lever and
@@ -6131,6 +6441,15 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             add("Drill the Slogs asleep under the drills of switch " + std::to_string(lever.mSwitch) + " with Lever#" + std::to_string(lever.mId), {regionFact(node), {Key::Switch(lever.mSwitch), offValue[lever.mSwitch]}}, found->second, 300, twice);
         }
     }
+}
+
+// Security orbs to be blown up
+void Domain::Builder::Orbs()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    std::vector<GrenadeTarget>& grenadeTargets = mGrenadeTargets;
     for (const OrbTarget& target : OrbTargets(nav.Input(), world))
     {
         const Entity* orb = world.Find(target.mOrb);
@@ -6159,6 +6478,15 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             d.mActions.back().mSpend = {Key::kRocks, 1};
         }
     }
+}
+
+// Flying Sligs: the levers under their tracks, and taking them over
+void Domain::Builder::Fliers()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    s32& abeNode = mAbeNode;
+    Domain& d = mD;
     // A lever under the track of a flying Slig that is about, or of one its own switch lets out of a spawner: he
     // stands still for the pull with it over him, so that is dear (where a flying Slig of his own can pull it for
     // him, below, that is the way). The Barracks' path 14: the levers of switches 208 and 214 on the long floor.
@@ -6505,7 +6833,13 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             add("Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with the flying Slig of FlierSpawner#" + std::to_string(spawner.mId), {regionFact(spot)}, {{Key::Switch(lock.mSwitch), 1}}, 900, speak);
         }
     }
+}
 
+// A Slig lock, answered by a Slig taken over
+void Domain::Builder::SligLocks()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
     // A Slig lock: a Slig that Abe has taken over says its code back to it. The Slig is one a spawner makes when
     // its lever is pulled, taken over from by the lever (on its screen, with no orb there), and walked to the
     // lock (SligWay): what is shut on its way has to be open first, and the Sligs it walks into it shoots.
@@ -6594,7 +6928,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+}
 
+// A Brew machine, its farts flown to mines, Sligs and orbs
+void Domain::Builder::BrewMachines()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
     // A Brew machine: the fart he has after a Brew can be flown through the air to a mine or a Slig and set off
     // there (FartFlight), from where he drank it. Not with an orb on the machine's screen: it is flown by
     // chanting. And until a Slig the fart can get to is dead, nothing is crossed onto its floor near it.
@@ -6787,6 +7128,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+}
+
+// A Slig on a floor only a lift goes to, and naked Sligs
+void Domain::Builder::PantsSligs()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
     // A Slig on a floor only a lift goes to, where a Glukkon's call for help sends a naked Slig for pants: that
     // one, come after him through an open gate whose lever is off its floor, is shut in, taken over from the
     // lever and ridden up the lift to shoot it (PantsSligTask). Until then nothing is drunk or used on that Slig's
@@ -6882,7 +7231,13 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             d.mStart.Set(Key::Mud(slig.mId), 2);
         }
     }
+}
 
+// A zone that sets a switch when he is in it
+void Domain::Builder::Zones()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
     // A zone that sets a switch when he is in it (an invisible switch): being there is a thing to do like pulling
     // a lever. The Barracks' path 14: the trap door at 1700,1420 is opened by the zone over it.
     {
@@ -6909,7 +7264,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+}
 
+// Foot switches that turn a gate over
+void Domain::Builder::FootSwitchGates()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
     // A foot switch that turns a gate over each time it is stepped on (the second Mudomo vault's locks, each
     // between two of them and two gates: in over one, which shuts him in with the lock, and out over the other):
     // stepping on it is a thing to do like pulling a lever
@@ -6964,13 +7326,20 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             a.mPre.push_back({Key::kPlate, static_cast<s32>(nearest->mId)});
         }
     }
+}
 
+// Fleeches on a floor a Paramite walks
+void Domain::Builder::ParamiteFleeches()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    std::vector<Goap::Fact>& eatenAll = mEatenAll;
+    std::set<s32>& linesAll = mLinesAll;
     // Fleeches loose on a floor a Paramite walks, with no ring for it to pull: it is taken over and made to eat
     // them (the walkthrough of the second Mudomo vault: "Possess him, then go right to get the other Paramite.
     // Have him follow and attack all of the Fleeches, then bring him all the way back to the right"). Until then
     // nothing is done on those floors and no way is taken onto them.
-    std::vector<Goap::Fact> eatenAll;
-    std::set<s32> linesAll;
     for (const ParamiteAt& live : world.mParamites)
     {
         const s32 at = live.mPossessed || live.Hidden() || live.mId == 0 ? -1 : nav.NodeAt(live.mX, live.mY, live.mHalf, 30);
@@ -7062,7 +7431,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+}
 
+// Scrabs got out of the way without a Scrab's death
+void Domain::Builder::Scrabs()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
     // Scrabs got out of the way without a Scrab's death: lured off the end of their floor (the Mudanchee vault's
     // path 5: "hang again until the Scrab runs over to you, pull back up as he falls over the edge"), and shut in
     // behind a gate by its lever ("pull the lever when the Scrab moves to the right to trap him by the door").
@@ -7192,9 +7568,8 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
-
-    return d;
 }
+
 
 // Everything that can be made true from the start, never mind the order or what it undoes
 struct Reach final

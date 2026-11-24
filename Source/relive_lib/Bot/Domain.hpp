@@ -340,6 +340,8 @@ struct Domain final
     static bool OnFlierTargetsFloor(const NavGraph& nav, const FlierTarget& target, s32 node);
 
     static Domain Build(const NavGraph& nav, const World& world, s32 abeNode, const std::function<bool(s32 edge)>& edgeUsable, bool kills = false);
+    // Build's working (Domain.cpp)
+    struct Builder;
     // The cell Abe uses a lever, ring or wheel from, or stands at for a portal: -1 if there's none. faceLeft is the way to face.
     // firstSide: for a lever, the side of it tried first (-1 left of it, 1 right)
     // The way a blind Mudokon can be walked from a cell to where it would see a portal open (on the portal's
