@@ -643,6 +643,17 @@ private:
     // for his health to come back (180 frames after the last shot) before he goes on. A shot takes a third.
     bool Resting();
     void Stuck(const std::string& why);
+    // Nothing to do for now: a look round and a plan again in a moment. True, for Replan to return.
+    bool ThinkAgain();
+    // The stages of Replan before the planning itself
+    void NoteGrenadeTargets(const PathKnowledge* know, s32 abeNode);
+    Domain BuildDomain(const PathKnowledge* know, s32 abeNode);
+    std::vector<Goap::Action> UsableActions(BaseMap& map, const Domain& domain);
+    Goap::Plan KeptPlan(const Domain& domain, const std::vector<Goap::Action>& actions, std::size_t openGoals);
+    s32 NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions, const Goap::Plan& plan, bool errandOpen, s32& plansFound, Goap::Plan& best, std::string& bestGoal,
+                 std::vector<Goap::Fact>& bestFacts, std::string& misses);
+    // Replan with no plan for anything: the last things to try (plan: the one for the way out, for its miss)
+    bool NoPlanAtAll(const Domain& domain, const Goap::Plan& plan, const std::string& misses);
     // The next task by the profile's goals. False with mState set when there's nothing more to do or no way to.
     bool Replan(BaseMap& map);
     std::unique_ptr<Task> MakeTask(const Domain& domain, const Goap::Action& action);

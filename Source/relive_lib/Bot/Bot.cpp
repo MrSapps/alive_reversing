@@ -364,88 +364,7 @@ bool Bot::Replan(BaseMap& map)
 {
     const PathKnowledge* know = mKnow;
     const s32 abeNode = AbeNode();
-    // A Slig a grenade is to be thrown at, and no grenade to be had yet: none on him, none had in this path so
-    // far, and no way to its machine as things are. Its floor is then a floor like any other, got by as
-    // such Sligs are elsewhere. (The Barracks' path 1 from its first screen: the machine is twelve screens on,
-    // behind the Slig that stands guard at 2137,1739, and with that Slig's floor shut until it was blown up
-    // there was no plan at all. The walkthrough: "roll off the edge to land hanging below the Slig. Once he
-    // turns away from you again, hoist up and quickly run and jump up to the next ledge above him".)
-    if (mIsAe && know)
-    {
-        mWorld.mNoGrenadeFor.clear();
-        const Entity* machine = nullptr;
-        for (const Entity& e : mWorld.mEntities)
-        {
-            if (e.mKind == EntityKind::eRockSack && e.mInputs[1] == 2 && !e.mGone && (!machine || std::abs(e.CentreX() - mAbe.mX) + std::abs(e.mY2 - mAbe.mY) < std::abs(machine->CentreX() - mAbe.mX) + std::abs(machine->mY2 - mAbe.mY)))
-            {
-                machine = &e;
-            }
-        }
-        mWorld.mBoomReached = mWorld.mBoomReached || (machine && mWorld.mRocks > 0);
-        if (machine && !mWorld.mBoomReached)
-        {
-            std::set<u32> flown;
-            for (const Entity& spawner : mWorld.mEntities)
-            {
-                if (spawner.mKind == EntityKind::eFlierSpawner)
-                {
-                    for (const Domain::FlierTarget& target : Domain::FlierTargets(know->mNav.Input(), mWorld, spawner))
-                    {
-                        flown.insert(target.mSlig);
-                    }
-                }
-            }
-            // (a machine there is a way to as things are, with those floors kept off, is one to go to first: the
-            // boom machine's rooms of that path, where the machine is a screen further off than the Sligs the
-            // grenades are for)
-            bool reached = false;
-            {
-                const NavGraph& nav = know->mNav;
-                std::set<s32> machines;
-                for (const Entity& e : mWorld.mEntities)
-                {
-                    if (e.mKind == EntityKind::eRockSack && e.mInputs[1] == 2 && !e.mGone)
-                    {
-                        machines.insert(Domain::UseNode(nav, e, nullptr));
-                    }
-                }
-                std::vector<char> seen(nav.Nodes().size(), 0);
-                std::vector<s32> open;
-                if (abeNode >= 0)
-                {
-                    open.push_back(abeNode);
-                    seen[abeNode] = 1;
-                }
-                while (!open.empty() && !reached)
-                {
-                    const s32 cur = open.back();
-                    open.pop_back();
-                    reached = machines.count(cur) != 0;
-                    for (s32 k = 0; k < nav.Nodes()[cur].mEdgeCount; k++)
-                    {
-                        const NavEdge& e = nav.Edges()[nav.Nodes()[cur].mFirstEdge + k];
-                        s32 switchId = 0;
-                        s32 openValue = 0;
-                        if (seen[e.mTo] || (nav.Condition(e, &switchId, &openValue) && mWorld.Switch(switchId) != openValue) ||
-                            (e.mClear >= 0 && nav.Input().mFeatures[e.mClear].mKind == FeatureKind::eDanger && nav.Input().mFeatures[e.mClear].mSwitch > 1 && mWorld.Switch(nav.Input().mFeatures[e.mClear].mSwitch) == 0))
-                        {
-                            continue;
-                        }
-                        seen[e.mTo] = 1;
-                        open.push_back(e.mTo);
-                    }
-                }
-            }
-            for (const Domain::GrenadeTarget& target : Domain::GrenadeTargets(know->mNav.Input(), mWorld))
-            {
-                const Entity* slig = mWorld.Find(target.mSlig);
-                if (!reached && slig && slig->mKind == EntityKind::eSlig && flown.count(target.mSlig) == 0)
-                {
-                    mWorld.mNoGrenadeFor.insert(World::HazardSwitch(target.mSlig));
-                }
-            }
-        }
-    }
+    NoteGrenadeTargets(know, abeNode);
     // In his trance (Abe's Motion_112_Chant, with nothing held) and what he is in not to be seen: it is on its way
     // somewhere (a Glukkon through a teleporter, to another level's copy of the path). Looked at again shortly.
     if (mIsAe && mAbe.mMotion == 112 && !(mBits & Btn::eChant))
@@ -527,172 +446,8 @@ bool Bot::Replan(BaseMap& map)
         }
     }
     mSwitchesPutBackSeen = true;
-    const auto allowed = [know](s32 edge)
-    {
-        if (know->mBannedEdges.count(edge) != 0)
-        {
-            return false;
-        }
-        // (running jumps taken together are for the way there, with a flying Slig about: to the plan they are
-        // the same crossings as the jumps one by one)
-        if (know->mNav.Edges()[edge].mX2 != 0)
-        {
-            return false;
-        }
-        // (onto a floor a loose Scrab can get at him on: Domain::Build wants him unseen for it)
-        return true;
-    };
-    mWorld.mExitUses = mKnow->mExitUses;
-    Domain domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll);
-    // A flying Slig that was to be got rid of before its stretch is gone into (FeatureKind::eDanger), with no fart
-    // that can be got flown at it: got by as it is after all. The Mines' path 2 has a Brew machine and a flying
-    // Slig, and the machine is past the Slig.
-    bool passed = false;
-    for (Entity& e : mWorld.mEntities)
-    {
-        if (e.mKind != EntityKind::eFlier || e.mInputs[0] != 1 || mWorld.Switch(e.mSwitch))
-        {
-            continue;
-        }
-        // (no way to get one flown at it from where he is, that is: the plan for just that)
-        bool fart = false;
-        for (const DomainStep& s : domain.mSteps)
-        {
-            fart = fart || (s.mKind == StepKind::eFartBomb && s.mEntity == e.mId);
-        }
-        // (or it is to be taken over and burst: Terminal 5's, under the Chant Protector a fart is for)
-        for (const Goap::Action& a : domain.mActions)
-        {
-            const StepKind kind = domain.mSteps[a.mTag].mKind;
-            fart = fart || ((kind == StepKind::eFlierBomb || kind == StepKind::eFlierPull) && std::find(a.mEffects.begin(), a.mEffects.end(), Goap::Fact{Key::Switch(e.mSwitch), 1}) != a.mEffects.end());
-        }
-        fart = fart && Goap::Planner::Find(domain.mStart, {{Key::Switch(e.mSwitch), 1}}, domain.mActions).mFound;
-        // (nor is one under a security orb, with a Brew to be had: the Brew is for the orb and the flying Slig is
-        // taken over then, from a place that may not be in reach yet)
-        bool underOrb = false;
-        bool brew = false;
-        for (const Entity& o : mWorld.mEntities)
-        {
-            underOrb = underOrb || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && o.mCamera == e.mCamera);
-            brew = brew || (o.mKind == EntityKind::eBrew && !o.mGone);
-        }
-        fart = fart || (underOrb && brew);
-        if (!fart)
-        {
-            Log("no fart can be flown at FlyingSlig#" + std::to_string(e.mId) + ": got by as it is");
-            e.mInputs[0] = 0;
-            passed = true;
-        }
-    }
-    if (passed)
-    {
-        domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll);
-    }
-    // Actions that keep failing are left out, and so are ways out that lead back to where the run has been
-    std::vector<Goap::Action> actions;
-    if (mArrivedKey != std::pair<s32, s32>{mAbe.mLevel, mAbe.mPath})
-    {
-        // Back out of a path there was no way on in: the way out of this one that led there is a dead end, and
-        // is not taken again while another leads to that path. (Feeco's lobby has three ways up into path 9,
-        // which is three places with nothing between them: two open, the third behind a Slig, and that is the
-        // one to the Bonewerkz.)
-        if (mBackFor == mArrivedKey.second && mArrivedKey.first == mAbe.mLevel && mKnow)
-        {
-            for (const NavExit& x : mKnow->mNav.Exits())
-            {
-                const NavFeature& f = mKnow->mNav.Input().mFeatures[x.mFeature];
-                if (std::abs((f.mX1 + f.mX2) / 2 - mAbe.mX) <= 40 && std::abs(f.mY2 - mAbe.mY) <= 40 && mDeadExits.insert({mAbe.mLevel, mAbe.mPath, x.mFeature}).second)
-                {
-                    Log("the way out at " + std::to_string((f.mX1 + f.mX2) / 2) + "," + std::to_string(f.mY2) + " led nowhere: another one to path " + std::to_string(f.mDestPath) + " first");
-                }
-            }
-        }
-        mArrivedKey = {mAbe.mLevel, mAbe.mPath};
-        mArrivedX = mAbe.mX;
-        mArrivedY = mAbe.mY;
-        // (out of the path he backed out of: it may be come into again, by another way, and backed out of again)
-        if (mBackFor != mAbe.mPath)
-        {
-            mBackFor = -1;
-        }
-    }
-    for (const Goap::Action& a : domain.mActions)
-    {
-        const auto failed = mFailedActions.find(a.mName);
-        if (failed != mFailedActions.end() && failed->second >= 2)
-        {
-            // For good if it killed Abe; else until he is somewhere else (no route from one place says
-            // nothing about another)
-            const auto deaths = mActionDeaths.find(a.mName);
-            const auto where = mFailedWhere.find(a.mName);
-            const bool moved = where != mFailedWhere.end() && (std::abs(where->second.first - mAbe.mX) > 400 || std::abs(where->second.second - mAbe.mY) > 150);
-            // (and not for ever: what has failed six times over is left alone)
-            const auto total = mFailedTotal.find(a.mName);
-            if ((deaths != mActionDeaths.end() && deaths->second >= 3) || !moved || (total != mFailedTotal.end() && total->second >= 6))
-            {
-                continue;
-            }
-            mFailedActions.erase(failed);
-        }
-        const DomainStep& step = domain.mSteps[a.mTag];
-        if (step.mKind == StepKind::eExit)
-        {
-            const NavFeature& f = mKnow->mNav.Input().mFeatures[mKnow->mNav.Exits()[step.mEdge].mFeature];
-            // The way he came in, with another way out to the same place: that other one is the one meant
-            if (mBackFor != mAbe.mPath && mKnow->mNav.Exits()[step.mEdge].mNode >= 0 && std::abs((f.mX1 + f.mX2) / 2 - mArrivedX) <= 40 && std::abs(f.mY2 - mArrivedY) <= 40)
-            {
-                bool twin = false;
-                for (const NavExit& other : mKnow->mNav.Exits())
-                {
-                    const NavFeature& g = mKnow->mNav.Input().mFeatures[other.mFeature];
-                    twin = twin || (other.mFeature != mKnow->mNav.Exits()[step.mEdge].mFeature && g.mDestLevel == f.mDestLevel && g.mDestPath == f.mDestPath);
-                }
-                if (twin)
-                {
-                    continue;
-                }
-            }
-            // (backing out: the way he came in, wherever in the level it leads)
-            if (mBackFor == mAbe.mPath && mKnow->mNav.Exits()[step.mEdge].mNode >= 0 && std::abs((f.mX1 + f.mX2) / 2 - mArrivedX) <= 40 && std::abs(f.mY2 - mArrivedY) <= 40)
-            {
-                actions.push_back(a);
-                continue;
-            }
-            if (mDeadExits.count({mAbe.mLevel, mAbe.mPath, mKnow->mNav.Exits()[step.mEdge].mFeature}) != 0)
-            {
-                bool other = false;
-                for (const NavExit& x : mKnow->mNav.Exits())
-                {
-                    const NavFeature& g = mKnow->mNav.Input().mFeatures[x.mFeature];
-                    // (one not gone for yet: once each of the others has been tried the dead one is a way again. What
-                    // shut the place it leads to may have been opened from one of the others: FeeCo's hub, the
-                    // door to the floor of its path 9 whose electric wall is worked from the ledge another of
-                    // its doors leads to.)
-                    const s32 idx = static_cast<s32>(&x - mKnow->mNav.Exits().data());
-                    const bool tried = mKnow->mExitUses.count(idx) != 0 && mKnow->mExitUses.at(idx) > 0;
-                    other = other || (g.mDestLevel == f.mDestLevel && g.mDestPath == f.mDestPath && mDeadExits.count({mAbe.mLevel, mAbe.mPath, x.mFeature}) == 0 && !tried);
-                }
-                if (other)
-                {
-                    continue;
-                }
-            }
-            bool sideTrip = false;
-            if (!ExitAllowed(map, f, &sideTrip))
-            {
-                continue;
-            }
-            if (sideTrip)
-            {
-                // Before the way on, which may not lead back
-                actions.push_back(a);
-                actions.back().mCost = 1;
-                continue;
-            }
-        }
-        actions.push_back(a);
-    }
-
+    Domain domain = BuildDomain(know, abeNode);
+    const std::vector<Goap::Action> actions = UsableActions(map, domain);
     // The goals in the order they matter: the Mudokons this ending rescues (the cheapest first), then the way out
     std::vector<std::pair<std::string, std::vector<Goap::Fact>>> goals;
     u32 mudIndex = 0;
@@ -728,63 +483,9 @@ bool Bot::Replan(BaseMap& map)
     }
     std::stable_sort(order.begin(), order.end());
 
-    // The plan in hand still holds from here (what is left of it can be done as things are and gets its goal):
-    // on with it, without thinking it all out again
-    // (not when a Mudokon can be got at that couldn't be when it was made, and the plan is for something else)
-    // (nor a plan that only tries what a switch does, once there is a way out: FeeCo's path 4, where the bones
-    // he had gone for made the way on, and he went back past the Sligs to try a mine with one)
-    bool keep = mKeptForMudokon || order.size() <= mKeptOpen;
-    if (keep && !mKeptPlan.empty() && mKeptGoalName.rfind("Try switch", 0) == 0 && Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, actions).mFound)
-    {
-        Log("there is a way out now: no more of " + mKeptGoalName);
-        keep = false;
-    }
-    Goap::Plan best;
-    std::string bestGoal;
     std::string misses;
-    for (std::size_t skip = 0; keep && skip < mKeptPlan.size() && !best.mFound; skip++)
-    {
-        Goap::Plan kept;
-        Goap::State state = domain.mStart;
-        bool holds = true;
-        for (std::size_t i = skip; i < mKeptPlan.size() && holds; i++)
-        {
-            holds = false;
-            for (std::size_t a = 0; a < actions.size(); a++)
-            {
-                if (actions[a].mName == mKeptPlan[i] && Goap::Planner::Can(state, actions[a]))
-                {
-                    const Goap::State before = state;
-                    Goap::Planner::Do(state, actions[a]);
-                    // (a step that gives nothing it does not have already is one that is done: a bone thrown to
-                    // Slogs, with the bone lying there, still spends a bone)
-                    holds = !(state == before) && !before.HasAll(actions[a].mEffects);
-                    kept.mSteps.push_back(static_cast<s32>(a));
-                    kept.mCost += std::max(1, actions[a].mCost);
-                    break;
-                }
-            }
-        }
-        if (holds && !domain.mStart.HasAll(mKeptGoal) && state.HasAll(mKeptGoal))
-        {
-            kept.mFound = true;
-            best = kept;
-            bestGoal = mKeptGoalName;
-            // (a plan with something dear left in it, made when there was no other way: looked at again, and
-            // the way that is 400 cheaper by now is taken. The Barracks' path 14: planned at its door, where no
-            // flying Slig is to be had, the lever under one was his to pull; kept, he went for it when the
-            // flying Slig the lever before it lets out could have.)
-            if (kept.mCost >= 1500)
-            {
-                const Goap::Plan fresh = Goap::Planner::Find(domain.mStart, mKeptGoal, actions);
-                if (fresh.mFound && !fresh.mSteps.empty() && fresh.mCost + 400 < kept.mCost)
-                {
-                    Log("the plan in hand has a cheaper way by now (" + std::to_string(fresh.mCost) + " for " + std::to_string(kept.mCost) + "): that one");
-                    best = fresh;
-                }
-            }
-        }
-    }
+    Goap::Plan best = KeptPlan(domain, actions, order.size());
+    std::string bestGoal = best.mFound ? mKeptGoalName : std::string();
     const bool keptOn = best.mFound;
 
     misses += unreachable;
@@ -919,380 +620,10 @@ bool Bot::Replan(BaseMap& map)
         }
         else
         {
-            // No way out is known yet: change what can be changed, a door it opens may show one. Switches the
-            // run has already set once are left alone, so it can't go round in circles.
-            // (the nearest looking first, and the first two that can be done are enough to choose from)
-            s32 others = 0;
-            for (const Goap::Action& a : actions)
+            const s32 decided = NoWayOut(domain, actions, plan, errandOpen, plansFound, best, bestGoal, bestFacts, misses);
+            if (decided >= 0)
             {
-                others += a.mName.rfind("Cross ", 0) == 0 ? 0 : 1;
-            }
-            if (mWhyNoWayOut != mAbe.mPath || mWhyCount != others)
-            {
-                mWhyNoWayOut = mAbe.mPath;
-                mWhyCount = others;
-                // (with what can be done here other than cross, to see which need nothing gives)
-                std::string can;
-                for (const Goap::Action& a : actions)
-                {
-                    if (a.mName.rfind("Cross ", 0) == 0)
-                    {
-                        continue;
-                    }
-                    can += "\n  " + a.mName + " needs";
-                    for (const Goap::Fact& f : a.mPre)
-                    {
-                        can += " " + std::to_string(f.mKey) + "=" + std::to_string(f.mValue);
-                    }
-                    can += " gives";
-                    for (const Goap::Fact& f : a.mEffects)
-                    {
-                        can += " " + std::to_string(f.mKey) + "=" + std::to_string(f.mValue);
-                    }
-                }
-                Log("no way out known: " + plan.mMiss + ". " + domain.Frontier() + can);
-            }
-            std::vector<std::pair<s32, Goap::Fact>> tries;
-            for (const Goap::Fact& fact : domain.Reachable())
-            {
-                if (fact.mKey < 1000 || fact.mKey >= 1000000 || mExplored.count({mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey}))
-                {
-                    continue;
-                }
-                // (a UXB is turned off where the way goes through it, not to see what that does: it does nothing else)
-                bool uxb = false;
-                for (const Entity& e : mWorld.mEntities)
-                {
-                    uxb = uxb || (e.mKind == EntityKind::eUxb && Key::Switch(e.mSwitch) == fact.mKey);
-                    // (nor is a mine blown up to see what that does: it is a noise, and it wakes what sleeps. Bonewerkz'
-                    // path 2: the two Sligs of the background slept until a mine went off.)
-                    uxb = uxb || (mIsAe && e.mKind == EntityKind::eMine && Key::Switch(e.mSwitch) == fact.mKey);
-                    // (nor is a bone thrown to Slogs to see what that does: it is eaten, and there are four)
-                    uxb = uxb || (e.mKind == EntityKind::eSlog && Key::Switch(e.mSwitch) == fact.mKey);
-                }
-                // (nor is a gate opened to see what that does, with Sligs awake on its floor on the far side of it
-                // from him: FeeCo's Executive Offices, where the gate shut on its two Sligs was opened again for want
-                // of anything else to try, and he was shot through it)
-                for (const NavFeature& f : mKnow->mNav.Input().mFeatures)
-                {
-                    if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mBeam || f.mSwitch <= 1 || Key::Switch(f.mSwitch) != fact.mKey || fact.mValue != (f.mStartClosed ? 1 : 0) ||
-                        mWorld.Switch(f.mSwitch) == fact.mValue || std::abs(mAbe.mY - f.mY2) > 60)
-                    {
-                        continue;
-                    }
-                    const s32 gateX = (f.mX1 + f.mX2) / 2;
-                    for (const SligAt& slig : mWorld.mSligs)
-                    {
-                        uxb = uxb || (!slig.mAsleep && !slig.mPossessed && slig.mHalf == f.mHalf && std::abs(slig.mY - f.mY2) <= 30 && std::abs(slig.mX - gateX) < 400 && (slig.mX - gateX) * (mAbe.mX - gateX) < 0);
-                    }
-                }
-                if (uxb)
-                {
-                    continue;
-                }
-                const s32 est = Goap::Planner::Short(domain.mStart, {fact}, actions);
-                if (est >= 0)
-                {
-                    tries.push_back({est, fact});
-                }
-            }
-            std::stable_sort(tries.begin(), tries.end(), [](const std::pair<s32, Goap::Fact>& a, const std::pair<s32, Goap::Fact>& b)
-                             { return a.first < b.first; });
-            for (const auto& entry : tries)
-            {
-                // (one more looked at while the best so far goes by Slogs that sleep)
-                if (plansFound >= (best.mFound && best.mCost >= 100000 ? 4 : 2))
-                {
-                    break;
-                }
-                const Goap::Fact fact = entry.second;
-                Goap::Plan sub = Goap::Planner::Find(domain.mStart, {fact}, actions);
-                // (a way that goes by Slogs that sleep is the last to be tried: what it wakes is there for all that
-                // comes after. Bonewerkz' boilers 3 and 4: the fourth's wheel, past the two Slogs on the
-                // platforms, was turned before the third's, and the door out of its room wants both; the way
-                // back to the third was the floor the Slogs were then loose on.)
-                if (sub.mFound && mIsAe)
-                {
-                    bool wakes = false;
-                    for (s32 step : sub.mSteps)
-                    {
-                        const DomainStep& st = domain.mSteps[actions[step].mTag];
-                        if (st.mKind != StepKind::eCross || st.mEdge < 0 || st.mEdge >= static_cast<s32>(mKnow->mNav.Edges().size()))
-                        {
-                            continue;
-                        }
-                        const NavNode& to = mKnow->mNav.Nodes()[mKnow->mNav.Edges()[st.mEdge].mTo];
-                        for (const RockAt& slog : mWorld.mSlogsAsleepAt)
-                        {
-                            wakes = wakes || (slog.mHalf == to.mHalf && std::abs(slog.mX - to.mX) <= 150 && std::abs(slog.mY - to.mY) <= 60);
-                        }
-                    }
-                    if (wakes)
-                    {
-                        sub.mCost += 100000;
-                    }
-                }
-                if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || sub.mCost < best.mCost))
-                {
-                    best = sub;
-                    bestGoal = "Try switch " + std::to_string(fact.mKey - 1000) + "=" + std::to_string(fact.mValue);
-                    bestFacts = {fact};
-                    mExploring = fact.mKey;
-                    plansFound++;
-                    // (planned for forty times over and still not so: it does not come of what is done for it. No
-                    // more of that one here. Bonewerkz' first annex with its Mudokon gone: two levers that count
-                    // only pulled together, pulled in turn by him alone for a million frames.)
-                    if (++mExploreTries[{mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey}] >= 40)
-                    {
-                        Log("switch " + std::to_string(fact.mKey - 1000) + " does not come of what is done for it: no more of it in this path");
-                        mExplored.insert({mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey});
-                    }
-                }
-                else if (!sub.mFound)
-                {
-                    misses += "switch " + std::to_string(fact.mKey - 1000) + ": " + sub.mMiss + "; ";
-                }
-            }
-            // Nothing left to switch, and the way out of the level this path has is not to be had: the level
-            // goes on through its other paths (Feeco's lobby, whose own way out is behind gates that the ends
-            // of two other paths open)
-            if (!best.mFound && !errandOpen && mLevel.Shut(mAbe.mPath))
-            {
-                Log("the way out of the level from this path is shut: on through the level's other paths (" + std::to_string(mLevel.Distance(mAbe.mPath)) + " away)");
-                mTask = std::make_unique<GoToTask>("think again", [](s32)
-                                                   { return true; });
-                mTaskAction.clear();
-                return true;
-            }
-            // Nothing left to switch, and a way out of this path into one of the level he has not been in, from
-            // which the level goes on: that before any wandering here (the Mudomo vaults' path 7: its way on, a
-            // bird portal, is only got to by coming back into it through path 10)
-            if (!best.mFound && !errandOpen && mNewPathFor != mAbe.mPath && mKnow)
-            {
-                bool onward = false;
-                for (const NavExit& x : mKnow->mNav.Exits())
-                {
-                    const NavFeature& f = mKnow->mNav.Input().mFeatures[x.mFeature];
-                    onward = onward || (f.mDestPath >= 0 && (f.mDestLevel < 0 || f.mDestLevel == mAbe.mLevel) && mVisitedPaths.count({mAbe.mLevel, f.mDestPath}) == 0 && mLevel.Distance(f.mDestPath) >= 0);
-                }
-                if (onward)
-                {
-                    mNewPathFor = mAbe.mPath;
-                    Log("no way on from here: any path of this level not yet been in will do (" + leave.mMiss + ". " + domain.Frontier() + ")");
-                    mTask = std::make_unique<GoToTask>("think again", [](s32)
-                                                       { return true; });
-                    mTaskAction.clear();
-                    return true;
-                }
-            }
-            // Nothing left to switch: somewhere he has not been yet (through a door that is open now, say). The
-            // way out may show from there.
-            // (by level and path: by the path alone, the regions of the Barracks' war room, barracks_ender 11, were
-            // taken for been in at FeeCo's Executive Offices, feeco_depot_ender 11, and Aslik never gone for)
-            const s32 pathKey = mAbe.mLevel * 1000 + mAbe.mPath;
-            mRegionsBeen.insert({pathKey, domain.mStart.Get(Key::kRegion)});
-            for (auto it = mCellsBeen.lower_bound({mAbe.mLevel * 1000 + mAbe.mPath, 0}); it != mCellsBeen.end() && it->first == mAbe.mLevel * 1000 + mAbe.mPath; ++it)
-            {
-                if (it->second < static_cast<s32>(domain.mRegions.size()))
-                {
-                    mRegionsBeen.insert({pathKey, domain.mRegions[it->second] + 1});
-                }
-            }
-            // (not with a gas countdown running: there is no time to look about, and any way out of the path will
-            // do. Bonewerkz' Executive Office: with 400 frames of the gas left he set off back through the door
-            // he had come out of, to the floor he began on.)
-            if (!best.mFound && !mWorld.mGasClock)
-            {
-                for (s32 pass = 0; pass < 2 && !best.mFound; pass++)
-                {
-                const bool doorPass = pass == 0;
-                for (s32 region : domain.ReachableRegions())
-                {
-                    const std::pair<s32, s32> key{pathKey, region};
-                    if (mRegionsBeen.count(key) || mRegionTries[key] >= 3 || plansFound >= 2)
-                    {
-                        continue;
-                    }
-                    // (a cell or two with nothing leading on is no place to look for a way out: the cell a lock
-                    // stands in, beyond the trap door it is slapped from)
-                    {
-                        s32 cells = 0;
-                        for (s32 r : domain.mRegions)
-                        {
-                            cells += r + 1 == region ? 1 : 0;
-                        }
-                        if (cells <= 2)
-                        {
-                            continue;
-                        }
-                    }
-                    const Goap::Fact fact{Key::kRegion, region};
-                    const Goap::Plan sub = Goap::Planner::Find(domain.mStart, {fact}, actions);
-                    // Through a door or a well first: along a floor nothing has led him onto is where what the
-                    // doors were shut against lives (Fleeches, in the Mudanchee vault)
-                    bool byDoor = false;
-                    for (s32 stepIdx : sub.mSteps)
-                    {
-                        const DomainStep& st = domain.mSteps[actions[stepIdx].mTag];
-                        const EdgeKind kind = st.mKind == StepKind::eCross ? mKnow->mNav.Edges()[st.mEdge].mKind : EdgeKind::eWalk;
-                        byDoor = byDoor || kind == EdgeKind::eDoor || kind == EdgeKind::eWell || kind == EdgeKind::ePortal;
-                    }
-                    if (sub.mFound && !sub.mSteps.empty() && byDoor != doorPass)
-                    {
-                        continue;
-                    }
-                    if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || sub.mCost < best.mCost))
-                    {
-                        best = sub;
-                        bestGoal = "Go somewhere new (region " + std::to_string(region) + ")";
-                        bestFacts = {fact};
-                        mRegionGoal = key;
-                        plansFound++;
-                    }
-                }
-                }
-                if (best.mFound)
-                {
-                    mRegionTries[mRegionGoal]++;
-                }
-            }
-            if (!best.mFound && errandOpen)
-            {
-                // No way to what the door elsewhere wants: that is given up, and the path is left like any other
-                for (const s32 sw : mLevel.Errands(mAbe.mPath))
-                {
-                    if (mWorld.Switch(sw) == 0 && mErrandsLeft.insert({mAbe.mLevel * 1000 + mAbe.mPath, sw}).second)
-                    {
-                        Log("no way to set switch " + std::to_string(sw) + " for the door of another path: given up (" + misses + ")");
-                    }
-                }
-                mTask = std::make_unique<GoToTask>("think again", [](s32)
-                                                   { return true; });
-                mTaskAction.clear();
-                return true;
-            }
-            if (!best.mFound)
-            {
-                // What failed from somewhere else may work from here: once in a while everything but what
-                // killed Abe gets another go
-                if (!mFailedActions.empty() && mAbe.mFrame - mForgaveFrame > 900)
-                {
-                    mForgaveFrame = mAbe.mFrame;
-                    for (auto it = mFailedActions.begin(); it != mFailedActions.end();)
-                    {
-                        const auto deaths = mActionDeaths.find(it->first);
-                        const auto total = mFailedTotal.find(it->first);
-                        // (a way out of the path is never ruled out for good: there is no going on without one. What
-                        // ends that is the same cell killing him twenty times. The second Mudomo vault in the run
-                        // from the Mines: both its exits given up on with its Paramites after him, and he stood
-                        // at one of them with no plan.)
-                        const bool forGood = it->first.rfind("Exit ", 0) != 0 && ((deaths != mActionDeaths.end() && deaths->second >= 3) || (total != mFailedTotal.end() && total->second >= 6));
-                        it = forGood ? std::next(it) : mFailedActions.erase(it);
-                    }
-                    // (and the ways ruled out in this path: one of them may be the only way there is. Bonewerkz' path
-                    // 2 in the run from the Mines: a hop over its mines ruled out after two deaths by the flying
-                    // Slig's grenades, with another way known then that was no way a moment later.)
-                    if (mKnow && !mKnow->mBannedEdges.empty())
-                    {
-                        Log("no plan: " + std::to_string(mKnow->mBannedEdges.size()) + " ways ruled out here are allowed again");
-                        mKnow->mBannedEdges.clear();
-                    }
-                    Log("no plan: trying again what failed before");
-                    mTask = std::make_unique<GoToTask>("think again", [](s32)
-                                                       { return true; });
-                    mTaskAction.clear();
-                    return true;
-                }
-                // The way on shut by switches nothing here sets (a hub whose door wants its side paths done): into
-                // a path of this level he has not been in yet
-                if (mNewPathFor != mAbe.mPath)
-                {
-                    mNewPathFor = mAbe.mPath;
-                    Log("no way on from here: any path of this level not yet been in will do");
-                    mTask = std::make_unique<GoToTask>("think again", [](s32)
-                                                       { return true; });
-                    mTaskAction.clear();
-                    return true;
-                }
-                // Nothing at all: back out the way he came in
-                // (three times at most from one path: he can come into it again by another door)
-                if (mBackFor != mAbe.mPath && mBackOuts[{mAbe.mLevel, mAbe.mPath}] < 3)
-                {
-                    mBackOuts[{mAbe.mLevel, mAbe.mPath}]++;
-                    mBackFor = mAbe.mPath;
-                    Log("no way on from here: back out the way he came in");
-                    mTask = std::make_unique<GoToTask>("think again", [](s32)
-                                                       { return true; });
-                    mTaskAction.clear();
-                    return true;
-                }
-                // Before that is the end: all that failed here and every way ruled out here once more, four times
-                // at most in a path. What failed did so in a state that is gone: a Slig that watched then, a way
-                // that was blocked then. (Bonewerkz' path 2 come into from the annex: a walk ruled out while a
-                // Slig stood in it, the lever beyond it given up on, and the end at a door that does nothing.)
-                if (mKnow && mLastChances[{mAbe.mLevel, mAbe.mPath}] < 4 && (!mFailedActions.empty() || !mKnow->mBannedEdges.empty()))
-                {
-                    mLastChances[{mAbe.mLevel, mAbe.mPath}]++;
-                    Log("no plan at all: the " + std::to_string(mFailedActions.size()) + " things that failed and the " + std::to_string(mKnow->mBannedEdges.size()) + " ways ruled out here once more");
-                    mFailedActions.clear();
-                    mKnow->mBannedEdges.clear();
-                    mBackFor = -1;
-                    mForgaveFrame = mAbe.mFrame;
-                    mTask = std::make_unique<GoToTask>("think again", [](s32)
-                                                       { return true; });
-                    mTaskAction.clear();
-                    return true;
-                }
-                // (with Slogs awake on his floor it is theirs to move: a run from them is what comes next, MakeFlee,
-                // as soon as nothing is between them and him. Bonewerkz' Executive Office: through the sensor
-                // that lets three out behind him there is no plan, the floors ahead being theirs, and that was
-                // the end, before the slam door they were behind was up.)
-                if (mIsAe && (mSlogStuckWaits == 0 || mAbe.mFrame - mSlogStuckFrame < 200))
-                {
-                    for (const SlogAt& slog : mWorld.mSlogs)
-                    {
-                        if ((!slog.mAsleep || slog.mWaking) && std::abs(slog.mY - mAbe.mY) <= 30 && std::abs(slog.mX - mAbe.mX) < 800)
-                        {
-                            if (mSlogStuckWaits++ == 0)
-                            {
-                                mSlogStuckFrame = mAbe.mFrame;
-                                Log("no plan, and Slogs awake on this floor: theirs to move");
-                            }
-                            if (std::unique_ptr<Task> flee = MakeSlogFlee())
-                            {
-                                mTask = std::move(flee);
-                                mTaskAction.clear();
-                                return true;
-                            }
-                            mTask = std::make_unique<GoToTask>("think again", [](s32)
-                                                               { return true; });
-                            mTaskAction.clear();
-                            return true;
-                        }
-                    }
-                }
-                // And a while longer where he stands, a dozen times in a path: what was just done may not have
-                // done all it does yet. (Bonewerkz' fourth boiler come to from the annex: its wheel sets a clock
-                // of 55 frames going that lets the Slogs out, the run from them by the well is what follows, and
-                // it was the end a frame before they were after him.)
-                // (thirty of them, a minute in all: Sligs that watch the only way on walk their beats. FeeCo's path 3
-                // in the run from the Mines: no way to its first door as he came in, and the end 900 frames on.)
-                if (mNoPlanWaits[{mAbe.mLevel, mAbe.mPath}] < 30)
-                {
-                    if (mNoPlanWaits[{mAbe.mLevel, mAbe.mPath}]++ == 0)
-                    {
-                        Log("no plan at all: a while here before that is the end");
-                    }
-                    mHold = 60;
-                    mTask = std::make_unique<GoToTask>("think again", [](s32)
-                                                       { return true; });
-                    mTaskAction.clear();
-                    return true;
-                }
-                // (what there was to plan with, for whoever reads the log)
-                Log("the actions there were:\n" + domain.Text());
-                Stuck("no_plan: Leave the path: " + plan.mMiss + ". " + domain.Frontier() + (misses.empty() ? "" : " Also no plan for: " + misses));
-                return false;
+                return decided != 0;
             }
         }
     }
@@ -3639,6 +2970,704 @@ bool Bot::OtherWayThan(s32 edge) const
                               }
                               return &e == &graph.Edges()[edge] ? -1 : cost(e);
                           }, other);
+}
+
+// The plan in hand, if it still holds from here: what is left of it, or a way that is much cheaper by now
+// (openGoals: how many Mudokons can be got at now)
+Goap::Plan Bot::KeptPlan(const Domain& domain, const std::vector<Goap::Action>& actions, std::size_t openGoals)
+{
+    // The plan in hand still holds from here (what is left of it can be done as things are and gets its goal):
+    // on with it, without thinking it all out again
+    // (not when a Mudokon can be got at that couldn't be when it was made, and the plan is for something else)
+    // (nor a plan that only tries what a switch does, once there is a way out: FeeCo's path 4, where the bones
+    // he had gone for made the way on, and he went back past the Sligs to try a mine with one)
+    bool keep = mKeptForMudokon || openGoals <= mKeptOpen;
+    if (keep && !mKeptPlan.empty() && mKeptGoalName.rfind("Try switch", 0) == 0 && Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, actions).mFound)
+    {
+        Log("there is a way out now: no more of " + mKeptGoalName);
+        keep = false;
+    }
+    Goap::Plan best;
+    for (std::size_t skip = 0; keep && skip < mKeptPlan.size() && !best.mFound; skip++)
+    {
+        Goap::Plan kept;
+        Goap::State state = domain.mStart;
+        bool holds = true;
+        for (std::size_t i = skip; i < mKeptPlan.size() && holds; i++)
+        {
+            holds = false;
+            for (std::size_t a = 0; a < actions.size(); a++)
+            {
+                if (actions[a].mName == mKeptPlan[i] && Goap::Planner::Can(state, actions[a]))
+                {
+                    const Goap::State before = state;
+                    Goap::Planner::Do(state, actions[a]);
+                    // (a step that gives nothing it does not have already is one that is done: a bone thrown to
+                    // Slogs, with the bone lying there, still spends a bone)
+                    holds = !(state == before) && !before.HasAll(actions[a].mEffects);
+                    kept.mSteps.push_back(static_cast<s32>(a));
+                    kept.mCost += std::max(1, actions[a].mCost);
+                    break;
+                }
+            }
+        }
+        if (holds && !domain.mStart.HasAll(mKeptGoal) && state.HasAll(mKeptGoal))
+        {
+            kept.mFound = true;
+            best = kept;
+            // (a plan with something dear left in it, made when there was no other way: looked at again, and
+            // the way that is 400 cheaper by now is taken. The Barracks' path 14: planned at its door, where no
+            // flying Slig is to be had, the lever under one was his to pull; kept, he went for it when the
+            // flying Slig the lever before it lets out could have.)
+            if (kept.mCost >= 1500)
+            {
+                const Goap::Plan fresh = Goap::Planner::Find(domain.mStart, mKeptGoal, actions);
+                if (fresh.mFound && !fresh.mSteps.empty() && fresh.mCost + 400 < kept.mCost)
+                {
+                    Log("the plan in hand has a cheaper way by now (" + std::to_string(fresh.mCost) + " for " + std::to_string(kept.mCost) + "): that one");
+                    best = fresh;
+                }
+            }
+        }
+    }
+    return best;
+}
+
+// What Sligs the grenades to be had in this path are for (World::mNoGrenadeFor), for the planning to come
+void Bot::NoteGrenadeTargets(const PathKnowledge* know, s32 abeNode)
+{
+    // A Slig a grenade is to be thrown at, and no grenade to be had yet: none on him, none had in this path so
+    // far, and no way to its machine as things are. Its floor is then a floor like any other, got by as
+    // such Sligs are elsewhere. (The Barracks' path 1 from its first screen: the machine is twelve screens on,
+    // behind the Slig that stands guard at 2137,1739, and with that Slig's floor shut until it was blown up
+    // there was no plan at all. The walkthrough: "roll off the edge to land hanging below the Slig. Once he
+    // turns away from you again, hoist up and quickly run and jump up to the next ledge above him".)
+    if (mIsAe && know)
+    {
+        mWorld.mNoGrenadeFor.clear();
+        const Entity* machine = nullptr;
+        for (const Entity& e : mWorld.mEntities)
+        {
+            if (e.mKind == EntityKind::eRockSack && e.mInputs[1] == 2 && !e.mGone && (!machine || std::abs(e.CentreX() - mAbe.mX) + std::abs(e.mY2 - mAbe.mY) < std::abs(machine->CentreX() - mAbe.mX) + std::abs(machine->mY2 - mAbe.mY)))
+            {
+                machine = &e;
+            }
+        }
+        mWorld.mBoomReached = mWorld.mBoomReached || (machine && mWorld.mRocks > 0);
+        if (machine && !mWorld.mBoomReached)
+        {
+            std::set<u32> flown;
+            for (const Entity& spawner : mWorld.mEntities)
+            {
+                if (spawner.mKind == EntityKind::eFlierSpawner)
+                {
+                    for (const Domain::FlierTarget& target : Domain::FlierTargets(know->mNav.Input(), mWorld, spawner))
+                    {
+                        flown.insert(target.mSlig);
+                    }
+                }
+            }
+            // (a machine there is a way to as things are, with those floors kept off, is one to go to first: the
+            // boom machine's rooms of that path, where the machine is a screen further off than the Sligs the
+            // grenades are for)
+            bool reached = false;
+            {
+                const NavGraph& nav = know->mNav;
+                std::set<s32> machines;
+                for (const Entity& e : mWorld.mEntities)
+                {
+                    if (e.mKind == EntityKind::eRockSack && e.mInputs[1] == 2 && !e.mGone)
+                    {
+                        machines.insert(Domain::UseNode(nav, e, nullptr));
+                    }
+                }
+                std::vector<char> seen(nav.Nodes().size(), 0);
+                std::vector<s32> open;
+                if (abeNode >= 0)
+                {
+                    open.push_back(abeNode);
+                    seen[abeNode] = 1;
+                }
+                while (!open.empty() && !reached)
+                {
+                    const s32 cur = open.back();
+                    open.pop_back();
+                    reached = machines.count(cur) != 0;
+                    for (s32 k = 0; k < nav.Nodes()[cur].mEdgeCount; k++)
+                    {
+                        const NavEdge& e = nav.Edges()[nav.Nodes()[cur].mFirstEdge + k];
+                        s32 switchId = 0;
+                        s32 openValue = 0;
+                        if (seen[e.mTo] || (nav.Condition(e, &switchId, &openValue) && mWorld.Switch(switchId) != openValue) ||
+                            (e.mClear >= 0 && nav.Input().mFeatures[e.mClear].mKind == FeatureKind::eDanger && nav.Input().mFeatures[e.mClear].mSwitch > 1 && mWorld.Switch(nav.Input().mFeatures[e.mClear].mSwitch) == 0))
+                        {
+                            continue;
+                        }
+                        seen[e.mTo] = 1;
+                        open.push_back(e.mTo);
+                    }
+                }
+            }
+            for (const Domain::GrenadeTarget& target : Domain::GrenadeTargets(know->mNav.Input(), mWorld))
+            {
+                const Entity* slig = mWorld.Find(target.mSlig);
+                if (!reached && slig && slig->mKind == EntityKind::eSlig && flown.count(target.mSlig) == 0)
+                {
+                    mWorld.mNoGrenadeFor.insert(World::HazardSwitch(target.mSlig));
+                }
+            }
+        }
+    }
+}
+
+// The planning problem of the path as it is now
+Domain Bot::BuildDomain(const PathKnowledge* know, s32 abeNode)
+{
+    const auto allowed = [know](s32 edge)
+    {
+        if (know->mBannedEdges.count(edge) != 0)
+        {
+            return false;
+        }
+        // (running jumps taken together are for the way there, with a flying Slig about: to the plan they are
+        // the same crossings as the jumps one by one)
+        if (know->mNav.Edges()[edge].mX2 != 0)
+        {
+            return false;
+        }
+        // (onto a floor a loose Scrab can get at him on: Domain::Build wants him unseen for it)
+        return true;
+    };
+    mWorld.mExitUses = mKnow->mExitUses;
+    Domain domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll);
+    // A flying Slig that was to be got rid of before its stretch is gone into (FeatureKind::eDanger), with no fart
+    // that can be got flown at it: got by as it is after all. The Mines' path 2 has a Brew machine and a flying
+    // Slig, and the machine is past the Slig.
+    bool passed = false;
+    for (Entity& e : mWorld.mEntities)
+    {
+        if (e.mKind != EntityKind::eFlier || e.mInputs[0] != 1 || mWorld.Switch(e.mSwitch))
+        {
+            continue;
+        }
+        // (no way to get one flown at it from where he is, that is: the plan for just that)
+        bool fart = false;
+        for (const DomainStep& s : domain.mSteps)
+        {
+            fart = fart || (s.mKind == StepKind::eFartBomb && s.mEntity == e.mId);
+        }
+        // (or it is to be taken over and burst: Terminal 5's, under the Chant Protector a fart is for)
+        for (const Goap::Action& a : domain.mActions)
+        {
+            const StepKind kind = domain.mSteps[a.mTag].mKind;
+            fart = fart || ((kind == StepKind::eFlierBomb || kind == StepKind::eFlierPull) && std::find(a.mEffects.begin(), a.mEffects.end(), Goap::Fact{Key::Switch(e.mSwitch), 1}) != a.mEffects.end());
+        }
+        fart = fart && Goap::Planner::Find(domain.mStart, {{Key::Switch(e.mSwitch), 1}}, domain.mActions).mFound;
+        // (nor is one under a security orb, with a Brew to be had: the Brew is for the orb and the flying Slig is
+        // taken over then, from a place that may not be in reach yet)
+        bool underOrb = false;
+        bool brew = false;
+        for (const Entity& o : mWorld.mEntities)
+        {
+            underOrb = underOrb || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && o.mCamera == e.mCamera);
+            brew = brew || (o.mKind == EntityKind::eBrew && !o.mGone);
+        }
+        fart = fart || (underOrb && brew);
+        if (!fart)
+        {
+            Log("no fart can be flown at FlyingSlig#" + std::to_string(e.mId) + ": got by as it is");
+            e.mInputs[0] = 0;
+            passed = true;
+        }
+    }
+    if (passed)
+    {
+        domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll);
+    }
+    return domain;
+}
+
+// The actions of the domain that are to be planned with: not ones that keep failing, nor ways out that lead back
+std::vector<Goap::Action> Bot::UsableActions(BaseMap& map, const Domain& domain)
+{
+    // Actions that keep failing are left out, and so are ways out that lead back to where the run has been
+    std::vector<Goap::Action> actions;
+    if (mArrivedKey != std::pair<s32, s32>{mAbe.mLevel, mAbe.mPath})
+    {
+        // Back out of a path there was no way on in: the way out of this one that led there is a dead end, and
+        // is not taken again while another leads to that path. (Feeco's lobby has three ways up into path 9,
+        // which is three places with nothing between them: two open, the third behind a Slig, and that is the
+        // one to the Bonewerkz.)
+        if (mBackFor == mArrivedKey.second && mArrivedKey.first == mAbe.mLevel && mKnow)
+        {
+            for (const NavExit& x : mKnow->mNav.Exits())
+            {
+                const NavFeature& f = mKnow->mNav.Input().mFeatures[x.mFeature];
+                if (std::abs((f.mX1 + f.mX2) / 2 - mAbe.mX) <= 40 && std::abs(f.mY2 - mAbe.mY) <= 40 && mDeadExits.insert({mAbe.mLevel, mAbe.mPath, x.mFeature}).second)
+                {
+                    Log("the way out at " + std::to_string((f.mX1 + f.mX2) / 2) + "," + std::to_string(f.mY2) + " led nowhere: another one to path " + std::to_string(f.mDestPath) + " first");
+                }
+            }
+        }
+        mArrivedKey = {mAbe.mLevel, mAbe.mPath};
+        mArrivedX = mAbe.mX;
+        mArrivedY = mAbe.mY;
+        // (out of the path he backed out of: it may be come into again, by another way, and backed out of again)
+        if (mBackFor != mAbe.mPath)
+        {
+            mBackFor = -1;
+        }
+    }
+    for (const Goap::Action& a : domain.mActions)
+    {
+        const auto failed = mFailedActions.find(a.mName);
+        if (failed != mFailedActions.end() && failed->second >= 2)
+        {
+            // For good if it killed Abe; else until he is somewhere else (no route from one place says
+            // nothing about another)
+            const auto deaths = mActionDeaths.find(a.mName);
+            const auto where = mFailedWhere.find(a.mName);
+            const bool moved = where != mFailedWhere.end() && (std::abs(where->second.first - mAbe.mX) > 400 || std::abs(where->second.second - mAbe.mY) > 150);
+            // (and not for ever: what has failed six times over is left alone)
+            const auto total = mFailedTotal.find(a.mName);
+            if ((deaths != mActionDeaths.end() && deaths->second >= 3) || !moved || (total != mFailedTotal.end() && total->second >= 6))
+            {
+                continue;
+            }
+            mFailedActions.erase(failed);
+        }
+        const DomainStep& step = domain.mSteps[a.mTag];
+        if (step.mKind == StepKind::eExit)
+        {
+            const NavFeature& f = mKnow->mNav.Input().mFeatures[mKnow->mNav.Exits()[step.mEdge].mFeature];
+            // The way he came in, with another way out to the same place: that other one is the one meant
+            if (mBackFor != mAbe.mPath && mKnow->mNav.Exits()[step.mEdge].mNode >= 0 && std::abs((f.mX1 + f.mX2) / 2 - mArrivedX) <= 40 && std::abs(f.mY2 - mArrivedY) <= 40)
+            {
+                bool twin = false;
+                for (const NavExit& other : mKnow->mNav.Exits())
+                {
+                    const NavFeature& g = mKnow->mNav.Input().mFeatures[other.mFeature];
+                    twin = twin || (other.mFeature != mKnow->mNav.Exits()[step.mEdge].mFeature && g.mDestLevel == f.mDestLevel && g.mDestPath == f.mDestPath);
+                }
+                if (twin)
+                {
+                    continue;
+                }
+            }
+            // (backing out: the way he came in, wherever in the level it leads)
+            if (mBackFor == mAbe.mPath && mKnow->mNav.Exits()[step.mEdge].mNode >= 0 && std::abs((f.mX1 + f.mX2) / 2 - mArrivedX) <= 40 && std::abs(f.mY2 - mArrivedY) <= 40)
+            {
+                actions.push_back(a);
+                continue;
+            }
+            if (mDeadExits.count({mAbe.mLevel, mAbe.mPath, mKnow->mNav.Exits()[step.mEdge].mFeature}) != 0)
+            {
+                bool other = false;
+                for (const NavExit& x : mKnow->mNav.Exits())
+                {
+                    const NavFeature& g = mKnow->mNav.Input().mFeatures[x.mFeature];
+                    // (one not gone for yet: once each of the others has been tried the dead one is a way again. What
+                    // shut the place it leads to may have been opened from one of the others: FeeCo's hub, the
+                    // door to the floor of its path 9 whose electric wall is worked from the ledge another of
+                    // its doors leads to.)
+                    const s32 idx = static_cast<s32>(&x - mKnow->mNav.Exits().data());
+                    const bool tried = mKnow->mExitUses.count(idx) != 0 && mKnow->mExitUses.at(idx) > 0;
+                    other = other || (g.mDestLevel == f.mDestLevel && g.mDestPath == f.mDestPath && mDeadExits.count({mAbe.mLevel, mAbe.mPath, x.mFeature}) == 0 && !tried);
+                }
+                if (other)
+                {
+                    continue;
+                }
+            }
+            bool sideTrip = false;
+            if (!ExitAllowed(map, f, &sideTrip))
+            {
+                continue;
+            }
+            if (sideTrip)
+            {
+                // Before the way on, which may not lead back
+                actions.push_back(a);
+                actions.back().mCost = 1;
+                continue;
+            }
+        }
+        actions.push_back(a);
+    }
+
+    return actions;
+}
+
+// No way out of the path is known: a switch to try, a path of the level not been in, somewhere new in this one,
+// and when none of that has a plan, NoPlanAtAll. 1 or 0 for Replan to return, or -1 with best (bestGoal,
+// bestFacts) the plan to follow. plan: the one for the way out, for its miss.
+s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions, const Goap::Plan& plan, bool errandOpen, s32& plansFound, Goap::Plan& best, std::string& bestGoal,
+                  std::vector<Goap::Fact>& bestFacts, std::string& misses)
+{
+    // No way out is known yet: change what can be changed, a door it opens may show one. Switches the
+    // run has already set once are left alone, so it can't go round in circles.
+    // (the nearest looking first, and the first two that can be done are enough to choose from)
+    s32 others = 0;
+    for (const Goap::Action& a : actions)
+    {
+        others += a.mName.rfind("Cross ", 0) == 0 ? 0 : 1;
+    }
+    if (mWhyNoWayOut != mAbe.mPath || mWhyCount != others)
+    {
+        mWhyNoWayOut = mAbe.mPath;
+        mWhyCount = others;
+        // (with what can be done here other than cross, to see which need nothing gives)
+        std::string can;
+        for (const Goap::Action& a : actions)
+        {
+            if (a.mName.rfind("Cross ", 0) == 0)
+            {
+                continue;
+            }
+            can += "\n  " + a.mName + " needs";
+            for (const Goap::Fact& f : a.mPre)
+            {
+                can += " " + std::to_string(f.mKey) + "=" + std::to_string(f.mValue);
+            }
+            can += " gives";
+            for (const Goap::Fact& f : a.mEffects)
+            {
+                can += " " + std::to_string(f.mKey) + "=" + std::to_string(f.mValue);
+            }
+        }
+        Log("no way out known: " + plan.mMiss + ". " + domain.Frontier() + can);
+    }
+    std::vector<std::pair<s32, Goap::Fact>> tries;
+    for (const Goap::Fact& fact : domain.Reachable())
+    {
+        if (fact.mKey < 1000 || fact.mKey >= 1000000 || mExplored.count({mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey}))
+        {
+            continue;
+        }
+        // (a UXB is turned off where the way goes through it, not to see what that does: it does nothing else)
+        bool uxb = false;
+        for (const Entity& e : mWorld.mEntities)
+        {
+            uxb = uxb || (e.mKind == EntityKind::eUxb && Key::Switch(e.mSwitch) == fact.mKey);
+            // (nor is a mine blown up to see what that does: it is a noise, and it wakes what sleeps. Bonewerkz'
+            // path 2: the two Sligs of the background slept until a mine went off.)
+            uxb = uxb || (mIsAe && e.mKind == EntityKind::eMine && Key::Switch(e.mSwitch) == fact.mKey);
+            // (nor is a bone thrown to Slogs to see what that does: it is eaten, and there are four)
+            uxb = uxb || (e.mKind == EntityKind::eSlog && Key::Switch(e.mSwitch) == fact.mKey);
+        }
+        // (nor is a gate opened to see what that does, with Sligs awake on its floor on the far side of it
+        // from him: FeeCo's Executive Offices, where the gate shut on its two Sligs was opened again for want
+        // of anything else to try, and he was shot through it)
+        for (const NavFeature& f : mKnow->mNav.Input().mFeatures)
+        {
+            if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mBeam || f.mSwitch <= 1 || Key::Switch(f.mSwitch) != fact.mKey || fact.mValue != (f.mStartClosed ? 1 : 0) ||
+                mWorld.Switch(f.mSwitch) == fact.mValue || std::abs(mAbe.mY - f.mY2) > 60)
+            {
+                continue;
+            }
+            const s32 gateX = (f.mX1 + f.mX2) / 2;
+            for (const SligAt& slig : mWorld.mSligs)
+            {
+                uxb = uxb || (!slig.mAsleep && !slig.mPossessed && slig.mHalf == f.mHalf && std::abs(slig.mY - f.mY2) <= 30 && std::abs(slig.mX - gateX) < 400 && (slig.mX - gateX) * (mAbe.mX - gateX) < 0);
+            }
+        }
+        if (uxb)
+        {
+            continue;
+        }
+        const s32 est = Goap::Planner::Short(domain.mStart, {fact}, actions);
+        if (est >= 0)
+        {
+            tries.push_back({est, fact});
+        }
+    }
+    std::stable_sort(tries.begin(), tries.end(), [](const std::pair<s32, Goap::Fact>& a, const std::pair<s32, Goap::Fact>& b)
+                     { return a.first < b.first; });
+    for (const auto& entry : tries)
+    {
+        // (one more looked at while the best so far goes by Slogs that sleep)
+        if (plansFound >= (best.mFound && best.mCost >= 100000 ? 4 : 2))
+        {
+            break;
+        }
+        const Goap::Fact fact = entry.second;
+        Goap::Plan sub = Goap::Planner::Find(domain.mStart, {fact}, actions);
+        // (a way that goes by Slogs that sleep is the last to be tried: what it wakes is there for all that
+        // comes after. Bonewerkz' boilers 3 and 4: the fourth's wheel, past the two Slogs on the
+        // platforms, was turned before the third's, and the door out of its room wants both; the way
+        // back to the third was the floor the Slogs were then loose on.)
+        if (sub.mFound && mIsAe)
+        {
+            bool wakes = false;
+            for (s32 step : sub.mSteps)
+            {
+                const DomainStep& st = domain.mSteps[actions[step].mTag];
+                if (st.mKind != StepKind::eCross || st.mEdge < 0 || st.mEdge >= static_cast<s32>(mKnow->mNav.Edges().size()))
+                {
+                    continue;
+                }
+                const NavNode& to = mKnow->mNav.Nodes()[mKnow->mNav.Edges()[st.mEdge].mTo];
+                for (const RockAt& slog : mWorld.mSlogsAsleepAt)
+                {
+                    wakes = wakes || (slog.mHalf == to.mHalf && std::abs(slog.mX - to.mX) <= 150 && std::abs(slog.mY - to.mY) <= 60);
+                }
+            }
+            if (wakes)
+            {
+                sub.mCost += 100000;
+            }
+        }
+        if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || sub.mCost < best.mCost))
+        {
+            best = sub;
+            bestGoal = "Try switch " + std::to_string(fact.mKey - 1000) + "=" + std::to_string(fact.mValue);
+            bestFacts = {fact};
+            mExploring = fact.mKey;
+            plansFound++;
+            // (planned for forty times over and still not so: it does not come of what is done for it. No
+            // more of that one here. Bonewerkz' first annex with its Mudokon gone: two levers that count
+            // only pulled together, pulled in turn by him alone for a million frames.)
+            if (++mExploreTries[{mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey}] >= 40)
+            {
+                Log("switch " + std::to_string(fact.mKey - 1000) + " does not come of what is done for it: no more of it in this path");
+                mExplored.insert({mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey});
+            }
+        }
+        else if (!sub.mFound)
+        {
+            misses += "switch " + std::to_string(fact.mKey - 1000) + ": " + sub.mMiss + "; ";
+        }
+    }
+    // Nothing left to switch, and the way out of the level this path has is not to be had: the level
+    // goes on through its other paths (Feeco's lobby, whose own way out is behind gates that the ends
+    // of two other paths open)
+    if (!best.mFound && !errandOpen && mLevel.Shut(mAbe.mPath))
+    {
+        Log("the way out of the level from this path is shut: on through the level's other paths (" + std::to_string(mLevel.Distance(mAbe.mPath)) + " away)");
+        return ThinkAgain() ? 1 : 0;
+    }
+    // Nothing left to switch, and a way out of this path into one of the level he has not been in, from
+    // which the level goes on: that before any wandering here (the Mudomo vaults' path 7: its way on, a
+    // bird portal, is only got to by coming back into it through path 10)
+    if (!best.mFound && !errandOpen && mNewPathFor != mAbe.mPath && mKnow)
+    {
+        bool onward = false;
+        for (const NavExit& x : mKnow->mNav.Exits())
+        {
+            const NavFeature& f = mKnow->mNav.Input().mFeatures[x.mFeature];
+            onward = onward || (f.mDestPath >= 0 && (f.mDestLevel < 0 || f.mDestLevel == mAbe.mLevel) && mVisitedPaths.count({mAbe.mLevel, f.mDestPath}) == 0 && mLevel.Distance(f.mDestPath) >= 0);
+        }
+        if (onward)
+        {
+            mNewPathFor = mAbe.mPath;
+            Log("no way on from here: any path of this level not yet been in will do (" + plan.mMiss + ". " + domain.Frontier() + ")");
+            return ThinkAgain() ? 1 : 0;
+        }
+    }
+    // Nothing left to switch: somewhere he has not been yet (through a door that is open now, say). The
+    // way out may show from there.
+    // (by level and path: by the path alone, the regions of the Barracks' war room, barracks_ender 11, were
+    // taken for been in at FeeCo's Executive Offices, feeco_depot_ender 11, and Aslik never gone for)
+    const s32 pathKey = mAbe.mLevel * 1000 + mAbe.mPath;
+    mRegionsBeen.insert({pathKey, domain.mStart.Get(Key::kRegion)});
+    for (auto it = mCellsBeen.lower_bound({mAbe.mLevel * 1000 + mAbe.mPath, 0}); it != mCellsBeen.end() && it->first == mAbe.mLevel * 1000 + mAbe.mPath; ++it)
+    {
+        if (it->second < static_cast<s32>(domain.mRegions.size()))
+        {
+            mRegionsBeen.insert({pathKey, domain.mRegions[it->second] + 1});
+        }
+    }
+    // (not with a gas countdown running: there is no time to look about, and any way out of the path will
+    // do. Bonewerkz' Executive Office: with 400 frames of the gas left he set off back through the door
+    // he had come out of, to the floor he began on.)
+    if (!best.mFound && !mWorld.mGasClock)
+    {
+        for (s32 pass = 0; pass < 2 && !best.mFound; pass++)
+        {
+        const bool doorPass = pass == 0;
+        for (s32 region : domain.ReachableRegions())
+        {
+            const std::pair<s32, s32> key{pathKey, region};
+            if (mRegionsBeen.count(key) || mRegionTries[key] >= 3 || plansFound >= 2)
+            {
+                continue;
+            }
+            // (a cell or two with nothing leading on is no place to look for a way out: the cell a lock
+            // stands in, beyond the trap door it is slapped from)
+            {
+                s32 cells = 0;
+                for (s32 r : domain.mRegions)
+                {
+                    cells += r + 1 == region ? 1 : 0;
+                }
+                if (cells <= 2)
+                {
+                    continue;
+                }
+            }
+            const Goap::Fact fact{Key::kRegion, region};
+            const Goap::Plan sub = Goap::Planner::Find(domain.mStart, {fact}, actions);
+            // Through a door or a well first: along a floor nothing has led him onto is where what the
+            // doors were shut against lives (Fleeches, in the Mudanchee vault)
+            bool byDoor = false;
+            for (s32 stepIdx : sub.mSteps)
+            {
+                const DomainStep& st = domain.mSteps[actions[stepIdx].mTag];
+                const EdgeKind kind = st.mKind == StepKind::eCross ? mKnow->mNav.Edges()[st.mEdge].mKind : EdgeKind::eWalk;
+                byDoor = byDoor || kind == EdgeKind::eDoor || kind == EdgeKind::eWell || kind == EdgeKind::ePortal;
+            }
+            if (sub.mFound && !sub.mSteps.empty() && byDoor != doorPass)
+            {
+                continue;
+            }
+            if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || sub.mCost < best.mCost))
+            {
+                best = sub;
+                bestGoal = "Go somewhere new (region " + std::to_string(region) + ")";
+                bestFacts = {fact};
+                mRegionGoal = key;
+                plansFound++;
+            }
+        }
+        }
+        if (best.mFound)
+        {
+            mRegionTries[mRegionGoal]++;
+        }
+    }
+    if (!best.mFound && errandOpen)
+    {
+        // No way to what the door elsewhere wants: that is given up, and the path is left like any other
+        for (const s32 sw : mLevel.Errands(mAbe.mPath))
+        {
+            if (mWorld.Switch(sw) == 0 && mErrandsLeft.insert({mAbe.mLevel * 1000 + mAbe.mPath, sw}).second)
+            {
+                Log("no way to set switch " + std::to_string(sw) + " for the door of another path: given up (" + misses + ")");
+            }
+        }
+        return ThinkAgain() ? 1 : 0;
+    }
+    if (!best.mFound)
+    {
+        return NoPlanAtAll(domain, plan, misses) ? 1 : 0;
+    }
+    return -1;
+}
+
+// No plan for anything at all: what is left to try before it is the end, one rung a time (each sets a task, or
+// is passed over for the next), and then the end
+bool Bot::NoPlanAtAll(const Domain& domain, const Goap::Plan& plan, const std::string& misses)
+{
+    // What failed from somewhere else may work from here: once in a while everything but what
+    // killed Abe gets another go
+    if (!mFailedActions.empty() && mAbe.mFrame - mForgaveFrame > 900)
+    {
+        mForgaveFrame = mAbe.mFrame;
+        for (auto it = mFailedActions.begin(); it != mFailedActions.end();)
+        {
+            const auto deaths = mActionDeaths.find(it->first);
+            const auto total = mFailedTotal.find(it->first);
+            // (a way out of the path is never ruled out for good: there is no going on without one. What
+            // ends that is the same cell killing him twenty times. The second Mudomo vault in the run
+            // from the Mines: both its exits given up on with its Paramites after him, and he stood
+            // at one of them with no plan.)
+            const bool forGood = it->first.rfind("Exit ", 0) != 0 && ((deaths != mActionDeaths.end() && deaths->second >= 3) || (total != mFailedTotal.end() && total->second >= 6));
+            it = forGood ? std::next(it) : mFailedActions.erase(it);
+        }
+        // (and the ways ruled out in this path: one of them may be the only way there is. Bonewerkz' path
+        // 2 in the run from the Mines: a hop over its mines ruled out after two deaths by the flying
+        // Slig's grenades, with another way known then that was no way a moment later.)
+        if (mKnow && !mKnow->mBannedEdges.empty())
+        {
+            Log("no plan: " + std::to_string(mKnow->mBannedEdges.size()) + " ways ruled out here are allowed again");
+            mKnow->mBannedEdges.clear();
+        }
+        Log("no plan: trying again what failed before");
+        return ThinkAgain();
+    }
+    // The way on shut by switches nothing here sets (a hub whose door wants its side paths done): into
+    // a path of this level he has not been in yet
+    if (mNewPathFor != mAbe.mPath)
+    {
+        mNewPathFor = mAbe.mPath;
+        Log("no way on from here: any path of this level not yet been in will do");
+        return ThinkAgain();
+    }
+    // Nothing at all: back out the way he came in
+    // (three times at most from one path: he can come into it again by another door)
+    if (mBackFor != mAbe.mPath && mBackOuts[{mAbe.mLevel, mAbe.mPath}] < 3)
+    {
+        mBackOuts[{mAbe.mLevel, mAbe.mPath}]++;
+        mBackFor = mAbe.mPath;
+        Log("no way on from here: back out the way he came in");
+        return ThinkAgain();
+    }
+    // Before that is the end: all that failed here and every way ruled out here once more, four times
+    // at most in a path. What failed did so in a state that is gone: a Slig that watched then, a way
+    // that was blocked then. (Bonewerkz' path 2 come into from the annex: a walk ruled out while a
+    // Slig stood in it, the lever beyond it given up on, and the end at a door that does nothing.)
+    if (mKnow && mLastChances[{mAbe.mLevel, mAbe.mPath}] < 4 && (!mFailedActions.empty() || !mKnow->mBannedEdges.empty()))
+    {
+        mLastChances[{mAbe.mLevel, mAbe.mPath}]++;
+        Log("no plan at all: the " + std::to_string(mFailedActions.size()) + " things that failed and the " + std::to_string(mKnow->mBannedEdges.size()) + " ways ruled out here once more");
+        mFailedActions.clear();
+        mKnow->mBannedEdges.clear();
+        mBackFor = -1;
+        mForgaveFrame = mAbe.mFrame;
+        return ThinkAgain();
+    }
+    // (with Slogs awake on his floor it is theirs to move: a run from them is what comes next, MakeFlee,
+    // as soon as nothing is between them and him. Bonewerkz' Executive Office: through the sensor
+    // that lets three out behind him there is no plan, the floors ahead being theirs, and that was
+    // the end, before the slam door they were behind was up.)
+    if (mIsAe && (mSlogStuckWaits == 0 || mAbe.mFrame - mSlogStuckFrame < 200))
+    {
+        for (const SlogAt& slog : mWorld.mSlogs)
+        {
+            if ((!slog.mAsleep || slog.mWaking) && std::abs(slog.mY - mAbe.mY) <= 30 && std::abs(slog.mX - mAbe.mX) < 800)
+            {
+                if (mSlogStuckWaits++ == 0)
+                {
+                    mSlogStuckFrame = mAbe.mFrame;
+                    Log("no plan, and Slogs awake on this floor: theirs to move");
+                }
+                if (std::unique_ptr<Task> flee = MakeSlogFlee())
+                {
+                    mTask = std::move(flee);
+                    mTaskAction.clear();
+                    return true;
+                }
+                return ThinkAgain();
+            }
+        }
+    }
+    // And a while longer where he stands, a dozen times in a path: what was just done may not have
+    // done all it does yet. (Bonewerkz' fourth boiler come to from the annex: its wheel sets a clock
+    // of 55 frames going that lets the Slogs out, the run from them by the well is what follows, and
+    // it was the end a frame before they were after him.)
+    // (thirty of them, a minute in all: Sligs that watch the only way on walk their beats. FeeCo's path 3
+    // in the run from the Mines: no way to its first door as he came in, and the end 900 frames on.)
+    if (mNoPlanWaits[{mAbe.mLevel, mAbe.mPath}] < 30)
+    {
+        if (mNoPlanWaits[{mAbe.mLevel, mAbe.mPath}]++ == 0)
+        {
+            Log("no plan at all: a while here before that is the end");
+        }
+        mHold = 60;
+        return ThinkAgain();
+    }
+    // (what there was to plan with, for whoever reads the log)
+    Log("the actions there were:\n" + domain.Text());
+    Stuck("no_plan: Leave the path: " + plan.mMiss + ". " + domain.Frontier() + (misses.empty() ? "" : " Also no plan for: " + misses));
+    return false;
+}
+
+bool Bot::ThinkAgain()
+{
+    mTask = std::make_unique<GoToTask>("think again", [](s32)
+                                       { return true; });
+    mTaskAction.clear();
+    return true;
 }
 
 void Bot::RewindTo(BaseMap& map, Saved& saved)

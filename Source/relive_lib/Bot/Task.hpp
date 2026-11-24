@@ -817,6 +817,33 @@ public:
     }
 
 private:
+    // What GoToTask::Next has found by the time it comes to the step along the edge in hand
+    struct Way final
+    {
+        const AbeState& mAbe;
+        NavGraph& mNav;
+        s32 mCur;
+        std::vector<s32>& mPath;
+        bool mAtGoal;
+        bool mLed;
+        bool mZOther;
+        std::size_t mSweepStop;
+        bool mSweepWalk;
+        std::size_t mSweepRoll;
+        bool mWasDucked;
+        const NavEdge& mFirst;
+        bool mOverGap;
+    };
+    // The step along each kind of edge
+    TaskStep RollStep(Bot& bot, const std::string& lastFailed, const Way& way);
+    TaskStep RunJumpStep(Bot& bot, const std::string& lastFailed, const Way& way);
+    TaskStep WalkStep(Bot& bot, const std::string& lastFailed, const Way& way);
+    TaskStep FallStep(Bot& bot, const std::string& lastFailed, const Way& way);
+    TaskStep HopStep(Bot& bot, const std::string& lastFailed, const Way& way);
+    TaskStep ClimbStep(Bot& bot, const std::string& lastFailed, const Way& way);
+    TaskStep HoistDownStep(Bot& bot, const std::string& lastFailed, const Way& way);
+    TaskStep PortalStep(Bot& bot, const std::string& lastFailed, const Way& way);
+    TaskStep TeleportStep(Bot& bot, const std::string& lastFailed, const Way& way);
     std::string mName;
     std::function<bool(s32)> mIsGoal;
     Gait mTopGait = Gait::eRun;
