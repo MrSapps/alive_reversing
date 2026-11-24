@@ -704,7 +704,17 @@ private:
     std::vector<ThrowArc::Point> mThrowSeen;
     s32 mCurrentEdge = -1;
     bool mLooked = false;
+    // Deaths on each drop and jump. (By the edge alone, which is any path's edge of that number: the run to the
+    // Brewery was built with it so, and keyed by path it dies on in the Paramite vaults.)
     std::map<s32, s32> mEdgeDeaths;
+    // Looking ahead, the moments (hold-backs) it killed at by path (level x 1000 + path, edge), and the ones ruled out for good by them (level
+    // and path, edges): a look-ahead save puts the bans back as they were, and these after them
+    std::map<std::pair<s32, s32>, std::set<s32>> mLookEdgeDeaths;
+    // The paths (level x 1000 + path) looking ahead gave up in: played on without it there
+    std::set<s32> mLookGivenUp;
+    std::map<std::pair<s32, s32>, std::set<s32>> mDeadlyEdges;
+    // Another way from where the edge starts to where it leads, by neither it nor what a switch has shut
+    bool OtherWayThan(s32 edge) const;
     // Whether the run may take an exit to that path now
     bool ExitAllowed(BaseMap& map, const NavFeature& exit, bool* sideTrip);
     // The human option's last dawdle, so two don't follow each other
@@ -784,6 +794,8 @@ private:
         // What the bot remembered then (see BotMemory), and the edges it had ruled out, by path
         BotMemory mMemory;
         std::map<std::pair<s32, s32>, std::set<s32>> mBanned;
+        // And the edges it had learnt, by path (NavGraph::Learnt)
+        std::map<std::pair<s32, s32>, std::map<s32, s32>> mLearnt;
     };
     std::vector<Saved> mCheckpoints;
     // The game put back to a save, and the inputs since it let go

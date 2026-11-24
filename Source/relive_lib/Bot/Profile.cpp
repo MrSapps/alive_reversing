@@ -45,6 +45,10 @@ bool Profile::Parse(const std::string& text, Profile& profile, std::string& erro
         {
             profile.mHuman = true;
         }
+        else if (word == "hurt_ok")
+        {
+            profile.mHurtOk = true;
+        }
         else if (word == "look")
         {
             profile.mLook = true;
@@ -73,7 +77,7 @@ bool Profile::Parse(const std::string& text, Profile& profile, std::string& erro
 std::string Profile::Text() const
 {
     const char* ending = mEnding == Ending::eSaveAll ? "save_all" : mEnding == Ending::eKillAll ? "kill_all" : mEnding == Ending::eAverage ? "average" : "any";
-    std::string text = std::string(ending) + ",seed=" + std::to_string(mSeed) + (mHuman ? ",human" : "") + (mLook ? ",look" : "");
+    std::string text = std::string(ending) + ",seed=" + std::to_string(mSeed) + (mHuman ? ",human" : "") + (mLook ? ",look" : "") + (mHurtOk ? ",hurt_ok" : "");
     for (const std::string& level : mBeen)
     {
         text += ",been=" + level;

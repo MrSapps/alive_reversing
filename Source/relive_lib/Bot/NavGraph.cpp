@@ -1235,6 +1235,8 @@ void NavGraph::Build(const NavInput& input)
 {
     mInput = input;
     mThrows.reset();
+    mLearnt.clear();
+    mBuiltTo.clear();
     mNodes.clear();
     mEdges.clear();
     mExits.clear();
@@ -2392,7 +2394,22 @@ void NavGraph::LearnEdge(s32 edgeIdx, s32 actualTo)
 {
     if (edgeIdx >= 0 && edgeIdx < static_cast<s32>(mEdges.size()) && actualTo >= 0)
     {
+        mBuiltTo.insert({edgeIdx, mEdges[edgeIdx].mTo});
         mEdges[edgeIdx].mTo = actualTo;
+        mLearnt[edgeIdx] = actualTo;
+    }
+}
+
+void NavGraph::PutLearnt(const std::map<s32, s32>& learnt)
+{
+    for (const auto& built : mBuiltTo)
+    {
+        mEdges[built.first].mTo = built.second;
+    }
+    mLearnt.clear();
+    for (const auto& e : learnt)
+    {
+        LearnEdge(e.first, e.second);
     }
 }
 

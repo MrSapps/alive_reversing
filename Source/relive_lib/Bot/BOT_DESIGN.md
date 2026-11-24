@@ -42,6 +42,22 @@ minutes. Judge the bot's speed on such a build: the Debug build's ASan makes it 
 - `GateShutsOut`: a Slig that has just stopped counts only while its least pause still covers the hop and the
   lever, and looking ahead the moment is left to the tries.
 
+**Looking ahead everywhere** (`look`), the way to replace the hand-made timing rules, is not there yet. With
+`hurt_ok` (only dying fails a try: the Scrab vault's Fleeches bite as they are led, and a try bitten once is
+kept) it gets from the Mines to the Slig Barracks' path 7 (f=232,789) with no death kept, and stops there with no
+plan. What it took, for every level:
+- Edges learnt in a try that failed are put back with the save (`NavGraph::Learnt/PutLearnt`): a Slurg in the way
+  of a hoist in Necrum's path 1 made it a way to nowhere for good.
+- A drop or jump that kills at eight different moments is ruled out for good where there is another way
+  (`mDeadlyEdges`). Not after two deaths: dying is how the moment is looked for.
+- When no try gets on, looking ahead is given up in that path and play goes on from the newest save as without
+  it (`mLookGivenUp`), instead of stopping.
+
+Checked against the run to the Brewery after each change: the same log, frame for frame, to f=319,239. **Lesson:**
+a build dir left half rebuilt (here by a `git stash` round trip) gave a binary that matched no source and looked
+like the game going nondeterministic; check the binary's time, or touch the sources, before believing a change in
+a run. The game and the bot are deterministic.
+
 ## Where it stands (2026-11-15)
 
 The sections after this one are the design as first written. This one is what is built, what was measured and

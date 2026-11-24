@@ -2,6 +2,7 @@
 
 #include "../Types.hpp"
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -260,6 +261,14 @@ public:
 
     // What doing an edge really led to: it goes there from now on
     void LearnEdge(s32 edgeIdx, s32 actualTo);
+    // What has been learnt (edge, where it leads), and putting it back to that: a try taken back did not happen,
+    // and what it learnt is not to stay (Necrum's path 1, looking ahead: a Slurg in the way of a hoist in a try
+    // that failed made it a way to nowhere, and the well beyond it was out of reach for good)
+    const std::map<s32, s32>& Learnt() const
+    {
+        return mLearnt;
+    }
+    void PutLearnt(const std::map<s32, s32>& learnt);
 
     // The floor a point over it would land on: line index or -1, with the y there
     // fallDistance is how far the fall is (AO's cameras have gaps between them that a fall skips)
@@ -296,6 +305,9 @@ public:
 
 private:
     mutable std::shared_ptr<ThrowMemo> mThrows;
+    // Edges learnt (edge, where it leads), and where each led as built
+    std::map<s32, s32> mLearnt;
+    std::map<s32, s32> mBuiltTo;
     bool IsFloor(const NavLine& line, bool half) const;
     // height: how far above the floor to look (0: at standing and at crouching height)
     bool WallBetween(s32 xa, s32 xb, s32 y, bool half, s32 height = 0) const;

@@ -2743,7 +2743,8 @@ void Bot::EnsureKnowledge(BaseMap& map)
         mErrandLevel = mAbe.mLevel;
         // (a path he looks ahead in, or the first that he does not: the saves so far were made the other way
         // and are not gone back to)
-        if (LookNow() != mLooked && mAuto)
+        // (not where looking ahead was given up: those saves are what the play without it goes back to)
+        if (LookNow() != mLooked && mAuto && mLookGivenUp.count(mAbe.mLevel * 1000 + mAbe.mPath) == 0)
         {
             Log(std::string(LookNow() ? "looking ahead" : "no more looking ahead") + " from here: the " + std::to_string(mCheckpoints.size()) + " saves so far are let go");
             mCheckpoints.clear();
@@ -2771,6 +2772,10 @@ void Bot::EnsureKnowledge(BaseMap& map)
 bool Bot::LookNow() const
 {
     // (a level, or one path of it: barracks, barracks/1)
+    if (mLookGivenUp.count(mAbe.mLevel * 1000 + mAbe.mPath) != 0)
+    {
+        return false;
+    }
     const std::string level = GameView::LevelName(mAbe.mLevel);
     return mProfile.mLook || std::find(mProfile.mLookIn.begin(), mProfile.mLookIn.end(), level) != mProfile.mLookIn.end() ||
            std::find(mProfile.mLookIn.begin(), mProfile.mLookIn.end(), level + "/" + std::to_string(mAbe.mPath)) != mProfile.mLookIn.end();
@@ -2936,7 +2941,7 @@ void Bot::MaybeCheckpoint(BaseMap& map)
         return;
     }
     // (but not hurt, nor just after: what hurt him may not be done)
-    if (look && !mTolerant && (mAbe.mHealthFp < 0x10000 || (mLastHurtFrame != 0 && mAbe.mFrame - mLastHurtFrame < 60)))
+    if (look && !mTolerant && !mProfile.mHurtOk && (mAbe.mHealthFp < 0x10000 || (mLastHurtFrame != 0 && mAbe.mFrame - mLastHurtFrame < 60)))
     {
         return;
     }
@@ -3000,6 +3005,7 @@ void Bot::MaybeCheckpoint(BaseMap& map)
         for (const auto& know : mKnowledge)
         {
             saved.mBanned[know.first] = know.second.mBannedEdges;
+            saved.mLearnt[know.first] = know.second.mNav.Learnt();
         }
     }
     mCheckpoints.push_back(std::move(saved));
@@ -3280,14 +3286,35 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
     // Too many without getting anywhere new: no more going back for a way through unhurt
     mTryFrames += frames;
     const bool spent = mTriesSince > kTriesPerObstacle || mTryFrames > (mTolerant ? kFramesPerObstacleDying : kFramesPerObstacle);
+    // Out of tries here: no more looking ahead in this path, and on from the newest save as without it, deaths and
+    // all (once a path: after that it is the end)
+    bool lookGivenUp = false;
+    const auto giveUpLooking = [&]()
+    {
+        if (!mLookGivenUp.insert(mAbe.mLevel * 1000 + mAbe.mPath).second)
+        {
+            return false;
+        }
+        Log("no try gets on here (" + what + " doing " + doing + "): on without looking ahead in this path, from the newest save");
+        mTolerant = false;
+        mTriesSince = 0;
+        mTryFrames = 0;
+        mCheckpoints.back().mStretch = Lookahead::Stretch();
+        mCheckpoints.back().mHasPressed = false;
+        return true;
+    };
     if (spent)
     {
         mTriesSince = 0;
         mTryFrames = 0;
         if (mTolerant)
         {
-            StuckNow("no try gets on, hurt or not (" + what + " doing " + doing + ")");
-            return;
+            lookGivenUp = giveUpLooking();
+            if (!lookGivenUp)
+            {
+                StuckNow("no try gets on, hurt or not (" + what + " doing " + doing + ")");
+                return;
+            }
         }
     }
     // What was pressed in a try the bot played itself is what the later tries from that save press
@@ -3308,9 +3335,9 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
         mCheckpoints.back().mPressed = pressed(mCheckpoints.back().mInputCount, mInputs.size());
         mCheckpoints.back().mHasPressed = true;
     }
-    s32 delay = -1;
+    s32 delay = lookGivenUp ? 0 : -1;
     std::string givenUp;
-    for (;;)
+    for (; !lookGivenUp;)
     {
         Saved& saved = mCheckpoints.back();
         delay = Lookahead::Failed(saved.mStretch, static_cast<s32>(mAbe.mFrame - saved.mCheckpoint.mFrame), (mAbe.mX / 25) * 4096 + mAbe.mY / 20);
@@ -3364,6 +3391,11 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
             Log("nothing gets through unhurt: being hurt is put up with for now");
             break;
         }
+        if (giveUpLooking())
+        {
+            delay = 0;
+            break;
+        }
         StuckNow("no try gets on from the oldest save (" + what + " doing " + doing + ")");
         return;
     }
@@ -3384,6 +3416,13 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
     {
         const auto banned = saved.mBanned.find(know.first);
         know.second.mBannedEdges = banned == saved.mBanned.end() ? std::set<s32>() : banned->second;
+        const auto learnt = saved.mLearnt.find(know.first);
+        know.second.mNav.PutLearnt(learnt == saved.mLearnt.end() ? std::map<s32, s32>() : learnt->second);
+        const auto deadly = mDeadlyEdges.find(know.first);
+        if (deadly != mDeadlyEdges.end())
+        {
+            know.second.mBannedEdges.insert(deadly->second.begin(), deadly->second.end());
+        }
     }
     mKeptPlan.clear();
     if (!givenUp.empty())
@@ -3429,6 +3468,22 @@ void Bot::OnDeath(BaseMap& map)
     mSweepPending = false;
     if (look)
     {
+        // A drop or a jump that kills every time it is begun, whenever that is (begun at eight moments, each one
+        // dead): ruled out where there is another way, and for good, past the rewinds (the Barracks' path 15: the
+        // fall from 887,720, 300 tries). (Not after two deaths: dying is how the moment is looked for, and the
+        // Scrab trial's running jump at 1287,880 is the way, at the right moment.)
+        if (mCurrentEdge >= 0 && mKnow)
+        {
+            const EdgeKind kind = mKnow->mNav.Edges()[mCurrentEdge].mKind;
+            if ((kind == EdgeKind::eFall || kind == EdgeKind::eHop || kind == EdgeKind::eRunJump) && !mCheckpoints.empty() &&
+                (mLookEdgeDeaths[{mAbe.mLevel * 1000 + mAbe.mPath, mCurrentEdge}].insert(mCheckpoints.back().mStretch.mDelay), mLookEdgeDeaths[{mAbe.mLevel * 1000 + mAbe.mPath, mCurrentEdge}].size() >= 8) &&
+                OtherWayThan(mCurrentEdge))
+            {
+                Log("the " + std::string(EdgeKindName(kind)) + " from " + std::to_string(mKnow->mNav.Nodes()[mKnow->mNav.Edges()[mCurrentEdge].mFrom].mX) + "," +
+                    std::to_string(mKnow->mNav.Nodes()[mKnow->mNav.Edges()[mCurrentEdge].mFrom].mY) + " kills: another way from now on");
+                mDeadlyEdges[{mAbe.mLevel, mAbe.mPath}].insert(mCurrentEdge);
+            }
+        }
         TryFailed(map, "died");
         return;
     }
@@ -3441,26 +3496,7 @@ void Bot::OnDeath(BaseMap& map)
         // ruled out after six deaths by its flying Slig.)
         if (mCurrentEdge >= 0 && mKnow)
         {
-            const NavEdge& dying = mKnow->mNav.Edges()[mCurrentEdge];
-            const s32 dyingEdge = mCurrentEdge;
-            const s32 dyingTo = dying.mTo;
-            const NavGraph::EdgeCost cost = EdgeCostFn();
-            const NavGraph* graph = &mKnow->mNav;
-            std::vector<s32> other;
-            if (graph->FindPath(dying.mFrom, [dyingTo](s32 n)
-                                { return n == dyingTo; }, [this, &cost, graph, dyingEdge](const NavEdge& e) -> s32
-                                {
-                                    // (not by what a switch has shut: a mine's cell is no other way. Bonewerkz'
-                                    // path 2 in the run from the Mines: the hops over its mines ruled out for the
-                                    // walk through them, which is no way at all.)
-                                    s32 sw = 0;
-                                    s32 open = 0;
-                                    if (graph->Condition(e, &sw, &open) && mWorld.Switch(sw) != open)
-                                    {
-                                        return -1;
-                                    }
-                                    return &e == &graph->Edges()[dyingEdge] ? -1 : cost(e);
-                                }, other))
+            if (OtherWayThan(mCurrentEdge))
             {
                 BanEdge(mCurrentEdge);
             }
@@ -3486,26 +3522,7 @@ void Bot::OnDeath(BaseMap& map)
             // (where there is another way to where it goes. The only way is tried again, a little later each
             // time, until the same cell has killed him twenty times: ruled out after two, it left no plan at
             // all. Bonewerkz' path 2, the hop at 3512,1240; the Scrab trial's last drop.)
-            const NavEdge& dying = mKnow->mNav.Edges()[mCurrentEdge];
-            const s32 dyingEdge = mCurrentEdge;
-            const s32 dyingTo = dying.mTo;
-            const NavGraph::EdgeCost cost = EdgeCostFn();
-            const NavGraph* graph = &mKnow->mNav;
-            std::vector<s32> other;
-            const bool another = graph->FindPath(dying.mFrom, [dyingTo](s32 n)
-                                                 { return n == dyingTo; }, [this, &cost, graph, dyingEdge](const NavEdge& e) -> s32
-                                {
-                                    // (not by what a switch has shut: a mine's cell is no other way. Bonewerkz'
-                                    // path 2 in the run from the Mines: the hops over its mines ruled out for the
-                                    // walk through them, which is no way at all.)
-                                    s32 sw = 0;
-                                    s32 open = 0;
-                                    if (graph->Condition(e, &sw, &open) && mWorld.Switch(sw) != open)
-                                    {
-                                        return -1;
-                                    }
-                                    return &e == &graph->Edges()[dyingEdge] ? -1 : cost(e);
-                                }, other);
+            const bool another = OtherWayThan(mCurrentEdge);
             if (another)
             {
                 BanEdge(mCurrentEdge);
@@ -3600,6 +3617,28 @@ void Bot::RewindMiss(BaseMap& map)
     Saved& saved = mCheckpoints.back();
     Log("taking the missed throw back: to f=" + std::to_string(saved.mCheckpoint.mFrame));
     RewindTo(map, saved);
+}
+
+bool Bot::OtherWayThan(s32 edge) const
+{
+    // (not by what a switch has shut: a mine's cell is no other way. Bonewerkz' path 2 in the run from the Mines:
+    // the hops over its mines ruled out for the walk through them, which is no way at all.)
+    const NavGraph& graph = mKnow->mNav;
+    const NavEdge& dying = graph.Edges()[edge];
+    const s32 to = dying.mTo;
+    const NavGraph::EdgeCost cost = EdgeCostFn();
+    std::vector<s32> other;
+    return graph.FindPath(dying.mFrom, [to](s32 n)
+                          { return n == to; }, [this, &cost, &graph, edge](const NavEdge& e) -> s32
+                          {
+                              s32 sw = 0;
+                              s32 open = 0;
+                              if (graph.Condition(e, &sw, &open) && mWorld.Switch(sw) != open)
+                              {
+                                  return -1;
+                              }
+                              return &e == &graph.Edges()[edge] ? -1 : cost(e);
+                          }, other);
 }
 
 void Bot::RewindTo(BaseMap& map, Saved& saved)
@@ -5079,7 +5118,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         if (mLastHealthFp > 0 && mAbe.mHealthFp > 0 && mAbe.mHealthFp < mLastHealthFp)
         {
             mLastHurtFrame = mAbe.mFrame;
-            if (!mTolerant && !mCheckpoints.empty())
+            if (!mTolerant && !mProfile.mHurtOk && !mCheckpoints.empty())
             {
                 mTryFailed = true;
                 mPilotActive = false;
