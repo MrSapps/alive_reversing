@@ -27,7 +27,7 @@ struct Profile final
     bool mHuman = false;
     // Tries are made from each save, and what fails taken back, until one gets on unhurt (see Lookahead)
     bool mLook = false;
-    // The levels he looks ahead in though mLook is off (look=<level>): the Slig Barracks were built with it, and
+    // The levels, or paths of them, he looks ahead in though mLook is off (look=<level> or look=<level>/<path>): the Slig Barracks were built with it, and
     // the levels before them without
     std::vector<std::string> mLookIn;
     std::vector<std::string> mBeen;

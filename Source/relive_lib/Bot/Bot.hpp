@@ -480,10 +480,15 @@ public:
             mKnow->mExitUses[exit]++;
         }
     }
-    void WantLossRewind()
+    // (at: when it was lost, where that is not a Mudokon's death, which is seen as it happens)
+    void WantLossRewind(u32 at = 0)
     {
         mLossRewind = true;
         mLossAction = mTaskAction;
+        if (at != 0)
+        {
+            mKillFrame = at;
+        }
     }
     // It is over with nothing learnt from it
     void ThrowOver()

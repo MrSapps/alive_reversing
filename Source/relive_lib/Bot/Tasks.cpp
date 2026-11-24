@@ -7707,6 +7707,17 @@ TaskStep SligLeverTask::Next(Bot& bot, const std::string& lastFailed)
     }
     // The Slig of this floor that is nearest, with nothing shut between
     const SligAt* slig = GlukkonsSlig(nav, world, *me);
+    // (or one beyond what is shut that has the lever on its side: it hears him through a gate, and the lever is
+    // what it is wanted for. The Barracks' war room: the Slig at 662 behind the gate with Lever#6008, told "Do it"
+    // from 737. With only those he can get to counted, he called for help there for 90,000 frames.)
+    for (const SligAt& s : world.mSligs)
+    {
+        if (!slig && !s.mPossessed && s.mHalf == me->mHalf && std::abs(s.mY - me->mY) <= 20 && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(me->mX, me->mY - 5) &&
+            Domain::FloorOpen(nav.Input(), world, s.mX, lever->CentreX(), me->mY + 4, me->mHalf))
+        {
+            slig = &s;
+        }
+    }
     if (mQuiet > 0)
     {
         mQuiet -= 2;
@@ -12844,6 +12855,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 mLost++;
                 bot.Log("the flying Slig is gone: " + std::to_string(mLost) + " lost");
+                mLostAt = bot.Abe().mFrame;
             }
             mPhase = 4;
             mAfter = 0;
@@ -12934,6 +12946,15 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             }
             if (++mWaits > (mLost > 0 ? 900 : 3000))
             {
+                // (the one he had was lost and no other came: taken back to before that, as a Mudokon a task
+                // can't do without is. The Barracks' Slig bunks: his flying Slig met the other one of that
+                // room four frames otherwise than in the run before, was lost, and with the spawner written
+                // off there was no plan left for the path.)
+                if (mLost > 0 && mLostAt != 0)
+                {
+                    bot.WantLossRewind(mLostAt);
+                    return TaskStep::Failed("the flying Slig was lost and no other came");
+                }
                 bot.NoFlier(mSpawner);
                 return TaskStep::Failed("no flying Slig came to be taken over");
             }

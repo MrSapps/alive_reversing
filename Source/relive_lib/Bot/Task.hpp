@@ -1799,6 +1799,8 @@ private:
     s32 mWaits = 0;
     s32 mAfter = 0;
     s32 mLost = 0;
+    // When the last one was lost
+    u32 mLostAt = 0;
     // The Sligs to get (Domain::FlierTargets), the frames until they are looked for again, and how many things
     // were known dead when they last were
     std::vector<Domain::FlierTarget> mTargets;

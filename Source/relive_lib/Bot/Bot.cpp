@@ -2678,14 +2678,6 @@ void Bot::EnsureKnowledge(BaseMap& map)
         }
         mLevel.Build(mAbe.mLevel, paths, mLevelsBeen);
         mLevelsBeen.insert(mAbe.mLevel);
-        // (a level he looks ahead in, or the first that he does not: the saves so far were made the other way
-        // and are not gone back to)
-        if (LookNow() != mLooked && mAuto)
-        {
-            Log(std::string(LookNow() ? "looking ahead" : "no more looking ahead") + " from here: the " + std::to_string(mCheckpoints.size()) + " saves so far are let go");
-            mCheckpoints.clear();
-        }
-        mLooked = LookNow();
         Log("level graph:\n" + mLevel.Text());
     }
     if (mErrandPath != mAbe.mPath)
@@ -2710,6 +2702,14 @@ void Bot::EnsureKnowledge(BaseMap& map)
             mOnlyEdges.clear();
         }
         mErrandPath = mAbe.mPath;
+        // (a path he looks ahead in, or the first that he does not: the saves so far were made the other way
+        // and are not gone back to)
+        if (LookNow() != mLooked && mAuto)
+        {
+            Log(std::string(LookNow() ? "looking ahead" : "no more looking ahead") + " from here: the " + std::to_string(mCheckpoints.size()) + " saves so far are let go");
+            mCheckpoints.clear();
+        }
+        mLooked = LookNow();
     }
     const std::pair<s32, s32> key{mAbe.mLevel, mAbe.mPath};
     auto it = mKnowledge.find(key);
@@ -2731,7 +2731,10 @@ void Bot::EnsureKnowledge(BaseMap& map)
 
 bool Bot::LookNow() const
 {
-    return mProfile.mLook || std::find(mProfile.mLookIn.begin(), mProfile.mLookIn.end(), GameView::LevelName(mAbe.mLevel)) != mProfile.mLookIn.end();
+    // (a level, or one path of it: barracks, barracks/1)
+    const std::string level = GameView::LevelName(mAbe.mLevel);
+    return mProfile.mLook || std::find(mProfile.mLookIn.begin(), mProfile.mLookIn.end(), level) != mProfile.mLookIn.end() ||
+           std::find(mProfile.mLookIn.begin(), mProfile.mLookIn.end(), level + "/" + std::to_string(mAbe.mPath)) != mProfile.mLookIn.end();
 }
 
 void Bot::Stuck(const std::string& why)
@@ -3520,7 +3523,7 @@ void Bot::RewindLoss(BaseMap& map)
     }
     mLossRewinds++;
     Saved& saved = mCheckpoints.back();
-    Log("a Mudokon that was needed is dead: back to f=" + std::to_string(saved.mCheckpoint.mFrame) + ", try " + std::to_string(mLossRewinds));
+    Log("what was needed is lost: back to f=" + std::to_string(saved.mCheckpoint.mFrame) + ", try " + std::to_string(mLossRewinds));
     mPilotActive = false;
     mBits = 0;
     mCurrentEdge = -1;
@@ -4136,7 +4139,20 @@ std::unique_ptr<Task> Bot::MakeFlee()
             // Barracks' path 1, the Slig that stands at 1962,1400 between the ledge he comes up at and the well:
             // sneaked up to from behind and on past its face, he was shot each time; at a run past it and into
             // the well he is not.)
-            const bool past = std::abs(slig.mX - mAbe.mX) <= 40;
+            // (and the step of the plan in hand goes to where it stands or beyond, on its floor: one he has come
+            // up behind to go the other way is left be. The Barracks' bombing range: up behind the Slig on the
+            // ledge at 1162,399 and on into the tunnel over it, he ran from it instead and never got there.)
+            bool past = false;
+            {
+                const std::size_t arrow = mTaskAction.rfind("->");
+                const std::size_t comma = arrow == std::string::npos ? std::string::npos : mTaskAction.find(',', arrow);
+                if (std::abs(slig.mX - mAbe.mX) <= 40 && mTaskAction.rfind("Cross ", 0) == 0 && comma != std::string::npos)
+                {
+                    const s32 toX = std::atoi(mTaskAction.substr(arrow + 2, comma - arrow - 2).c_str());
+                    const s32 toY = std::atoi(mTaskAction.substr(comma + 1).c_str());
+                    past = std::abs(toY - slig.mY) <= 45 && (toX - slig.mX) * (mAbe.mX - slig.mX) <= 0;
+                }
+            }
             if (mIsAe && slig.mMotion == 0 && slig.mFacingLeft == (mAbe.mX > slig.mX) && !past)
             {
                 continue;
