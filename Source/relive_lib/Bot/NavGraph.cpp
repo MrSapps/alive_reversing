@@ -1234,6 +1234,7 @@ void NavGraph::AddLedgeCatches(std::vector<NavEdge>& edges, s32 from, s32 dir) c
 void NavGraph::Build(const NavInput& input)
 {
     mInput = input;
+    mThrows.reset();
     mNodes.clear();
     mEdges.clear();
     mExits.clear();

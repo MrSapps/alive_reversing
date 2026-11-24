@@ -34,6 +34,8 @@ public:
     // A throw from a cell (its middle, its floor). With a mine to aim at (its cell's middle, its floor), the
     // rock bounces off it as it sets it off.
     static Flight Throw(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine = nullptr);
+    // The same, worked out once per path and then looked up (NavGraph::Throws)
+    static Flight Throw(const NavGraph& nav, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine = nullptr);
 
     // A grenade thrown from a cell, to where it lies when its fuse has run down (the last point): it goes off
     // there. AE's comes back down off a floor it flies up under; AO's goes through it.

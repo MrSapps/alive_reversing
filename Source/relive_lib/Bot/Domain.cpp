@@ -957,7 +957,7 @@ std::vector<ThrowSpot> Domain::ThrowSpots(const NavGraph& nav, s32 x, s32 y, boo
                 continue;
             }
             const ThrowArc::Point target{mineX, mineY};
-            const ThrowArc::Flight flight = ThrowArc::Throw(nav.Input(), n.mX, n.mY, half, mineX < n.mX, kind, &target);
+            const ThrowArc::Flight flight = ThrowArc::Throw(nav, n.mX, n.mY, half, mineX < n.mX, kind, &target);
             const s32 hit = flight.mHit;
             if (hit < 0)
             {
@@ -7449,7 +7449,7 @@ bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY
         for (const ThrowSpot::Kind kind : kKinds)
         {
             // (a bone flies as a rock does)
-            const ThrowArc::Flight flight = ThrowArc::Throw(nav.Input(), from.mX, from.mY, from.mHalf, side == 1, kind);
+            const ThrowArc::Flight flight = ThrowArc::Throw(nav, from.mX, from.mY, from.mHalf, side == 1, kind);
             s32 at = -1;
             for (std::size_t k = 1; k < flight.mPoints.size() && at < 0; k++)
             {

@@ -1,0 +1,14 @@
+# Abe's Exoddus from the start of the Mines to the Brewery (headless: run with SDL_VIDEO_DRIVER=offscreen)
+# Looks ahead in the places that are a matter of timing (the Slig Barracks' first path, the Scrab trial, Bonewerkz'
+# boilers and Executive Offices). On an optimised build it is in the Brewery (f=319,239) in about 8 minutes.
+timeout 100000
+start mines 1 4 838 1498
+wait_until in_game
+draw 0
+wait_frames 40
+bot_log bot_log.txt
+bot any,look=barracks/1,look=mudanchee_vault_ender,look=bonewerkz_ender,look=bonewerkz/4,seed=1
+wait_until camera brewery 16 1
+bot_report bot_report.txt
+bot_inputs bot_inputs.txt
+quit

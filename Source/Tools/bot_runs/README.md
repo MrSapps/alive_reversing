@@ -24,6 +24,13 @@ When the bot stops, `bot_report` writes what it was doing, what it saw and why i
 `STUCK: no_plan / action_failed ...`), and `bot_inputs` the buttons of the run, which the `replay` command
 plays back without the bot.
 
+## The run to the Brewery (2026-11-24)
+
+`ae_mines_to_brewery.txt` plays `any` from the Mines' start to the Brewery's first screen, through every level
+between, with look-ahead only in the places that are a matter of timing. It is headless (`draw 0`). The bot is
+most of the cost: on a Debug build it is far slower than the game, so for a full run use an optimised build (a
+build dir with `-O1` and no sanitizers runs it at about 700 game frames a second, over twenty times real time).
+
 ## What to expect (2026-11-11)
 
 `ae_mines.txt` with `any` gets through the first path of the Mines (about 12,000 game frames: a few minutes

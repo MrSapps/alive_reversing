@@ -113,7 +113,7 @@ const SligAt* GoToTask::Sentry(const World& world, s32 x, s32 y, bool half)
     return best;
 }
 
-s32 GoToTask::JumpUpPastGuard(const NavGraph& nav, const World& world, s32 cell, const NavEdge& hoistUp)
+s32 GoToTask::JumpUpPastGuard(const NavGraph& nav, const World& world, s32 cell, const NavEdge& hoistUp, bool hurry)
 {
     if (!nav.Input().mIsAe || hoistUp.mKind != EdgeKind::eHoistUp || hoistUp.mFeature < 0)
     {
@@ -128,8 +128,12 @@ s32 GoToTask::JumpUpPastGuard(const NavGraph& nav, const World& world, s32 cell,
     {
         return 0;
     }
+    // (one further on than the hoist only in a hurry, off the floor of a Slig that has woken: FeeCo's Executive
+    // Offices, where a Slig that walks through the gate past the hoist had stopped at its beat's end, was taken for
+    // a guard and run past, and the noise of the jump split the two of them up)
     const SligAt* guard = Sentry(world, at.mX, at.mY, at.mHalf);
-    return guard && (guard->mX - at.mX) * way > 0 ? at.mX + 2 * step * way : 0;
+    const bool between = guard && (guard->mX - under.mX) * way <= step;
+    return guard && (guard->mX - at.mX) * way > 0 && (between || hurry) ? at.mX + 2 * step * way : 0;
 }
 
 bool GoToTask::TurnsFrom(const SligAt& slig, s32 x)
@@ -1534,6 +1538,12 @@ static bool OutToHoist(const NavGraph& nav, const std::vector<s32>& path)
 // from it (the time to go: the lever shuts it on them), 2 when not yet
 static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode, std::vector<s32>* moved = nullptr)
 {
+    // (looking ahead, the moment is found by trying it: the Sligs' pauses at the ends of their beat are random, and
+    // what was worked out from where they were went wrong as often as not)
+    if (bot.LookNow())
+    {
+        return 0;
+    }
     const NavNode& to = nav.Nodes()[toNode];
     const World& world = bot.GetWorld();
     s32 state = 0;
@@ -1572,9 +1582,10 @@ static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode, std::ve
             const bool walksAway = slig.mMotion == 2 && slig.mFacingLeft == (way < 0);
             const s32 then = slig.mX + way * 66;
             const bool room = slig.mBeatMax <= slig.mBeatMin || (way < 0 ? then >= slig.mBeatMin + 10 : then <= slig.mBeatMax - 10);
-            // (or one that has only just come to a stand beyond the gate with its back to it: it stands thirty frames
-            // at least before it turns. The two of FeeCo's Executive Offices are as often half a round apart as
-            // together, and waited for to walk away side by side they never did in three thousand frames.)
+            // (or one that has come to a stand beyond the gate with its back to it, and stands there for long enough
+            // yet: the least it stands at that end of its beat (its pause is that and a random part more), less what
+            // it has stood, covers the hop and the lever. FeeCo's Executive Offices: taken to stand thirty frames
+            // whatever, one turned at 25 with him in the air. Their random pauses put the two out of step and back.)
             const std::size_t idx = static_cast<std::size_t>(&slig - world.mSligs.data());
             const s32 now = static_cast<s32>(bot.Abe().mFrame);
             if (moved)
@@ -1588,7 +1599,8 @@ static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode, std::ve
                     (*moved)[idx] = now;
                 }
             }
-            const bool justStood = moved && slig.mMotion == 0 && slig.mFacingLeft == (way < 0) && (slig.mX - gateX) * way >= 15 && now - (*moved)[idx] <= 4;
+            const s32 pause = way < 0 ? slig.mPauseLeft : slig.mPauseRight;
+            const bool justStood = moved && slig.mMotion == 0 && slig.mFacingLeft == (way < 0) && (slig.mX - gateX) * way >= 15 && pause - (now - (*moved)[idx]) >= 40;
             all = all && ((walksAway && (then - gateX) * way >= 15 && room) || justStood);
             walking = walking || walksAway;
         }
@@ -3391,7 +3403,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // AE: a Slig that stands guard between him and a hoist three cells on: up it by a running jump
             if (last + 1 < path.size() && nav.Edges()[path[last]].mTo == nav.Edges()[path[last + 1]].mFrom)
             {
-                const s32 takeoff = JumpUpPastGuard(nav, bot.GetWorld(), cur, nav.Edges()[path[last + 1]]);
+                const s32 takeoff = JumpUpPastGuard(nav, bot.GetWorld(), cur, nav.Edges()[path[last + 1]], mHurry);
                 if (takeoff != 0)
                 {
                     bot.Log("past the Slig that stands guard at a running jump from " + std::to_string(takeoff) + " that catches the hoist behind it");
@@ -15239,7 +15251,7 @@ TaskStep MeatLureTask::Next(Bot& bot, const std::string& lastFailed)
                     {
                         break;
                     }
-                    const ThrowArc::Flight flight = ThrowArc::Throw(nav.Input(), nav.Nodes()[n].mX, lock.mY, lock.mHalf, mSide < 0, kind);
+                    const ThrowArc::Flight flight = ThrowArc::Throw(nav, nav.Nodes()[n].mX, lock.mY, lock.mHalf, mSide < 0, kind);
                     for (const ThrowArc::Point& p : flight.mPoints)
                     {
                         if (p.mY >= lock.mY - 12 && (p.mX - nav.Nodes()[n].mX) * mSide > 0)
@@ -16433,7 +16445,7 @@ TaskStep MeatFeedTask::Next(Bot& bot, const std::string& lastFailed)
                 s32 best = 0;
                 for (ThrowSpot::Kind kind : {ThrowSpot::eUp, ThrowSpot::eLob, ThrowSpot::eForward})
                 {
-                    const ThrowArc::Flight flight = ThrowArc::Throw(nav.Input(), spot.mX, spot.mY, spot.mHalf, mDir > 0, kind);
+                    const ThrowArc::Flight flight = ThrowArc::Throw(nav, spot.mX, spot.mY, spot.mHalf, mDir > 0, kind);
                     for (std::size_t i = 1; i < flight.mPoints.size(); i++)
                     {
                         const ThrowArc::Point& p = flight.mPoints[i];

@@ -7408,6 +7408,12 @@ TEST(BotSligGuard, PastAGuardTheHoistThreeCellsOnIsCaughtAtARunningJumpFromAStan
     EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *up), 162);
     world.mSligs[0].mX = 212;
     EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *up), 162);
+    // Further on than that only in a hurry, from a Slig that has woken: one that walks a beat beyond the hoist
+    // and has stopped at its end is not run past for nothing
+    world.mSligs[0].mX = 262;
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *up), 0);
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *up, true), 162);
+    world.mSligs[0].mX = 212;
     // Behind him it is not on the way, and one that walks is not a guard
     world.mSligs[0].mX = 62;
     EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *up), 0);

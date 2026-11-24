@@ -515,7 +515,7 @@ bool Bot::Replan(BaseMap& map)
     {
         if (mWorld.mSwitches[i] != mLastSwitches[i])
         {
-            if (mSwitchesPutBack > 0)
+            if (mAbe.mFrame <= mSwitchesPutBackUntil || !mSwitchesPutBackSeen)
             {
                 mExplored.erase({mAbe.mLevel * 1000 + mAbe.mPath, Key::Switch(i)});
             }
@@ -526,8 +526,7 @@ bool Bot::Replan(BaseMap& map)
             mLastSwitches[i] = mWorld.mSwitches[i];
         }
     }
-    // (the putting back takes a few of his turns to show)
-    mSwitchesPutBack = std::max(0, mSwitchesPutBack - 1);
+    mSwitchesPutBackSeen = true;
     const auto allowed = [know](s32 edge)
     {
         if (know->mBannedEdges.count(edge) != 0)
@@ -865,7 +864,7 @@ bool Bot::Replan(BaseMap& map)
     for (const s32 sw : best.mFound ? std::vector<s32>() : mLevel.Wanted(mAbe.mPath))
     {
         const std::vector<Goap::Fact> facts{{Key::Switch(sw), 1}};
-        if (mWorld.Switch(sw) != 0 || mErrandsLeft.count({mAbe.mPath, sw}) != 0)
+        if (mWorld.Switch(sw) != 0 || mErrandsLeft.count({mAbe.mLevel * 1000 + mAbe.mPath, sw}) != 0)
         {
             continue;
         }
@@ -889,7 +888,7 @@ bool Bot::Replan(BaseMap& map)
         {
             doorsOwn = doorsOwn || (e.mKind == EntityKind::eSwitchLogic && e.mSwitch >= 256 && e.mState == sw);
         }
-        errandOpen = errandOpen || (!doorsOwn && mWorld.Switch(sw) == 0 && mErrandsLeft.count({mAbe.mPath, sw}) == 0);
+        errandOpen = errandOpen || (!doorsOwn && mWorld.Switch(sw) == 0 && mErrandsLeft.count({mAbe.mLevel * 1000 + mAbe.mPath, sw}) == 0);
     }
     // Electric walls on across the floor of Sligs they have not got yet: that first, whatever else there is to do.
     // What turned them on may be turned back by the next thing done (Bonewerkz' first annex: "When both Sligs
@@ -970,6 +969,22 @@ bool Bot::Replan(BaseMap& map)
                     uxb = uxb || (mIsAe && e.mKind == EntityKind::eMine && Key::Switch(e.mSwitch) == fact.mKey);
                     // (nor is a bone thrown to Slogs to see what that does: it is eaten, and there are four)
                     uxb = uxb || (e.mKind == EntityKind::eSlog && Key::Switch(e.mSwitch) == fact.mKey);
+                }
+                // (nor is a gate opened to see what that does, with Sligs awake on its floor on the far side of it
+                // from him: FeeCo's Executive Offices, where the gate shut on its two Sligs was opened again for want
+                // of anything else to try, and he was shot through it)
+                for (const NavFeature& f : mKnow->mNav.Input().mFeatures)
+                {
+                    if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mBeam || f.mSwitch <= 1 || Key::Switch(f.mSwitch) != fact.mKey || fact.mValue != (f.mStartClosed ? 1 : 0) ||
+                        mWorld.Switch(f.mSwitch) == fact.mValue || std::abs(mAbe.mY - f.mY2) > 60)
+                    {
+                        continue;
+                    }
+                    const s32 gateX = (f.mX1 + f.mX2) / 2;
+                    for (const SligAt& slig : mWorld.mSligs)
+                    {
+                        uxb = uxb || (!slig.mAsleep && !slig.mPossessed && slig.mHalf == f.mHalf && std::abs(slig.mY - f.mY2) <= 30 && std::abs(slig.mX - gateX) < 400 && (slig.mX - gateX) * (mAbe.mX - gateX) < 0);
+                    }
                 }
                 if (uxb)
                 {
@@ -1072,12 +1087,15 @@ bool Bot::Replan(BaseMap& map)
             }
             // Nothing left to switch: somewhere he has not been yet (through a door that is open now, say). The
             // way out may show from there.
-            mRegionsBeen.insert({mAbe.mPath, domain.mStart.Get(Key::kRegion)});
+            // (by level and path: by the path alone, the regions of the Barracks' war room, barracks_ender 11, were
+            // taken for been in at FeeCo's Executive Offices, feeco_depot_ender 11, and Aslik never gone for)
+            const s32 pathKey = mAbe.mLevel * 1000 + mAbe.mPath;
+            mRegionsBeen.insert({pathKey, domain.mStart.Get(Key::kRegion)});
             for (auto it = mCellsBeen.lower_bound({mAbe.mLevel * 1000 + mAbe.mPath, 0}); it != mCellsBeen.end() && it->first == mAbe.mLevel * 1000 + mAbe.mPath; ++it)
             {
                 if (it->second < static_cast<s32>(domain.mRegions.size()))
                 {
-                    mRegionsBeen.insert({mAbe.mPath, domain.mRegions[it->second] + 1});
+                    mRegionsBeen.insert({pathKey, domain.mRegions[it->second] + 1});
                 }
             }
             // (not with a gas countdown running: there is no time to look about, and any way out of the path will
@@ -1090,7 +1108,7 @@ bool Bot::Replan(BaseMap& map)
                 const bool doorPass = pass == 0;
                 for (s32 region : domain.ReachableRegions())
                 {
-                    const std::pair<s32, s32> key{mAbe.mPath, region};
+                    const std::pair<s32, s32> key{pathKey, region};
                     if (mRegionsBeen.count(key) || mRegionTries[key] >= 3 || plansFound >= 2)
                     {
                         continue;
@@ -1143,7 +1161,7 @@ bool Bot::Replan(BaseMap& map)
                 // No way to what the door elsewhere wants: that is given up, and the path is left like any other
                 for (const s32 sw : mLevel.Errands(mAbe.mPath))
                 {
-                    if (mWorld.Switch(sw) == 0 && mErrandsLeft.insert({mAbe.mPath, sw}).second)
+                    if (mWorld.Switch(sw) == 0 && mErrandsLeft.insert({mAbe.mLevel * 1000 + mAbe.mPath, sw}).second)
                     {
                         Log("no way to set switch " + std::to_string(sw) + " for the door of another path: given up (" + misses + ")");
                     }
@@ -1658,7 +1676,7 @@ bool Bot::ExitAllowed(BaseMap& map, const NavFeature& exit, bool* sideTrip)
     // A door elsewhere wants a switch that is got at through one of the ways out of here (a hub and the paths
     // around it): that way, and no other while there is one
     const std::set<s32> errands = mLevel.ErrandExits(mAbe.mPath, [this](s32 path, s32 sw)
-                                                     { return mWorld.Switch(sw) == 0 && mErrandsLeft.count({path, sw}) == 0; });
+                                                     { return mWorld.Switch(sw) == 0 && mErrandsLeft.count({mAbe.mLevel * 1000 + path, sw}) == 0; });
     if (!errands.empty())
     {
         return errands.count(destPath) != 0;
@@ -2679,13 +2697,33 @@ void Bot::EnsureKnowledge(BaseMap& map)
         mLevel.Build(mAbe.mLevel, paths, mLevelsBeen);
         mLevelsBeen.insert(mAbe.mLevel);
         Log("level graph:\n" + mLevel.Text());
+        // What a path of this level may still be allowed is per visit: FeeCo Depot is come to three times, and by
+        // the third its path 9 had no backing out left in it, and that was the end
+        for (auto* counts : {&mBackOuts, &mLastChances, &mNoPlanWaits})
+        {
+            for (auto it = counts->begin(); it != counts->end();)
+            {
+                it = it->first.first == mAbe.mLevel ? counts->erase(it) : std::next(it);
+            }
+        }
+        // (and so is which switches were tried: the third time, the lever that lets him on from where the door from
+        // path 2 puts him in path 9 was taken for tried, and never pulled)
+        for (auto it = mExplored.begin(); it != mExplored.end();)
+        {
+            it = it->first / 1000 == mAbe.mLevel ? mExplored.erase(it) : std::next(it);
+        }
+        for (auto it = mExploreTries.begin(); it != mExploreTries.end();)
+        {
+            it = it->first.first / 1000 == mAbe.mLevel ? mExploreTries.erase(it) : std::next(it);
+        }
     }
-    if (mErrandPath != mAbe.mPath)
+    if (mErrandPath != mAbe.mPath || mErrandLevel != mAbe.mLevel)
     {
         // What the path he has left could have set for a door elsewhere and has not: given up
-        for (const s32 sw : mErrandPath >= 0 ? mLevel.Errands(mErrandPath) : std::vector<s32>())
+        // (a path of this level: the level graph is this level's now)
+        for (const s32 sw : mErrandPath >= 0 && mErrandLevel == mAbe.mLevel ? mLevel.Errands(mErrandPath) : std::vector<s32>())
         {
-            if (mWorld.Switch(sw) == 0 && mErrandsLeft.insert({mErrandPath, sw}).second)
+            if (mWorld.Switch(sw) == 0 && mErrandsLeft.insert({mAbe.mLevel * 1000 + mErrandPath, sw}).second)
             {
                 Log("left path " + std::to_string(mErrandPath) + " with switch " + std::to_string(sw) + " not set");
             }
@@ -2702,6 +2740,7 @@ void Bot::EnsureKnowledge(BaseMap& map)
             mOnlyEdges.clear();
         }
         mErrandPath = mAbe.mPath;
+        mErrandLevel = mAbe.mLevel;
         // (a path he looks ahead in, or the first that he does not: the saves so far were made the other way
         // and are not gone back to)
         if (LookNow() != mLooked && mAuto)
@@ -2746,6 +2785,19 @@ void Bot::Stuck(const std::string& why)
         Log("this try ends with nothing to do: " + why);
         mTryWhy = "nothing to do";
         mTryFailed = true;
+        mPilotActive = false;
+        mBits = 0;
+        return;
+    }
+    // Not looking ahead, with saves of this path to go back past: what led here is done again from further back,
+    // a few times in a path. The deaths that brought him to the newest save may have left what it needs gone (the
+    // Barracks' path 7: put back after the Slig lock had let him by, its door shut on a clock and the Slig that
+    // opened it gone, there was no plan.)
+    const s32 key = mAbe.mLevel * 1000 + mAbe.mPath;
+    if (mAuto && mState == BotState::eRunning && mCheckpoints.size() >= 2 && mStuckRewinds[key] < 6)
+    {
+        mStuckRewinds[key]++;
+        mStuckRewind = why;
         mPilotActive = false;
         mBits = 0;
         return;
@@ -3174,7 +3226,7 @@ void Bot::ThrowMissed()
             const NavNode& from = mKnow->mNav.Nodes()[mThrowSpot.mNode];
             const s32 mineNode = mKnow->mNav.NodeAt(mine->CentreX(), mine->mY2, mine->mHalf, 12);
             const ThrowArc::Point target{mineNode >= 0 ? mKnow->mNav.Nodes()[mineNode].mX : mine->CentreX(), mineNode >= 0 ? mKnow->mNav.Nodes()[mineNode].mY : mine->mY2};
-            const ThrowArc::Flight flight = ThrowArc::Throw(mKnow->mNav.Input(), from.mX, from.mY, from.mHalf, target.mX < from.mX, mThrowSpot.mKind, &target);
+            const ThrowArc::Flight flight = ThrowArc::Throw(mKnow->mNav, from.mX, from.mY, from.mHalf, target.mX < from.mX, mThrowSpot.mKind, &target);
             std::string text = "missed throw " + std::to_string(static_cast<s32>(mThrowSpot.mKind)) + " from " + std::to_string(from.mX) + "," + std::to_string(from.mY) + " at " + std::to_string(target.mX) + "," + std::to_string(target.mY) + ": to hit on frame " + std::to_string(flight.mHit) + (flight.mSure ? "" : " (not sure)") + "; table";
             for (std::size_t i = 0; i < flight.mPoints.size() && i < 45; i++)
             {
@@ -3343,7 +3395,11 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
     saved.mCheckpoint.Load(map);
     mRestoring = true;
     mRestores++;
-    mSwitchesPutBack = 60;
+    // (what a save puts back shows within a few frames of the frame it was taken at; what changes after that is
+    // done since. Counted in his turns, 60 of them, the lever FeeCo's path 9 wants pulled, pulled a while after a
+    // death, was taken for put back each time and pulled on and off for good.)
+    mSwitchesPutBackUntil = saved.mCheckpoint.mFrame + 10;
+    mSwitchesPutBackSeen = false;
     mLastCheckpointFrame = saved.mCheckpoint.mFrame;
 }
 
@@ -3494,12 +3550,7 @@ void Bot::OnDeath(BaseMap& map)
     // (back in an earlier path, perhaps: that is no leaving of the one he was in)
     mErrandPath = -1;
     Log("died (" + std::string(mTask ? mTask->Name() : "no task") + "), back to f=" + std::to_string(saved.mCheckpoint.mFrame) + " try " + std::to_string(mAttempt));
-    mInputs.resize(saved.mInputCount);
-    saved.mCheckpoint.Load(map);
-    mRestoring = true;
-    mRestores++;
-    mSwitchesPutBack = 60;
-    mLastCheckpointFrame = saved.mCheckpoint.mFrame;
+    RewindTo(map, saved);
     // Each try from the same save begins a little later than the one before: begun on the same frame it is the
     // same try, to the frame he dies on, wherever nothing was learnt from the death. (The Scrab trial's last
     // ledge: the Scrab stood under it each of thirteen times, as it never did in a run of the trial alone.)
@@ -3524,15 +3575,7 @@ void Bot::RewindLoss(BaseMap& map)
     mLossRewinds++;
     Saved& saved = mCheckpoints.back();
     Log("what was needed is lost: back to f=" + std::to_string(saved.mCheckpoint.mFrame) + ", try " + std::to_string(mLossRewinds));
-    mPilotActive = false;
-    mBits = 0;
-    mCurrentEdge = -1;
-    mInputs.resize(saved.mInputCount);
-    saved.mCheckpoint.Load(map);
-    mRestoring = true;
-    mRestores++;
-    mSwitchesPutBack = 60;
-    mLastCheckpointFrame = saved.mCheckpoint.mFrame;
+    RewindTo(map, saved);
     // (what he was at has not failed: it is to be done again. Counted as failed twice it was left out of the
     // plan, which went on to the lever its Sligs watch with both alive.)
     mFailedActions.erase(mLossAction);
@@ -3556,6 +3599,11 @@ void Bot::RewindMiss(BaseMap& map)
     mMissRewinds++;
     Saved& saved = mCheckpoints.back();
     Log("taking the missed throw back: to f=" + std::to_string(saved.mCheckpoint.mFrame));
+    RewindTo(map, saved);
+}
+
+void Bot::RewindTo(BaseMap& map, Saved& saved)
+{
     mPilotActive = false;
     mBits = 0;
     mCurrentEdge = -1;
@@ -3563,8 +3611,35 @@ void Bot::RewindMiss(BaseMap& map)
     saved.mCheckpoint.Load(map);
     mRestoring = true;
     mRestores++;
-    mSwitchesPutBack = 60;
+    // (what a save puts back shows within a few frames of the frame it was taken at; what changes after that is
+    // done since. Counted in his turns, 60 of them, the lever FeeCo's path 9 wants pulled, pulled a while after a
+    // death, was taken for put back each time and pulled on and off for good.)
+    mSwitchesPutBackUntil = saved.mCheckpoint.mFrame + 10;
+    mSwitchesPutBackSeen = false;
     mLastCheckpointFrame = saved.mCheckpoint.mFrame;
+}
+
+void Bot::RewindStuck(BaseMap& map)
+{
+    const std::string why = mStuckRewind;
+    mStuckRewind.clear();
+    // The newest save of this path led here: the one before it, while that is of this path too
+    const s32 key = mAbe.mLevel * 1000 + mAbe.mPath;
+    if (mCheckpoints.size() < 2 || mCheckpoints.back().mPathKey != key || mCheckpoints[mCheckpoints.size() - 2].mPathKey != key)
+    {
+        StuckNow(why);
+        return;
+    }
+    mCheckpoints.pop_back();
+    Saved& saved = mCheckpoints.back();
+    Log("stuck (" + why.substr(0, 60) + "): back past the newest save, to f=" + std::to_string(saved.mCheckpoint.mFrame) + ", " + std::to_string(mStuckRewinds[key]) + " of 6");
+    // (nothing that failed after it is held against what comes next: it is all to be done again)
+    mFailedActions.clear();
+    mNoPlanWaits.erase({mAbe.mLevel, mAbe.mPath});
+    mDeathCells.clear();
+    RewindTo(map, saved);
+    // (a little later than the time before)
+    mHold = 11 * mStuckRewinds[key];
 }
 
 // How far along a flying Slig's track (its track lines, end to end in the order they are in the path) the place
@@ -4576,6 +4651,14 @@ void Bot::Think(BaseMap& map)
             return;
         }
     }
+    if (!mStuckRewind.empty())
+    {
+        RewindStuck(map);
+        if (mRestoring)
+        {
+            return;
+        }
+    }
 
     mFlierRun = false;
     if (mKnow && mIsAe && !mWorld.mFliers.empty())
@@ -4871,7 +4954,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         // The switch that is being tried for the sake of it has changed, if only for a moment (a trap door that
         // shuts itself again): it has been tried
         // (not when a checkpoint has just put it back)
-        if (mSwitchesPutBack == 0 && mExploring >= 1000 && mExploring < 1256 && mWorld.mSwitches[mExploring - 1000] != mLastSwitches[mExploring - 1000])
+        if (mAbe.mFrame > mSwitchesPutBackUntil && mSwitchesPutBackSeen && mExploring >= 1000 && mExploring < 1256 && mWorld.mSwitches[mExploring - 1000] != mLastSwitches[mExploring - 1000])
         {
             mExplored.insert({mAbe.mLevel * 1000 + mAbe.mPath, mExploring});
         }

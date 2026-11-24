@@ -2,6 +2,7 @@
 
 #include "../Types.hpp"
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -206,6 +207,9 @@ struct NavExit final
     s32 mFeature = 0;
 };
 
+// ThrowArc's flights in one path (ThrowArc.cpp)
+struct ThrowMemo;
+
 // Where Abe can stand in a path and how he gets from one place to the next. Built from the lines and features alone:
 // it is a guess at what the game allows, which the bot corrects by doing (see Bot::LearnEdge).
 class NavGraph final
@@ -285,7 +289,13 @@ public:
     // The cell centre at or after x
     s32 SnapUp(s32 x, bool half) const;
 
+    // The throws worked out in this path (ThrowArc::Throw with a graph), kept: a flight depends on the path's lines
+    // alone, and working them all out again at each plan was most of what the bot spent its time on. Copies of the
+    // graph share them. (Defined in ThrowArc.cpp.)
+    ThrowMemo& Throws() const;
+
 private:
+    mutable std::shared_ptr<ThrowMemo> mThrows;
     bool IsFloor(const NavLine& line, bool half) const;
     // height: how far above the floor to look (0: at standing and at crouching height)
     bool WallBetween(s32 xa, s32 xb, s32 y, bool half, s32 height = 0) const;

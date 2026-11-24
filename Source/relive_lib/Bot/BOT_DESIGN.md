@@ -9,6 +9,39 @@ it can test a plan step for real before committing to it, because a quicksave re
 Premise: quicksave/restore is deterministic (the determinism work on this branch). Everything below
 leans on that.
 
+## Mines to the Brewery in one run (2026-11-24)
+
+`Source/Tools/bot_runs/ae_mines_to_brewery.txt` (`any`, seed 1) plays from the Mines' start through Necrum, the
+Scrab and Paramite vaults and trials, FeeCo, Bonewerkz and Phleg's office, FeeCo again, the Slig Barracks and the
+war room, FeeCo's Executive Offices and Terminal 5, into the Brewery (f=319,239), and on as far as Zulag 1. It
+looks ahead only where it is a matter of timing: `look=barracks/1,look=mudanchee_vault_ender,
+look=bonewerkz_ender,look=bonewerkz/4`. Deaths are allowed for now (77 to the Brewery).
+
+**Speed.** The bot, not the game, was the cost: sampled, 80% of a run was `Domain::ThrowSpots` working out the same
+rock flights at every plan. They depend on the path's lines alone and are now worked out once per path
+(`NavGraph::Throws`, `ThrowArc::Throw` with a graph): the Mines' first 19,000 frames went from 278 s to 84 s on the
+Debug build, with the same inputs. The game alone replays them in 23 s. On an optimised build (`-O1`, no
+sanitizers) the bot runs at ~700-1,500 frames a second, 25 to 50 times real time; the whole run above takes 7.5
+minutes. Judge the bot's speed on such a build: the Debug build's ASan makes it look slow.
+
+**What was wrong on the way, and is fixed for every level, not one place:**
+- What the bot remembers per path was keyed by the path number alone in places: the regions he has been in
+  (`mRegionsBeen`) and the switches a path left unset (`mErrandsLeft`). The war room is `barracks_ender` 11 and the
+  Executive Offices `feeco_depot_ender` 11: the offices' regions were taken for been in, and Aslik never gone for.
+  Now level x 1000 + path.
+- What a path allows per visit (backing out, the last chances, the waits with no plan, the switches tried) was per
+  run: FeeCo is come to three times, and by the third its path 9 had nothing left. It starts over when the level
+  is entered again.
+- A switch change counted as "put back by a save" for 60 of the bot's turns after any rewind, which was a thousand
+  frames and more: the lever FeeCo's path 9 needs was pulled on and off for good. Now the frames right after the
+  restore (and the first look after it).
+- Stuck without looking ahead, with saves of the path to go back to: back past the newest save, six times a path,
+  before stopping (`Bot::RewindStuck`). The rewinds share `Bot::RewindTo`.
+- Switches are not tried for the sake of it when that opens a gate on awake Sligs on the far side of it from him.
+- A Slig further on than the hoist is only run past (`JumpUpPastGuard`) in a hurry, off a woken Slig's floor.
+- `GateShutsOut`: a Slig that has just stopped counts only while its least pause still covers the hop and the
+  lever, and looking ahead the moment is left to the tries.
+
 ## Where it stands (2026-11-15)
 
 The sections after this one are the design as first written. This one is what is built, what was measured and

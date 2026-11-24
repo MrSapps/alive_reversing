@@ -1,6 +1,8 @@
 #include "ThrowArc.hpp"
 #include <algorithm>
 #include <cmath>
+#include <map>
+#include <tuple>
 
 namespace Bot {
 
@@ -99,6 +101,34 @@ ThrowArc::Flight ThrowArc::Throw(const NavInput& in, s32 x, s32 y, bool half, bo
         flight = Fly(in, x, y, half, left, kind, mine, false);
     }
     return flight;
+}
+
+struct ThrowMemo final
+{
+    // x, y, half, left, kind, whether there is a mine, the mine's x and y
+    using Key = std::tuple<s32, s32, bool, bool, s32, bool, s32, s32>;
+    std::map<Key, ThrowArc::Flight> mFlights;
+};
+
+ThrowMemo& NavGraph::Throws() const
+{
+    if (!mThrows)
+    {
+        mThrows = std::make_shared<ThrowMemo>();
+    }
+    return *mThrows;
+}
+
+ThrowArc::Flight ThrowArc::Throw(const NavGraph& nav, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine)
+{
+    std::map<ThrowMemo::Key, Flight>& flights = nav.Throws().mFlights;
+    const ThrowMemo::Key key{x, y, half, left, static_cast<s32>(kind), mine != nullptr, mine ? mine->mX : 0, mine ? mine->mY : 0};
+    auto it = flights.find(key);
+    if (it == flights.end())
+    {
+        it = flights.emplace(key, Throw(nav.Input(), x, y, half, left, kind, mine)).first;
+    }
+    return it->second;
 }
 
 ThrowArc::Flight ThrowArc::Fly(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, bool sure)

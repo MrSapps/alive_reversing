@@ -771,7 +771,8 @@ public:
     // held from the start), and the jump catches the hoist in the very next cell: hung from 2162,1660 eleven
     // frames after the run began, where walking there and jumping up at it takes some forty with it a cell off.
     // The walkthrough's "hoist up and quickly run and jump up to the next ledge above him".
-    static s32 JumpUpPastGuard(const NavGraph& nav, const World& world, s32 cell, const NavEdge& hoistUp);
+    // hurry: off the floor of a Slig that has woken, where one further on than the hoist counts too
+    static s32 JumpUpPastGuard(const NavGraph& nav, const World& world, s32 cell, const NavEdge& hoistUp, bool hurry = false);
     // The frames from hung to up (24) and to off its floor by a running jump (12), and some over
     static const s32 kUpAndOff = 60;
     // Never faster than this (Mudokons in tow don't stop at wheels when they have to run to keep up)

@@ -75,7 +75,7 @@ struct BotMemory
     std::set<std::pair<s32, u32>> mExplored;
     // How often each was planned for and not got (the path, the key)
     std::map<std::pair<s32, u32>, s32> mExploreTries;
-    // The regions (path, kRegion value) he has stood in, and how often each has been made for
+    // The regions (level x 1000 + path, kRegion value) he has stood in, and how often each has been made for
     std::set<std::pair<s32, s32>> mRegionsBeen;
     // The cells (path, node) he has stood on: the region of each counts as been in, whatever it was then (a
     // trap door's cells are a region of their own once it is shut, and he may have walked over them)
@@ -136,8 +136,10 @@ struct BotMemory
     std::map<s32, SideTrip> mSideTrips;
     // A switch a door of another path wants that he left its path without setting (path, switch): no reason to
     // go there again. And the path he was last in, to tell when he leaves one.
+    // (level x 1000 + path, switch)
     std::set<std::pair<s32, s32>> mErrandsLeft;
     s32 mErrandPath = -1;
+    s32 mErrandLevel = -1;
     s32 mLogicWaits = 0;
     std::map<u32, s32> mReflexTries;
     s32 mSlogTraps = 0;
@@ -347,6 +349,8 @@ public:
         mChasedFrame = mAbe.mFrame;
         mChasedPath = mAbe.mPath;
     }
+    // Looking ahead as the profile has it, for all levels or for the one he is in
+    bool LookNow() const;
     bool RecentlyChased() const
     {
         return mChasedFrame != 0 && mChasedPath == mAbe.mPath && mAbe.mFrame - mChasedFrame < 900;
@@ -632,6 +636,8 @@ private:
     void OnDeath(BaseMap& map);
     void RewindMiss(BaseMap& map);
     void RewindLoss(BaseMap& map);
+    // Stuck without looking ahead: back past the newest save of this path instead (see Stuck)
+    void RewindStuck(BaseMap& map);
     void MaybeCheckpoint(BaseMap& map);
     // AE: hurt, between two things to do, and nothing about that could hurt him more where he stands: he waits
     // for his health to come back (180 frames after the last shot) before he goes on. A shot takes a third.
@@ -677,6 +683,9 @@ private:
     u32 mLastLogFrame = 0;
     bool mMissRewind = false;
     bool mLossRewind = false;
+    // Stuck, and to go back past the newest save rather than stop (why it was stuck, and how often per path)
+    std::string mStuckRewind;
+    std::map<s32, s32> mStuckRewinds;
     // What he was at when the Mudokon was lost: taken back, it has not failed
     std::string mLossAction;
     s32 mLossRewinds = 0;
@@ -694,8 +703,6 @@ private:
     // Where the rock thrown last was on each frame
     std::vector<ThrowArc::Point> mThrowSeen;
     s32 mCurrentEdge = -1;
-    // Looking ahead as the profile has it, for all levels or for the one he is in
-    bool LookNow() const;
     bool mLooked = false;
     std::map<s32, s32> mEdgeDeaths;
     // Whether the run may take an exit to that path now
@@ -779,10 +786,14 @@ private:
         std::map<std::pair<s32, s32>, std::set<s32>> mBanned;
     };
     std::vector<Saved> mCheckpoints;
+    // The game put back to a save, and the inputs since it let go
+    void RewindTo(BaseMap& map, Saved& saved);
     bool mRestoring = false;
     s32 mAttempt = 0;
     // A checkpoint has just been put back: the switches it changed back are not ones that were tried
-    s32 mSwitchesPutBack = 0;
+    // (until that frame, and at the first look after it whenever that is)
+    u32 mSwitchesPutBackUntil = 0;
+    bool mSwitchesPutBackSeen = true;
     s32 mDeaths = 0;
     s32 mRestores = 0;
     u32 mLastCheckpointFrame = 0;
