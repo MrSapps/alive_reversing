@@ -173,6 +173,11 @@ public:
     {
         return "Ride mine car #" + std::to_string(mCar);
     }
+    // Walking out to get a Slig to come after him, or back to the car from it: it is meant to see him
+    bool Luring() const
+    {
+        return mLurePhase == 1 || mLurePhase == 2;
+    }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
 
 private:
@@ -198,6 +203,14 @@ private:
     u32 mAheadUxb = 0;
     s32 mAsideExits = 0;
     s32 mUxbHeld = 0;
+    // With Mudokons to save, a Slig that never leaves their screen is got to come after him and run over (the
+    // walkthrough: "get the Slig's attention and run back out ... jump into the mine car and crush him when he
+    // appears"): 1 out to where it sees him, 2 back into the car, 3 waiting in it and running it over
+    s32 mLurePhase = 0;
+    s32 mLureDir = 0;
+    s32 mLureY = 0;
+    s32 mLureFrames = 0;
+    s32 mLureTries = 0;
     std::unique_ptr<Task> mAside;
     std::vector<u32> mLed;
 };

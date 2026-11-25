@@ -4265,7 +4265,8 @@ std::unique_ptr<Task> Bot::MakeFlee()
     // (nor with a grenade thrown from a shadow: the Slig it is for turns to its noise, and out of the shadow is
     // into its sight. The Barracks' path 7: shot as he left the shadow at 562 for this.)
     if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(LookNow() && mVary == Lookahead::Way::eQuiet) && !dynamic_cast<const GetRocksTask*>(mTask.get()) && !dynamic_cast<const GrenadeSligTask*>(mTask.get()) && !dynamic_cast<const GrenadeOrbTask*>(mTask.get()) &&
-        !dynamic_cast<const SligCallTask*>(mTask.get()) && !(dynamic_cast<const SligLockTask*>(mTask.get()) && static_cast<const SligLockTask*>(mTask.get())->Luring()))
+        !dynamic_cast<const SligCallTask*>(mTask.get()) && !(dynamic_cast<const SligLockTask*>(mTask.get()) && static_cast<const SligLockTask*>(mTask.get())->Luring()) &&
+        !(dynamic_cast<const RideCarTask*>(mTask.get()) && static_cast<const RideCarTask*>(mTask.get())->Luring()))
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);

@@ -5630,6 +5630,90 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
     }
     const NavNode& dest = nav.Nodes()[mDest];
     const s32 cell = NavGraph::GridStep(car->mHalf);
+    // The Slig that never leaves the Mudokons' screen: the nearest awake one on their floor beyond the car
+    const SligAt* lured = nullptr;
+    if (mLurePhase > 0)
+    {
+        const s32 carX = car->mLive ? car->mLiveX : car->CentreX();
+        for (const SligAt& slig : world.mSligs)
+        {
+            if (!slig.mAsleep && !slig.mPossessed && slig.mHalf == car->mHalf && std::abs(slig.mY - mLureY) <= 45 && (slig.mX - carX) * mLureDir > 0 && (!lured || std::abs(slig.mX - carX) < std::abs(lured->mX - carX)))
+            {
+                lured = &slig;
+            }
+        }
+        if (!lured || ++mLureFrames > 3000)
+        {
+            bot.Log(lured ? "the Slig never came after him" : "the Slig is gone: on");
+            mLurePhase = 0;
+            mAhead = 0;
+            mAheadGroup.clear();
+            mKey = 0;
+            mDud.clear();
+            mGo.reset();
+            if (lured)
+            {
+                return TaskStep::Failed("the Slig on the Mudokons' floor never came after him");
+            }
+        }
+    }
+    if (car->mState == 0 && (mLurePhase == 1 || mLurePhase == 2))
+    {
+        const s32 carX = car->mLive ? car->mLiveX : car->CentreX();
+        const s32 carY = car->mLive ? car->mLiveY : car->mY2;
+        const s32 carNode = nav.NodeAt(carX, carY, car->mHalf, 30);
+        const s32 sligCam = nav.CameraOf(lured->mX, lured->mY - 5);
+        const bool seenBy = nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5) == sligCam && lured->mFacingLeft == (lured->mX > bot.Abe().mX);
+        if (mLurePhase == 1 && seenBy)
+        {
+            bot.Log("the Slig at " + std::to_string(lured->mX) + " has seen him: back to the car");
+            mLurePhase = 2;
+            mGo.reset();
+        }
+        if (mLurePhase == 1)
+        {
+            // (a cell onto its screen, at the edge nearest the car)
+            const s32 camW = nav.Input().mCamW;
+            const s32 edge = mLureDir > 0 ? (lured->mX / camW) * camW : (lured->mX / camW + 1) * camW;
+            const s32 spot = nav.NodeAt(edge + mLureDir * cell, mLureY, car->mHalf, 30);
+            if (spot < 0)
+            {
+                mLurePhase = 0;
+                return TaskStep::Failed("nowhere to be seen from on the Slig's screen");
+            }
+            if (!mGo)
+            {
+                mGo = GoToNode(spot);
+            }
+            const TaskStep goStep = mGo->Next(bot, lastFailed);
+            if (goStep.mKind == TaskStep::Kind::ePrim)
+            {
+                return goStep;
+            }
+            mGo.reset();
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        // Back in at a run: up, standing in its cell
+        if (bot.AbeNode() != carNode)
+        {
+            if (!mGo)
+            {
+                mGo = GoToNode(carNode);
+                mGo->SetHurry(true);
+            }
+            const TaskStep goStep = mGo->Next(bot, lastFailed);
+            if (goStep.mKind == TaskStep::Kind::ePrim)
+            {
+                return goStep;
+            }
+            mGo.reset();
+            if (bot.AbeNode() != carNode)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+        return TaskStep::Do(Prim::Wait(14, Btn::eUp));
+    }
     if (car->mState == 0 && mAhead)
     {
         // Out by the Mudokon ahead: the UXB by it off first, then it is led back behind the car
@@ -5689,6 +5773,20 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
         mAside.reset();
         if (step.mKind == TaskStep::Kind::eFailed)
         {
+            const Entity* aheadMud = world.Find(mAhead);
+            if (step.mWhy.find("never leaves the screen") != std::string::npos && aheadMud && mLureTries < 3)
+            {
+                const s32 carX = car->mLive ? car->mLiveX : car->CentreX();
+                const s32 mudX = aheadMud->mLive ? aheadMud->mLiveX : aheadMud->CentreX();
+                mLurePhase = 1;
+                mLureDir = mudX > carX ? 1 : -1;
+                mLureY = aheadMud->mLive ? aheadMud->mLiveY : aheadMud->mY2;
+                mLureFrames = 0;
+                mLureTries++;
+                mGo.reset();
+                bot.Log("a Slig that never leaves the Mudokon's screen: to be got to come after him and run over with the car");
+                return Next(bot, "");
+            }
             return TaskStep::Failed("the Mudokon on the car's way: " + step.mWhy);
         }
         if (mAheadUxb)
@@ -5761,6 +5859,21 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
     mLastX = x;
     mLastY = y;
     // A blind Mudokon to save on its floor ahead (or a UXB just short of one): stopped short of it, and out
+    if (mLurePhase == 2)
+    {
+        mLurePhase = 3;
+    }
+    if (mLurePhase == 3 && lured)
+    {
+        // At it once it is near enough to be had before it turns back: its own screen, or coming
+        const bool coming = lured->mFacingLeft == (lured->mX > x);
+        if (std::abs(lured->mX - x) < 250 || (coming && nav.CameraOf(lured->mX, lured->mY - 5) == nav.CameraOf(x, y - 5)))
+        {
+            mKey = mLureDir > 0 ? Btn::eRight : Btn::eLeft;
+            return TaskStep::Do(Prim::Wait(4, mKey));
+        }
+        return TaskStep::Do(Prim::Wait(4));
+    }
     // (before it moves too: in again short of a UXB, the first push would set it off)
     if (!mAhead && bot.SavesMudokons() && (goingX != 0 || mKey == Btn::eRight || mKey == Btn::eLeft || (mKey == 0 && std::abs(dest.mY - y) <= 12) || (mKey == 0 && dest.mX != x)))
     {
