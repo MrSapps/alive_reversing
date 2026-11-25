@@ -5579,6 +5579,33 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
     {
         // Out by the Mudokon ahead: the UXB by it off first, then it is led back behind the car
         const Entity* uxb = mAheadUxb ? world.Find(mAheadUxb) : nullptr;
+        // (the UXB only with quiet enough to turn it off and be back up on the ledge before a Slig is in sight: done
+        // with the Slig walking up, he was seen going back and shot at, the Mudokon with him. Till then off its
+        // floor: the walkthrough's "when the Slig has come and gone, hop over the beam ... then quickly run and
+        // jump back up to the ledge")
+        if (!mAside && uxb && !uxb->mGone && bot.QuietFrames(uxb->CentreX(), uxb->mY2, uxb->mHalf) < 260 && (mUxbHeld += 6) < 6000)
+        {
+            const s32 abeNode = bot.AbeNode();
+            const s32 floorY = uxb->mY2;
+            const auto off = [&nav, floorY](s32 n)
+            {
+                return std::abs(nav.Nodes()[n].mY - floorY) > 45;
+            };
+            if (abeNode >= 0 && std::abs(nav.Nodes()[abeNode].mY - floorY) <= 45)
+            {
+                if (!mGo)
+                {
+                    mGo = std::make_unique<GoToTask>("off the Sligs' floor", off);
+                }
+                const TaskStep goStep = mGo->Next(bot, lastFailed);
+                if (goStep.mKind == TaskStep::Kind::ePrim)
+                {
+                    return goStep;
+                }
+                mGo.reset();
+            }
+            return TaskStep::Do(Prim::Wait(6));
+        }
         if (!mAside)
         {
             if (uxb && !uxb->mGone)

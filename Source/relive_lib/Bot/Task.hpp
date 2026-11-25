@@ -196,6 +196,7 @@ private:
     u32 mAhead = 0;
     u32 mAheadUxb = 0;
     s32 mAsideExits = 0;
+    s32 mUxbHeld = 0;
     std::unique_ptr<Task> mAside;
     std::vector<u32> mLed;
 };
