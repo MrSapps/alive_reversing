@@ -1782,7 +1782,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         const s32 onTopNode = onTop ? nav.NodeAt(onTop->mX, onTop->mY, onTop->mHalf, 30) : -1;
         // (and only after a hop or a roll off a trap door that ends hung across a gap, the edges only Zulag 1 has:
         // other hangs are the rule's below, and taken for these the run from the Mines stuck in the Barracks)
-        const bool caughtAcross = mLastEdge >= 0 && nav.Edges()[mLastEdge].mHung && (nav.Edges()[mLastEdge].mKind == EdgeKind::eHop || (nav.Edges()[mLastEdge].mKind == EdgeKind::eFall && nav.Nodes()[nav.Edges()[mLastEdge].mFrom].mTrapDoor >= 0)) && std::abs(nav.Nodes()[nav.Edges()[mLastEdge].mFrom].mY - nav.Nodes()[nav.Edges()[mLastEdge].mTo].mY) <= 12;
+        const bool caughtAcross = mLastEdge >= 0 && nav.Edges()[mLastEdge].mHung && (nav.Edges()[mLastEdge].mKind == EdgeKind::eHop || (nav.Edges()[mLastEdge].mKind == EdgeKind::eFall && (nav.Nodes()[nav.Edges()[mLastEdge].mFrom].mTrapDoor >= 0 || nav.Nodes()[nav.Edges()[mLastEdge].mFrom].mLow))) && std::abs(nav.Nodes()[nav.Edges()[mLastEdge].mFrom].mY - nav.Nodes()[nav.Edges()[mLastEdge].mTo].mY) <= 12;
         const bool noneOnTop = caughtAcross && top >= 0 && (onTop == nullptr || onTopNode < 0 || nav.Nodes()[onTopNode].mLine != nav.Nodes()[top].mLine);
         if (!down && top >= 0 && nav.Input().mIsAe && noneOnTop && SligSeesIn(bot, nav.Nodes()[top].mX, nav.Nodes()[top].mY, nav.Nodes()[top].mHalf) < 40 && mHangSeenWaits < 3000)
         {

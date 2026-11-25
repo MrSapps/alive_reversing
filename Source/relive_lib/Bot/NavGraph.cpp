@@ -1453,7 +1453,12 @@ void NavGraph::Build(const NavInput& input)
                         const s32 drop = f.mY1 - n.mY;
                         const s32 lo = std::min(nx + dir * step, nx + dir * 4 * step) - step / 2;
                         const s32 hi = std::max(nx + dir * step, nx + dir * 4 * step) + step / 2;
-                        if (drop * scale < 60 || drop * scale > 300 || f.mX2 < lo || f.mX1 > hi || (belowLine >= 0 && fy <= f.mY1 + 10))
+                        // (or at his own height a cell or two out, over a gap, from a low place where a roll is all there
+                        // is: Zulag 1's tunnel at 1900..1975, off its end at 1950 to the ledge at 2000, "roll and hang
+                        // from the lower ledges to avoid the patrolling Slig")
+                        const s32 nearX = dir > 0 ? f.mX1 : f.mX2;
+                        const bool level = n.mLow && f.mKind == FeatureKind::eEdge && std::abs(drop) <= 12 && (nearX - n.mX) * dir >= step / 2 && (nearX - n.mX) * dir <= 3 * step;
+                        if (!level && (drop * scale < 60 || drop * scale > 300 || f.mX2 < lo || f.mX1 > hi || (belowLine >= 0 && fy <= f.mY1 + 10)))
                         {
                             continue;
                         }
@@ -1846,7 +1851,7 @@ void NavGraph::Build(const NavInput& input)
             // pulls up (Zulag 1, by the mine at 1302 on the last cell before the gap at 1325..1375: "stand in front of
             // the mine and hop over it. Pull up")
             s32 ly0 = 0;
-            if ((hopLine < 0 || FloorNear(nx, n.mY, n.mHalf, 12, &ly0) < 0) && !n.mLow && !WallBetween(n.mX, n.mX + dir * step * 3, n.mY, n.mHalf))
+            if ((hopLine < 0 || FloorNear(nx, n.mY, n.mHalf, 12, &ly0) < 0) && !WallBetween(n.mX, n.mX + dir * step * 3, n.mY, n.mHalf))
             {
                 for (const NavFeature& f : mInput.mFeatures)
                 {
@@ -1861,7 +1866,9 @@ void NavGraph::Build(const NavInput& input)
                     // ledge. Wait for the Slig to come and go again and climb up.")
                     // (only off a trap door: elsewhere such a roll-off took ways the runs had no need of, and the run
                     // from the Mines stuck in Bonewerkz)
-                    const bool rollOff = off >= step / 2 && off < 2 * step && FloorNear(nx, n.mY, n.mHalf, 12, &ly0) < 0 && n.mTrapDoor >= 0;
+                    // (or out of a low place, where a roll is all there is: Zulag 1's tunnel at 1900..1975, off the end at 1950
+                    // to the ledge at 2000, "roll and hang from the lower ledges to avoid the patrolling Slig")
+                    const bool rollOff = off >= step / 2 && off <= 2 * step && FloorNear(nx, n.mY, n.mHalf, 12, &ly0) < 0 && (n.mTrapDoor >= 0 || n.mLow);
                     // (and the hop only over a hazard on the last cell before the gap: the mine at 1302)
                     const s32 overLine = FloorNear(nx, n.mY, n.mHalf, 12, &ly0);
                     const s32 over = overLine >= 0 ? NodeOnLine(overLine, nx) : -1;
