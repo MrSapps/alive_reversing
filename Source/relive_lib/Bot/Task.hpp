@@ -176,7 +176,7 @@ public:
     // Walking out to get a Slig to come after him, or back to the car from it: it is meant to see him
     bool Luring() const
     {
-        return mLurePhase == 1 || mLurePhase == 2;
+        return mLurePhase == 1 || mLurePhase == 2 || mLurePhase >= 4;
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
 
@@ -211,6 +211,8 @@ private:
     s32 mLureY = 0;
     s32 mLureFrames = 0;
     s32 mLureTries = 0;
+    s32 mLureCam = -1;
+    std::unique_ptr<Task> mLureDisarm;
     std::unique_ptr<Task> mAside;
     std::vector<u32> mLed;
 };

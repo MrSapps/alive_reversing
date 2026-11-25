@@ -5642,7 +5642,8 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
                 lured = &slig;
             }
         }
-        if (!lured || ++mLureFrames > 3000)
+        // (off its screen it isn't seen at all: gone only once the car has been at it)
+        if ((!lured && mLurePhase == 3) || ++mLureFrames > 3000)
         {
             bot.Log(lured ? "the Slig never came after him" : "the Slig is gone: on");
             mLurePhase = 0;
@@ -5657,14 +5658,52 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
             }
         }
     }
-    if (car->mState == 0 && (mLurePhase == 1 || mLurePhase == 2))
+    if (car->mState == 0 && mLurePhase == 6)
+    {
+        mLurePhase = 1;
+    }
+    if (car->mState == 0 && (mLurePhase == 1 || mLurePhase == 2 || mLurePhase == 4))
     {
         const s32 carX = car->mLive ? car->mLiveX : car->CentreX();
         const s32 carY = car->mLive ? car->mLiveY : car->mY2;
         const s32 carNode = nav.NodeAt(carX, carY, car->mHalf, 30);
-        const s32 sligCam = nav.CameraOf(lured->mX, lured->mY - 5);
-        const bool seenBy = nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5) == sligCam && lured->mFacingLeft == (lured->mX > bot.Abe().mX);
-        if (mLurePhase == 1 && seenBy)
+        const s32 sligCam = mLureCam;
+        const bool seenBy = lured && nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5) == sligCam && lured->mFacingLeft == (lured->mX > bot.Abe().mX);
+        // (an armed UXB on the Slig's floor among the Mudokons is turned off first: the Slig, running after him,
+        // set it off and it killed them. "Sneak all the way over to the UXB. Crouch and deactivate it, and quickly
+        // sneak back out the way you came before the Slig turns around.")
+        if (mLurePhase == 1 && !mLureDisarm)
+        {
+            for (const Entity& uxb : world.mEntities)
+            {
+                if (uxb.mKind == EntityKind::eUxb && !uxb.mGone && uxb.mHalf == car->mHalf && std::abs(uxb.mY2 - mLureY) <= 25 && (uxb.CentreX() - carX) * mLureDir > 0 && nav.CameraOf(uxb.CentreX(), mLureY - 5) == sligCam)
+                {
+                    if (SligSeesIn(bot, uxb.CentreX(), uxb.mY2, uxb.mHalf) < 110 && (mUxbHeld += 2) < 6000)
+                    {
+                        return TaskStep::Do(Prim::Wait(2));
+                    }
+                    bot.Log("the UXB at " + std::to_string(uxb.CentreX()) + " among the Mudokons first, before the Slig is got to come after him");
+                    mLureDisarm = std::make_unique<DisarmTask>(uxb.CentreX(), uxb.mY2, uxb.mHalf, -1);
+                    break;
+                }
+            }
+        }
+        if (mLureDisarm)
+        {
+            const TaskStep disarmStep = mLureDisarm->Next(bot, lastFailed);
+            if (disarmStep.mKind == TaskStep::Kind::ePrim)
+            {
+                return disarmStep;
+            }
+            mLureDisarm.reset();
+            mGo.reset();
+            if (disarmStep.mKind == TaskStep::Kind::eFailed)
+            {
+                mLurePhase = 0;
+                return TaskStep::Failed("couldn't turn off the UXB among the Mudokons: " + disarmStep.mWhy);
+            }
+        }
+        if (mLurePhase == 1 && seenBy && nav.CameraOf(carX, carY - 5) != sligCam)
         {
             bot.Log("the Slig at " + std::to_string(lured->mX) + " has seen him: back to the car");
             mLurePhase = 2;
@@ -5674,7 +5713,17 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
         {
             // (a cell onto its screen, at the edge nearest the car)
             const s32 camW = nav.Input().mCamW;
-            const s32 edge = mLureDir > 0 ? (lured->mX / camW) * camW : (lured->mX / camW + 1) * camW;
+            const s32 mudEdgeX = carX + mLureDir * camW;
+            s32 edge = mLureDir > 0 ? (mudEdgeX / camW) * camW : (mudEdgeX / camW + 1) * camW;
+            // (the edge of the Mudokons' screen nearest the car)
+            for (s32 ex = carX; std::abs(ex - carX) < 2 * camW; ex += mLureDir * 5)
+            {
+                if (nav.CameraOf(ex, mLureY - 5) == mLureCam)
+                {
+                    edge = ex;
+                    break;
+                }
+            }
             const s32 spot = nav.NodeAt(edge + mLureDir * cell, mLureY, car->mHalf, 30);
             if (spot < 0)
             {
@@ -5778,9 +5827,12 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 const s32 carX = car->mLive ? car->mLiveX : car->CentreX();
                 const s32 mudX = aheadMud->mLive ? aheadMud->mLiveX : aheadMud->CentreX();
-                mLurePhase = 1;
                 mLureDir = mudX > carX ? 1 : -1;
                 mLureY = aheadMud->mLive ? aheadMud->mLiveY : aheadMud->mY2;
+                mLureCam = nav.CameraOf(mudX, mLureY - 5);
+                // (from off its screen: the car backed off it first, or the Slig shoots at him in the car across the
+                // Mudokons)
+                mLurePhase = nav.CameraOf(carX, mLureY - 5) == mLureCam ? 4 : 1;
                 mLureFrames = 0;
                 mLureTries++;
                 mGo.reset();
@@ -5863,11 +5915,43 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
     {
         mLurePhase = 3;
     }
+    if (mLurePhase == 4)
+    {
+        mLurePhase = 5;
+    }
+    if (mLurePhase == 5 || mLurePhase == 6)
+    {
+        // Backed off the Mudokons' screen, a cell clear of it, and out
+        if (mLurePhase == 5 && nav.CameraOf(x + mLureDir * cell, y - 5) == mLureCam)
+        {
+            mKey = mLureDir > 0 ? Btn::eLeft : Btn::eRight;
+            return TaskStep::Do(Prim::Wait(4, mKey));
+        }
+        mLurePhase = 6;
+        if (moved)
+        {
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        return TaskStep::Do(Prim::Wait(8, Btn::eAction));
+    }
     if (mLurePhase == 3 && lured)
     {
-        // At it once it is near enough to be had before it turns back: its own screen, or coming
+        // At it once it is near enough to be had before it turns back: its own screen, or coming. Only once it is
+        // nearer than any blind Mudokon or UXB on the floor: driven over the UXB by the three on the top floor, the
+        // car set it off and it killed them.
         const bool coming = lured->mFacingLeft == (lured->mX > x);
-        if (std::abs(lured->mX - x) < 250 || (coming && nav.CameraOf(lured->mX, lured->mY - 5) == nav.CameraOf(x, y - 5)))
+        s32 obstacle = 1 << 30;
+        for (const Entity& e : world.mEntities)
+        {
+            const s32 ex = e.mLive ? e.mLiveX : e.CentreX();
+            const s32 ey = e.mLive ? e.mLiveY : e.mY2;
+            if (((e.mKind == EntityKind::eMudokon && e.mBlind) || e.mKind == EntityKind::eUxb) && !e.mGone && e.mHalf == car->mHalf && std::abs(ey - y) <= 25 && (ex - x) * mLureDir > 0)
+            {
+                obstacle = std::min(obstacle, std::abs(ex - x));
+            }
+        }
+        const bool clear = std::abs(lured->mX - x) + 2 * cell < obstacle;
+        if (clear && (std::abs(lured->mX - x) < 250 || (coming && nav.CameraOf(lured->mX, lured->mY - 5) == nav.CameraOf(x, y - 5))))
         {
             mKey = mLureDir > 0 ? Btn::eRight : Btn::eLeft;
             return TaskStep::Do(Prim::Wait(4, mKey));
@@ -9184,8 +9268,9 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
 }
 
 // The cells on a Mudokon's floor from minCells to maxCells away from it, either side
-static std::unique_ptr<GoToTask> GoNearMud(const NavGraph& nav, const World& world, s32 mudNode, s32 minHalfCells, s32 maxHalfCells, s32 side = 0)
+static std::unique_ptr<GoToTask> GoNearMud(const NavGraph& nav, const World& world, s32 mudNode, s32 minHalfCells, s32 maxHalfCells, s32 side = 0, bool sameScreen = false)
 {
+    const s32 mudCam = sameScreen ? nav.CameraOf(nav.Nodes()[mudNode].mX, nav.Nodes()[mudNode].mY - 5) : -1;
     const s32 line = nav.Nodes()[mudNode].mLine;
     const s32 mudX = nav.Nodes()[mudNode].mX;
     const s32 half = NavGraph::GridStep(nav.Nodes()[mudNode].mHalf) / 2;
@@ -9196,11 +9281,11 @@ static std::unique_ptr<GoToTask> GoNearMud(const NavGraph& nav, const World& wor
         const s32 dx = std::abs(node.mX - mudX);
         clearOne = clearOne || (node.mLine == line && dx >= minHalfCells * half && dx <= maxHalfCells * half && (node.mX - mudX) * side >= 0 && !node.mHazard && !GoToTask::DormantDrillOver(world, node.mX, node.mY, node.mHalf));
     }
-    return std::make_unique<GoToTask>("to the Mudokon", [&nav, &world, line, mudX, half, minHalfCells, maxHalfCells, side, clearOne](s32 n)
+    return std::make_unique<GoToTask>("to the Mudokon", [&nav, &world, line, mudX, half, minHalfCells, maxHalfCells, side, clearOne, mudCam](s32 n)
                                       {
                                           const NavNode& node = nav.Nodes()[n];
                                           const s32 dx = std::abs(node.mX - mudX);
-                                          if (node.mLine != line || dx < minHalfCells * half || dx > maxHalfCells * half || (node.mX - mudX) * side < 0)
+                                          if (node.mLine != line || dx < minHalfCells * half || dx > maxHalfCells * half || (node.mX - mudX) * side < 0 || (mudCam >= 0 && nav.CameraOf(node.mX, node.mY - 5) != mudCam))
                                           {
                                               return false;
                                           }
@@ -9446,7 +9531,10 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
     const s32 minHalf = close ? 1 : 3;
     const s32 maxHalf = close ? 3 : 5;
     const bool wrongSide = (abe.mX - (mud->mLive ? mud->mLiveX : mud->CentreX())) * mSide < 0;
-    if (!mRemote && (!sameFloor || dx * 2 < minHalf * cell || dx * 2 > maxHalf * cell || wrongSide))
+    // (on its screen: it doesn't hear him from the next, however near. With Mudokons to save: the Mines' path 5, a
+    // hello said fifty times from 3387 to the one at 3337, the screens parting at 3375.)
+    const bool otherScreen = bot.SavesMudokons() && nav.CameraOf(abe.mX, abe.mY - 5) != nav.CameraOf(mud->mLive ? mud->mLiveX : mud->CentreX(), (mud->mLive ? mud->mLiveY : mud->mY2) - 5);
+    if (!mRemote && (!sameFloor || dx * 2 < minHalf * cell || dx * 2 > maxHalf * cell || wrongSide || otherScreen))
     {
         if (++mCloseIns > 12)
         {
@@ -9465,7 +9553,7 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
                 return Next(bot, "");
             }
         }
-        mGo = GoNearMud(nav, bot.GetWorld(), mudNode, minHalf, maxHalf, mSide);
+        mGo = GoNearMud(nav, bot.GetWorld(), mudNode, minHalf, maxHalf, mSide, bot.SavesMudokons());
         return Next(bot, "");
     }
     if (!mud->mLive)
