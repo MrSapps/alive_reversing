@@ -5445,6 +5445,65 @@ void Domain::Builder::TrapDoorSligs()
     const NavGraph& nav = mNav;
     const World& world = mWorld;
     Domain& d = mD;
+    // Slogs on the floor under a pull ring, between the trap doors it opens: they are let out after him from a
+    // floor over them and shut away by a slam door, then come running back at him at the ring over a trap door
+    // (SlogRingTask). Gone for good, with the danger of their floor.
+    for (const Entity& ring : world.mEntities)
+    {
+        if (ring.mKind != EntityKind::ePullRing || ring.mGone || ring.mSwitch <= 1)
+        {
+            continue;
+        }
+        const s32 at = UseNode(nav, ring, nullptr);
+        if (at < 0)
+        {
+            continue;
+        }
+        const NavNode& under = nav.Nodes()[at];
+        bool doors = false;
+        bool onDoor = false;
+        for (const NavFeature& door : nav.Input().mFeatures)
+        {
+            if (door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring.mSwitch && door.mHalf == under.mHalf && std::abs(door.mY1 - under.mY) < 40)
+            {
+                doors = true;
+                onDoor = onDoor || (under.mX >= door.mX1 - 12 && under.mX <= door.mX2 + 12);
+            }
+        }
+        if (!doors || onDoor)
+        {
+            continue;
+        }
+        std::vector<Goap::Fact> gives;
+        for (const Entity& slog : world.mEntities)
+        {
+            if (slog.mKind == EntityKind::eSlog && !slog.mGone && world.mFleechKilled.count(slog.mId) == 0 && slog.mHalf == under.mHalf && std::abs(slog.mY2 - under.mY) <= 40 && std::abs(slog.CentreX() - under.mX) <= 200)
+            {
+                gives.push_back({Key::Switch(World::HazardSwitch(slog.mId)), 1});
+            }
+        }
+        // (from the nearest cell over the floor on the ring's screen)
+        s32 over = -1;
+        const s32 cam = nav.CameraOf(under.mX, under.mY - 5);
+        for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+        {
+            const NavNode& node = nav.Nodes()[n];
+            if (node.mHalf == under.mHalf && !node.mHazard && node.mY <= under.mY - 60 && node.mY >= under.mY - 160 && nav.CameraOf(node.mX, node.mY - 5) == cam &&
+                (over < 0 || std::abs(node.mX - under.mX) < std::abs(nav.Nodes()[over].mX - under.mX)))
+            {
+                over = static_cast<s32>(n);
+            }
+        }
+        if (gives.empty() || over < 0)
+        {
+            continue;
+        }
+        DomainStep drop;
+        drop.mKind = StepKind::eSlogRing;
+        drop.mEntity = ring.mId;
+        drop.mEdge = at;
+        add("Drop the Slogs through the trap doors of PullRing#" + std::to_string(ring.mId), {regionFact(over)}, gives, 900, drop);
+    }
     // A Slig that walks over a trap door a lever opens: the lever is pulled as it is on the door, and until it
     // has gone down nothing is crossed onto its floor near there (AO's Rupture Farms, path 16: the Slig at
     // 3600,313 that walks over the trap door at 3539, and the lever on the ledge over it)

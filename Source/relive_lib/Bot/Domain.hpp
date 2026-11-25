@@ -99,6 +99,8 @@ enum class StepKind : u8
     eFleechLure, // lead the Fleeches that guard entity mEntity off and use it
     eSligDrop,  // at lever mEntity until Slig mOther walks onto the trap door (feature mEdge) the lever opens,
                 // then pull it
+    eSlogRing,  // the Slogs of the floor under pull ring mEntity (pulled from the cell mEdge): from a floor over
+                // them until they are shut away from it, then at the ring until they run back over its trap doors
     eStepOn,    // onto the cell mEdge, where a foot switch that turns a gate over is
     eParamiteClear, // take over Paramite mOther from the cell mEdge, have it eat the Fleeches of its floors, call
                 // the other Paramites of those floors to follow it, and leave them all at the end away from

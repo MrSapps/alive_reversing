@@ -6450,6 +6450,56 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
             rock = &r;
         }
     }
+    // Down on a floor a Slog is awake on after the jump through a sack over it: on at a run in the way he jumped,
+    // and up off that floor (Zulag 5: "jump to hit the sack and keep running, jumping up to the left ledge").
+    // Waited for where he came down, he was eaten.
+    if (mJumps > 0 && (mEscape || abe.mOnGround))
+    {
+        bool slog = false;
+        for (const SlogAt& sl : world.mSlogs)
+        {
+            slog = slog || (!sl.mAsleep && std::abs(sl.mY - abe.mY) <= 30 && std::abs(sl.mX - abe.mX) < 400);
+        }
+        if (slog || mEscape)
+        {
+            const s32 abeX = abe.mX;
+            const s32 abeY = abe.mY;
+            const bool ahead = mJumpLeft;
+            const s32 cam = nav.CameraOf(abeX, abeY - 5);
+            // (the danger of that floor let to him on the way off it)
+            for (const NavEdge& e : nav.Edges())
+            {
+                const NavNode& to = nav.Nodes()[e.mTo];
+                s32 sw = 0;
+                s32 value = 0;
+                if (std::abs(to.mY - abeY) <= 10 && std::abs(to.mX - abeX) <= 300 && nav.Condition(e, &sw, &value) && sw > 1 && world.Switch(sw) != value)
+                {
+                    bot.LetDanger(sw, bot.Abe().mFrame + 3);
+                }
+            }
+            if (!mEscape)
+            {
+                mEscape = true;
+                bot.Log("down by a Slog after the jump through the sack: on and up off its floor");
+                mGo = std::make_unique<GoToTask>("up off the Slog's floor", [&bot, abeX, abeY, ahead, cam](s32 n)
+                                                 {
+                                                     const NavNode& node = bot.Nav().Nodes()[n];
+                                                     return node.mY <= abeY - 60 && std::abs(node.mX - abeX) <= 300 && (node.mX < abeX) == ahead && bot.Nav().CameraOf(node.mX, node.mY - 5) == cam;
+                                                 });
+                mGo->SetHurry(true);
+            }
+            if (mGo)
+            {
+                TaskStep go;
+                if (!RunGo(mGo, bot, lastFailed, go))
+                {
+                    return go;
+                }
+                mGo.reset();
+            }
+            mWaits = 30;
+        }
+    }
     if (rock)
     {
         const s32 left = nav.NodeAt(rock->mX - cell, rock->mY, rock->mHalf, 12);
@@ -6609,7 +6659,47 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
             return TaskStep::Do(Prim::Face(left));
         }
         bot.Log("running and jumping through the rock sack at " + std::to_string(sack->CentreX()));
-        return TaskStep::Do(Prim::RunJump(takeoffX, left));
+        mJumpLeft = left;
+        Prim jump = Prim::RunJump(takeoffX, left);
+        // (down on a floor a Slog is awake on: on at a run from the landing into a jump up off it, the way he
+        // jumped. Zulag 5: "jump to hit the sack and keep running, jumping up to the left ledge". Stopped where
+        // he came down, the Slog had him.)
+        // (the floor he comes down on: the nearest under the sack)
+        s32 landing = under;
+        for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+        {
+            const NavNode& node = nav.Nodes()[n];
+            if (node.mHalf == sack->mHalf && std::abs(node.mX - sack->CentreX()) <= cell && node.mY > nav.Nodes()[under].mY + 40 &&
+                (landing == under || node.mY < nav.Nodes()[landing].mY))
+            {
+                landing = static_cast<s32>(n);
+            }
+        }
+        const NavNode& down = nav.Nodes()[landing];
+        bool slog = false;
+        for (const Entity& e : world.mEntities)
+        {
+            slog = slog || (e.mKind == EntityKind::eSlog && !e.mGone && world.mFleechKilled.count(e.mId) == 0 && e.mHalf == down.mHalf && std::abs(e.mY2 - down.mY) <= 30 && std::abs(e.CentreX() - down.mX) < 400);
+        }
+        s32 best = -1;
+        for (std::size_t i = 0; slog && i < nav.Edges().size(); i++)
+        {
+            const NavEdge& e = nav.Edges()[i];
+            const NavNode& a = nav.Nodes()[e.mFrom];
+            const NavNode& b = nav.Nodes()[e.mTo];
+            const s32 dir = left ? -1 : 1;
+            if (e.mKind == EdgeKind::eRunJump && a.mLine == down.mLine && b.mY <= a.mY - 60 && (b.mX - a.mX) * dir > 0 && (e.mX - down.mX) * dir >= cell &&
+                (best < 0 || (e.mX - down.mX) * dir < (nav.Edges()[best].mX - down.mX) * dir))
+            {
+                best = static_cast<s32>(i);
+            }
+        }
+        if (best >= 0)
+        {
+            jump.mX2 = nav.Edges()[best].mX;
+            bot.Log("and on from the landing into a jump up to " + std::to_string(nav.Nodes()[nav.Edges()[best].mTo].mX) + "," + std::to_string(nav.Nodes()[nav.Edges()[best].mTo].mY) + ", off the Slog's floor");
+        }
+        return TaskStep::Do(jump);
     }
     // A boom machine with a Slig awake on its floor and screen: the button and off that screen at once, at a run
     // (the machine is heard: it turns to look, and shoots what it has seen even into a shadow). The walkthrough
@@ -13370,6 +13460,308 @@ TaskStep ParamitePullTask::Next(Bot& bot, const std::string& lastFailed)
             return pulled ? TaskStep::Done() : TaskStep::Failed("the ring was not pulled");
     }
     return TaskStep::Failed("lost its place");
+}
+
+SlogRingTask::~SlogRingTask() = default;
+TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* ring = world.Find(mRing);
+    if (!ring || mAt < 0)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if ((mFrames += 1) > 6000)
+    {
+        return TaskStep::Failed("the Slogs did not go down");
+    }
+    const NavNode& under = nav.Nodes()[mAt];
+    const s32 cam = nav.CameraOf(under.mX, under.mY - 5);
+    // The ring pulled: under way, then a while for them to go down
+    if (mUse)
+    {
+        const TaskStep step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mUse.reset();
+        mAfter = 40;
+    }
+    std::vector<const SlogAt*> slogs;
+    for (const SlogAt& s : world.mSlogs)
+    {
+        if (std::abs(s.mY - under.mY) <= 30 && std::abs(s.mX - under.mX) <= 450)
+        {
+            slogs.push_back(&s);
+        }
+    }
+    // (the danger of their floor let for the way down to the ring and the wait there)
+    // (the switch the ways down onto it wait on)
+    s32 danger = 0;
+    for (const NavEdge& e : nav.Edges())
+    {
+        const NavNode& to = nav.Nodes()[e.mTo];
+        s32 sw = 0;
+        s32 value = 0;
+        if (std::abs(to.mY - under.mY) <= 5 && std::abs(to.mX - under.mX) <= 50 && nav.Condition(e, &sw, &value) && sw > 1 && world.Switch(sw) != value)
+        {
+            danger = sw;
+        }
+    }
+    // (none seen counts only with him on the ring's screen: off it they are not loaded)
+    const bool here = nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5) == cam;
+    if (slogs.empty() && here)
+    {
+        if ((mGone += 1) > 40)
+        {
+            bot.Log("the Slogs under PullRing#" + std::to_string(mRing) + " are gone");
+            for (const Entity& e : world.mEntities)
+            {
+                if (e.mKind == EntityKind::eSlog && !e.mGone && std::abs(e.mY2 - under.mY) <= 40 && std::abs(e.CentreX() - under.mX) <= 200)
+                {
+                    bot.FleechKilled(e.mId);
+                }
+            }
+            return TaskStep::Done();
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    mGone = 0;
+    if (mAfter > 0)
+    {
+        mAfter--;
+        if (danger > 1)
+        {
+            bot.LetDanger(danger, bot.Abe().mFrame + 3);
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (mPhase == 0)
+    {
+        // Shut away: each one well off the ring with something solid between
+        // (past a shut slam door, clear of it: one in its doorway as it shuts is still on the ring's side. Zulag 5:
+        // at 1447 in the door at 1425..1449, it was on the trap door as he got to the ring.)
+        bool away = !slogs.empty();
+        for (const SlogAt* s : slogs)
+        {
+            bool past = false;
+            for (const NavFeature& f : nav.Input().mFeatures)
+            {
+                if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == under.mHalf && f.mY1 <= under.mY + 4 && f.mY2 >= under.mY - 40 && !Domain::FloorOpen(nav.Input(), world, f.mX1 - 2, f.mX2 + 2, under.mY + 4, under.mHalf))
+                {
+                    past = past || (s->mX > under.mX ? s->mX > f.mX2 + 10 && f.mX1 > under.mX : s->mX < f.mX1 - 10 && f.mX2 < under.mX);
+                }
+            }
+            away = away && past && std::abs(s->mX - under.mX) >= 120;
+        }
+        // (and a slam door between that keeps turning over has only just shut: the way down to the ring takes a
+        // while. Zulag 5: the Mudokon at lever 139 opens it again and again, and set off when it was shut, he found
+        // them on the trap door as he got to the ring.)
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            s32 since = 0;
+            if (away && f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == under.mHalf && f.mY1 <= under.mY + 4 && f.mY2 >= under.mY - 40 && bot.SwitchCycles(f.mSwitch, &since))
+            {
+                for (const SlogAt* sl : slogs)
+                {
+                    const bool between = (f.mX1 + f.mX2) / 2 > std::min(sl->mX, under.mX) && (f.mX1 + f.mX2) / 2 < std::max(sl->mX, under.mX);
+                    away = away && (!between || since <= 6);
+                }
+            }
+        }
+        if (away)
+        {
+            bot.Log("the Slogs under PullRing#" + std::to_string(mRing) + " are shut away from it: to the ring");
+            mPhase = 1;
+            mGo.reset();
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        // Else over their floor, at the far end of the ring's screen, for them to come out after him
+        if (mGoal < 0)
+        {
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                const NavNode& node = nav.Nodes()[n];
+                if (node.mHalf == under.mHalf && !node.mHazard && node.mY <= under.mY - 60 && node.mY >= under.mY - 160 && nav.CameraOf(node.mX, node.mY - 5) == cam &&
+                    (mGoal < 0 || std::abs(node.mX - under.mX) > std::abs(nav.Nodes()[mGoal].mX - under.mX)))
+                {
+                    mGoal = static_cast<s32>(n);
+                }
+            }
+            if (mGoal < 0)
+            {
+                return TaskStep::Failed("no floor over the Slogs");
+            }
+            bot.Log("the Slogs under PullRing#" + std::to_string(mRing) + ": over their floor at " + std::to_string(nav.Nodes()[mGoal].mX) + "," + std::to_string(nav.Nodes()[mGoal].mY) + " for them to come out after him");
+        }
+        if (bot.AbeNode() != mGoal)
+        {
+            if (!mGo)
+            {
+                mGo = GoToNode(mGoal);
+            }
+            TaskStep go;
+            if (!RunGo(mGo, bot, lastFailed, go))
+            {
+                return go;
+            }
+            mGo.reset();
+            if (go.mKind == TaskStep::Kind::eFailed)
+            {
+                return go;
+            }
+        }
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    if (danger > 1)
+    {
+        bot.LetDanger(danger, bot.Abe().mFrame + 3);
+    }
+    // (first to the floor over the ring, nearest it, and from there down to it only as a slam door between them
+    // and the ring that keeps turning over has just shut again: the way down from the far end took longer than it
+    // stays shut)
+    if (mPhase == 1)
+    {
+        // (over the floor on the Slogs' side, short of the slam door that shuts them away and as near it as can be:
+        // over the ring itself they come back in under him as it opens. Zulag 5: 1412,360, a hop, a hoist and a
+        // step from the ring.)
+        s32 doorX = 0;
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == under.mHalf && f.mY1 <= under.mY + 4 && f.mY2 >= under.mY - 40 && !slogs.empty() &&
+                (f.mX1 + f.mX2) / 2 > std::min(slogs[0]->mX, under.mX) && (f.mX1 + f.mX2) / 2 < std::max(slogs[0]->mX, under.mX))
+            {
+                doorX = slogs[0]->mX > under.mX ? f.mX1 : f.mX2;
+            }
+        }
+        // (chosen once: following him along their side they come into the doorway, and it is between no more)
+        s32 over = mOver;
+        for (std::size_t n = 0; mOver < 0 && n < nav.Nodes().size(); n++)
+        {
+            const NavNode& node = nav.Nodes()[n];
+            const bool between = doorX != 0 && (node.mX - under.mX) * (doorX - under.mX) > 0 && std::abs(node.mX - under.mX) < std::abs(doorX - under.mX) - 6;
+            if (node.mHalf == under.mHalf && !node.mHazard && node.mY <= under.mY - 60 && node.mY >= under.mY - 160 && nav.CameraOf(node.mX, node.mY - 5) == cam && (doorX == 0 || between) &&
+                (over < 0 || (doorX != 0 ? std::abs(node.mX - under.mX) > std::abs(nav.Nodes()[over].mX - under.mX) : std::abs(node.mX - under.mX) < std::abs(nav.Nodes()[over].mX - under.mX))))
+            {
+                over = static_cast<s32>(n);
+            }
+        }
+        mDoorX = mOver < 0 ? doorX : mDoorX;
+        mOver = over;
+        if (over >= 0 && bot.AbeNode() != over && bot.Abe().mY < under.mY - 40)
+        {
+            if (!mGo)
+            {
+                mGo = GoToNode(over);
+                mGo->SetHurry(true);
+            }
+            TaskStep go;
+            if (!RunGo(mGo, bot, lastFailed, go))
+            {
+                return go;
+            }
+            mGo.reset();
+            if (go.mKind == TaskStep::Kind::eFailed)
+            {
+                return go;
+            }
+        }
+        if (over >= 0 && bot.AbeNode() == over)
+        {
+            bool fresh = true;
+            for (const NavFeature& f : nav.Input().mFeatures)
+            {
+                s32 since = 0;
+                if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == under.mHalf && f.mY1 <= under.mY + 4 && f.mY2 >= under.mY - 40 && mDoorX >= f.mX1 && mDoorX <= f.mX2)
+                {
+                    const bool cycles = bot.SwitchCycles(f.mSwitch, &since);
+                    const bool shut = !Domain::FloorOpen(nav.Input(), world, f.mX1 - 2, f.mX2 + 2, under.mY + 4, under.mHalf);
+                    fresh = fresh && shut && (!cycles || since <= 8);
+                }
+            }
+            bool still = true;
+            for (const SlogAt* sl : slogs)
+            {
+                still = still && std::abs(sl->mX - under.mX) >= 120;
+            }
+            if (!still)
+            {
+                bot.Log("the Slogs under PullRing#" + std::to_string(mRing) + " came back: out after him again");
+                mPhase = 0;
+                mOver = -1;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (!fresh)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            bot.Log("the slam door between has just shut: down to the ring");
+            mPhase = 3;
+        }
+        else if (over < 0)
+        {
+            mPhase = 3;
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (mPhase == 3)
+    {
+        if (bot.AbeNode() != mAt)
+        {
+            if (!mGo)
+            {
+                mGo = GoToNode(mAt);
+                mGo->SetHurry(true);
+            }
+            TaskStep go;
+            if (!RunGo(mGo, bot, lastFailed, go))
+            {
+                return go;
+            }
+            mGo.reset();
+            if (go.mKind == TaskStep::Kind::eFailed)
+            {
+                return go;
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mPhase = 2;
+        mLastX.clear();
+    }
+    // At the ring: pulled as one of them will be on a trap door by the time it opens (at the pace it runs now)
+    const s32 frames = std::max(1, static_cast<s32>(bot.Abe().mFrame) - mLastFrame);
+    bool on = false;
+    std::vector<s32> xs;
+    for (const SlogAt* s : slogs)
+    {
+        xs.push_back(s->mX);
+        s32 last = 0;
+        for (const s32 x : mLastX)
+        {
+            last = last == 0 || std::abs(x - s->mX) < std::abs(last - s->mX) ? x : last;
+        }
+        const s32 pace10 = last != 0 && std::abs(s->mX - last) < 14 * frames ? (s->mX - last) * 10 / frames : 0;
+        const s32 then = s->mX + pace10 * mDelay / 10;
+        for (const NavFeature& door : nav.Input().mFeatures)
+        {
+            on = on || (pace10 != 0 && door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring->mSwitch && std::abs(door.mY1 - under.mY) < 40 && then >= door.mX1 + 2 && then <= door.mX2 - 2);
+        }
+    }
+    mLastX = xs;
+    mLastFrame = static_cast<s32>(bot.Abe().mFrame);
+    if (!on || !bot.Abe().Settled())
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (++mPulls > 6)
+    {
+        return TaskStep::Failed("the trap doors did not take the Slogs");
+    }
+    bot.Log("a Slog will be on a trap door of PullRing#" + std::to_string(mRing) + " in " + std::to_string(mDelay) + " frames: the ring");
+    mUse = std::make_unique<UseTask>(mRing, 1);
+    return TaskStep::Do(Prim::Wait(1));
 }
 
 SligDropTask::~SligDropTask() = default;

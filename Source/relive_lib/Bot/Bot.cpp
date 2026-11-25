@@ -344,6 +344,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<ParamiteTourTask>(step.mOther, step.mEdge);
         case StepKind::eSligDrop:
             return std::make_unique<SligDropTask>(step.mEntity, step.mOther, step.mEdge);
+        case StepKind::eSlogRing:
+            return std::make_unique<SlogRingTask>(step.mEntity, step.mEdge);
         case StepKind::eStepOn:
         {
             return std::make_unique<StepOnTask>(step.mEntity, step.mEdge);
@@ -4250,6 +4252,11 @@ std::unique_ptr<Task> Bot::MakeSlogFlee()
     }
     // (hung from a ledge he is on no floor of theirs: GoToTask::HungBySlog says when to go up)
     if (mAbe.mMove == Move::eHang)
+    {
+        return nullptr;
+    }
+    // (on his way down to a ring that drops them, or at it: SlogRingTask has their floor let to him)
+    if (mTask && mTask->Name().rfind("Drop the Slogs under", 0) == 0 && mAbe.mFrame <= mDangerLetUntil)
     {
         return nullptr;
     }

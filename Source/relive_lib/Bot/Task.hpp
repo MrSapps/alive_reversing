@@ -151,6 +151,9 @@ private:
     s32 mJumps = 0;
     s32 mWaits = 0;
     s32 mPicks = 0;
+    // The way the jump through the sack went, and on and off a Slog's floor after it
+    bool mJumpLeft = false;
+    bool mEscape = false;
     // Meat with a Paramite on the sack's level: what the first sack drops is left for it, and the meat to keep
     // is had from another sack of that level while it eats (mBaitX: the first sack)
     bool mBaited = false;
@@ -1794,6 +1797,46 @@ private:
 };
 
 // A Slig dropped through a trap door: at the door's lever until the Slig is on the door, then the lever.
+// The Slogs of the floor under a pull ring, dropped through the trap doors it opens: from a floor over them, away
+// from the ring, until they have come out after him and are shut away from it (a slam door between); then at the
+// ring, pulled as one of them runs back over a trap door. (Zulag 5: "Get the Sloggies to chase you past the right
+// barrier. When they're caught behind it, run to the ring, then pull it when the Sloggies are running towards you
+// to drop them through the trapdoor.")
+class SlogRingTask final : public Task
+{
+public:
+    SlogRingTask(u32 ring, s32 at)
+        : mRing(ring)
+        , mAt(at)
+    {
+    }
+    ~SlogRingTask() override;
+    std::string Name() const override
+    {
+        return "Drop the Slogs under PullRing#" + std::to_string(mRing);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mRing;
+    s32 mAt;
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mGone = 0;
+    s32 mAfter = 0;
+    s32 mPulls = 0;
+    // The frames from setting off for the ring until its trap doors are open: a jump up to it and the pull down
+    s32 mDelay = 24;
+    s32 mLastFrame = 0;
+    std::vector<s32> mLastX;
+    s32 mGoal = -1;
+    s32 mOver = -1;
+    // The side of the slam door that shuts them away that faces the ring
+    s32 mDoorX = 0;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<Task> mUse;
+};
+
 class SligDropTask final : public Task
 {
 public:
