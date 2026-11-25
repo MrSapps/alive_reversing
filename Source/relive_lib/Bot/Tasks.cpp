@@ -5663,7 +5663,7 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
     {
         const s32 dir = mKey == Btn::eRight ? 1 : mKey == Btn::eLeft ? -1 : (dest.mX >= x ? 1 : -1);
         const Entity* near = nullptr;
-        s32 nearD = 5 * cell + 1;
+        s32 nearD = 32 * cell + 1;
         for (const Entity& mud : world.mEntities)
         {
             const s32 d = ((mud.mLive ? mud.mLiveX : mud.CentreX()) - x) * dir;
@@ -5684,7 +5684,11 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
                 uxbId = uxb.mId;
             }
         }
-        if (near && stopD <= 3 * cell)
+        // (stopped on the screen before its own, as the walkthrough leaves the car: driven onto its screen the car
+        // wakes the Sligs there, and they shoot it. The Mines' path 5: "Get him behind the mine car on the left".)
+        const s32 mudCam = near ? nav.CameraOf(x + nearD * dir, y - 5) : -1;
+        const bool nextScreen = near && mudCam >= 0 && nav.CameraOf(x, y - 5) != mudCam && nav.CameraOf(x + 2 * cell * dir, y - 5) == mudCam;
+        if (near && (nextScreen || stopD <= 3 * cell))
         {
             mAhead = near->mId;
             mAheadUxb = uxbId;
@@ -8581,6 +8585,13 @@ TaskStep DisarmTask::Next(Bot& bot, const std::string& lastFailed)
         return Next(bot, "");
     }
     const bool faceLeft = cur == right;
+    // (not a move while a motion detector's beam is on him or comes over him before it is done: the walkthrough's
+    // "crouch and tap it once the beam passes you". The Mines' path 5, the UXB at 2425 by the detector at 2300:
+    // tapped in the beam, the alarm brought the Sligs, and they shot the blind Mudokon by it.)
+    if (!bot.GetWorld().BeamClear(abe.mX, abe.mY, abe.mHalfScale, 0, 0, 20) && ++mBeamWaits < 900)
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
     if (abe.mMove != Move::eCrouch)
     {
         if (abe.mFacingLeft != faceLeft)

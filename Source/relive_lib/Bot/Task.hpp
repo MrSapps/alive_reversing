@@ -109,6 +109,7 @@ private:
     bool mWasGreen = true;
     s32 mFrames = 0;
     s32 mSlaps = 0;
+    s32 mBeamWaits = 0;
 };
 
 // Jump into a rock sack and pick up the rocks that fall out
