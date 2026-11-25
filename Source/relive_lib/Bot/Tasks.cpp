@@ -11379,6 +11379,40 @@ bool RescueTask::LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, co
                 mBlindRide = -1;
                 // (begun only with quiet enough for all of it: hello, its answer, follow me, and its walk back past the
                 // car. Off the Slig's floor till then. The Mines' path 5: a Slig comes onto the screen at 2587.)
+                // (up to a ledge over its floor on its screen first, where there is one: led from there he is never in
+                // the Sligs' sight)
+                {
+                    const s32 mudY = mud.mLive ? mud.mLiveY : mud.mY2;
+                    const s32 mudCam = nav.CameraOf(mudX, mudY - 5);
+                    const NavGraph* graph = &nav;
+                    const auto ledge = [graph, mudY, mudCam](s32 n)
+                    {
+                        const NavNode& node = graph->Nodes()[n];
+                        return node.mY < mudY - 45 && node.mY > mudY - 200 && graph->CameraOf(node.mX, node.mY - 5) == mudCam;
+                    };
+                    const s32 abeNode = bot.AbeNode();
+                    std::vector<s32> up;
+                    if (mBlindTries == 0 && !mLedgeGone && abeNode >= 0 && std::abs(bot.Abe().mY - mudY) <= 45 && nav.FindPath(abeNode, ledge, bot.EdgeCostFn(), up) && up.size() <= 12)
+                    {
+                        if (!mLedgeGo)
+                        {
+                            mLedgeGo = std::make_unique<GoToTask>("up over the Mudokon", ledge);
+                        }
+                        const TaskStep upStep = mLedgeGo->Next(bot, lastFailed);
+                        if (upStep.mKind == TaskStep::Kind::ePrim)
+                        {
+                            step = upStep;
+                            return false;
+                        }
+                        mLedgeGo.reset();
+                        mLedgeGone = true;
+                    }
+                    if (bot.Abe().mMove == Move::eHang)
+                    {
+                        step = TaskStep::Do(Prim::Press(Btn::eUp));
+                        return false;
+                    }
+                }
                 if (mBlindTries == 0)
                 {
                     const s32 mudY = mud.mLive ? mud.mLiveY : mud.mY2;
@@ -11399,11 +11433,16 @@ bool RescueTask::LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, co
                     step = TaskStep::Failed("nowhere behind the mine car for the blind Mudokon");
                     return false;
                 }
-                bot.Log("leading the blind Mudokon from " + std::to_string(mudX) + " back past the mine car at " + std::to_string(carX) + " to " + std::to_string(nav.Nodes()[mBlindStop].mX));
+                // (from the ledge over it, where he is out of the Sligs' sight: it hears him anywhere on its screen.
+                // Hello, follow me and wait all from up there, as it walks back past the car below him.)
+                const s32 mudY = mud.mLive ? mud.mLiveY : mud.mY2;
+                const bool fromLedge = std::abs(bot.Abe().mY - mudY) > 45 && nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5) == nav.CameraOf(mudX, mudY - 5);
+                bot.Log("leading the blind Mudokon from " + std::to_string(mudX) + " back past the mine car at " + std::to_string(carX) + " to " + std::to_string(nav.Nodes()[mBlindStop].mX) + (fromLedge ? ", from the ledge" : ""));
                 mRecruit = std::make_unique<RecruitTask>(mMud);
                 mRecruit->SetSide(mBlindDir);
+                mRecruit->SetRemote(fromLedge);
                 mBlindPhase = 1;
-                mBlindAhead = false;
+                mBlindAhead = fromLedge;
                 return LeadBlind(bot, mud, portal, lastFailed, step);
             }
             // (out from under a drill it is led by the way it will go once all is open, only as far as is clear)
