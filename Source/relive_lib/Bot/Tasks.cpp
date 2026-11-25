@@ -8138,7 +8138,15 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return step;
     }
-    if (mFrom >= 0 && bot.AbeNode() != mFrom)
+    // (with the Glukkon on his screen and no Slig to see him, chanted for from where he is: the chant takes one
+    // anywhere on the screen. Zulag 1: the one the lever at 2400 calls comes in right under him, and the way to the
+    // place planned for, past the Slig of its floor, flipped with the screen shown, and he ran to and fro.)
+    const NavGraph& nav = bot.Nav();
+    const bool onScreen = nav.CameraOf(any->mX, any->mY - 5) == nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5);
+    // (and on with the chant once it is begun there)
+    const bool here = onScreen && ((mChanted > 0 && mChantHere) || (bot.Abe().mMove == Move::eIdle && SligSeesIn(bot, bot.Abe().mX, bot.Abe().mY, bot.Abe().mHalfScale) >= 60));
+    mChantHere = here;
+    if (mFrom >= 0 && bot.AbeNode() != mFrom && !here)
     {
         if (bot.AbeNode() < 0)
         {

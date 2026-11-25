@@ -3381,7 +3381,17 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
         Log("no way out known: " + plan.mMiss + ". " + domain.Frontier() + can);
     }
     std::vector<std::pair<s32, Goap::Fact>> tries;
-    for (const Goap::Fact& fact : domain.Reachable())
+    // (and a switch that brings a Glukkon in, which nothing known waits for: what it can be made to do is found once
+    // it is there. Zulag 1's lever at 2400.)
+    std::vector<Goap::Fact> worth = domain.Reachable();
+    for (const s32 sw : mWorld.mGlukkonSpawn)
+    {
+        if (mWorld.Switch(sw) == 0)
+        {
+            worth.push_back({Key::Switch(sw), 1});
+        }
+    }
+    for (const Goap::Fact& fact : worth)
     {
         if (fact.mKey < 1000 || fact.mKey >= 1000000 || mExplored.count({mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey}))
         {

@@ -800,6 +800,7 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mSlogSpawnersSpent.clear();
     world.mWingLockers.clear();
     world.mGlukkonHelp.clear();
+    world.mGlukkonSpawn.clear();
     for (auto& cam : path.GetCameras())
     {
         if (!cam)
@@ -814,6 +815,10 @@ static void BuildEntities(BinaryPath& path, World& world)
             if (tlv.mTlvType == ReliveTypes::eGlukkon && static_cast<const relive::Path_Glukkon&>(tlv).mHelpSwitchId > 1)
             {
                 world.mGlukkonHelp.push_back(static_cast<const relive::Path_Glukkon&>(tlv).mHelpSwitchId);
+            }
+            if (tlv.mTlvType == ReliveTypes::eGlukkon && static_cast<const relive::Path_Glukkon&>(tlv).mSpawnSwitchId > 1)
+            {
+                world.mGlukkonSpawn.push_back(static_cast<const relive::Path_Glukkon&>(tlv).mSpawnSwitchId);
             }
             if (tlv.mTlvType == ReliveTypes::eSligGetWings)
             {

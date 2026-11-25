@@ -381,6 +381,7 @@ private:
     s32 mFrom;
     std::unique_ptr<GoToTask> mGo;
     s32 mChanted = 0;
+    bool mChantHere = false;
     s32 mWalked = 0;
     // Frames in the lock's box since it was come into (or since the last try), and the tries
     s32 mInBox = 0;

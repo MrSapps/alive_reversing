@@ -529,6 +529,9 @@ struct World final
     std::vector<GlukkonAt> mGlukkons;
     // The switches the path's Glukkons set when they call for help (a spawner with one of them makes a Slig then)
     std::vector<s32> mGlukkonHelp;
+    // The switches that bring a Glukkon of the path in (its spawn switch): worth trying for what it can be made to do
+    // (Zulag 1: the lever at 2400 calls the one at 2325, "pull the lever to summon a Glukkon")
+    std::vector<s32> mGlukkonSpawn;
     // The naked Slig he has taken over (it is not among mCrawlers), where it is and the way it faces
     bool mCrawlerMine = false;
     s32 mCrawlerX = 0;
