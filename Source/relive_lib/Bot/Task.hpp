@@ -1287,6 +1287,10 @@ public:
     static bool Find(const NavGraph& nav, const World& world, const SligAt& slig, u32& ring, u32& drill);
 
 private:
+    // With Mudokons to save, a blind one under the drill is called out from under it first: from the ring, while
+    // the Slig is off past the drills, and told to wait once it is clear. True while that is going on.
+    bool CallMudOff(Bot& bot, s32 x1, s32 x2, const SligAt* slig, TaskStep& step);
+
     u32 mRing;
     u32 mDrill;
     std::unique_ptr<GoToTask> mGo;
@@ -1294,6 +1298,11 @@ private:
     s32 mWaits = 0;
     s32 mPulls = 0;
     s32 mLastX = 0;
+    s32 mCallWaits = 0;
+    s32 mSinceLine = 1000;
+    bool mSaidHello = false;
+    // The one called, until it has been told to wait
+    u32 mCalled = 0;
 };
 
 // A blind Mudokon is called from the wheel's side of it, walks until the wheel stops it, and is told to work

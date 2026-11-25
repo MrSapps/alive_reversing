@@ -2253,13 +2253,13 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             u32 drill = 0;
             if (onWay && !slig.mAsleep && !slig.mPossessed && TrapSligTask::Find(nav, bot.GetWorld(), slig, ring, drill))
             {
-                // (not with a Mudokon to be saved under it too: the Mines' path 4, the blind one by the ring at
-                // 487,1920. The walkthrough leads it off first.)
+                // (not with a Mudokon to be saved under it too, unless it is blind: that one is called out from
+                // under it first, TrapSligTask::CallMudOff. The Mines' path 4, the ring at 487,1920.)
                 const Entity* drillEntity = bot.GetWorld().Find(drill);
                 bool mudUnder = false;
                 for (const Entity& mud : bot.GetWorld().mEntities)
                 {
-                    mudUnder = mudUnder || (bot.SavesMudokons() && drillEntity && mud.mKind == EntityKind::eMudokon && !mud.mGone && Domain::UnderDrill(*drillEntity, mud, mud.mLive ? mud.mLiveX : mud.CentreX(), mud.mLive ? mud.mLiveY : mud.mY2));
+                    mudUnder = mudUnder || (bot.SavesMudokons() && drillEntity && mud.mKind == EntityKind::eMudokon && !mud.mGone && !mud.mBlind && Domain::UnderDrill(*drillEntity, mud, mud.mLive ? mud.mLiveX : mud.CentreX(), mud.mLive ? mud.mLiveY : mud.mY2));
                 }
                 if (mudUnder)
                 {
@@ -10626,7 +10626,11 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
         const s32 px = portal->CentreX();
         for (const Entity& drill : world.mEntities)
         {
-            if (drill.mKind != EntityKind::eDrill || drill.mHalf != mud->mHalf || !world.SweepRuns(drill) || std::abs(portal->mY2 - my) > 20 || drill.mX2 < std::min(mx, px) || drill.mX1 > std::max(mx, px) || drill.mY2 < my - (mud->mHalf ? 30 : 60) || drill.mY1 > my)
+            // (with Mudokons to save, those on the portal's floor wherever it starts from: led down onto that floor
+            // first, it walked on into them while he went for their levers. The Mines' path 4, from the ledge at
+            // 737,1400: "pull all three levers to deactivate the drills" comes before leading them.)
+            const s32 fy = bot.SavesMudokons() ? portal->mY2 : my;
+            if (drill.mKind != EntityKind::eDrill || drill.mHalf != mud->mHalf || !world.SweepRuns(drill) || (!bot.SavesMudokons() && std::abs(portal->mY2 - my) > 20) || drill.mX2 < std::min(mx, px) || drill.mX1 > std::max(mx, px) || drill.mY2 < fy - (mud->mHalf ? 30 : 60) || drill.mY1 > fy)
             {
                 continue;
             }
@@ -10811,6 +10815,70 @@ bool TrapSligTask::Find(const NavGraph& nav, const World& world, const SligAt& s
     return false;
 }
 
+bool TrapSligTask::CallMudOff(Bot& bot, s32 x1, s32 x2, const SligAt* slig, TaskStep& step)
+{
+    const World& world = bot.GetWorld();
+    const Entity* drill = world.Find(mDrill);
+    if (!bot.SavesMudokons() || !drill)
+    {
+        return false;
+    }
+    const Entity* mud = mCalled ? world.Find(mCalled) : nullptr;
+    for (const Entity& e : world.mEntities)
+    {
+        const s32 x = e.mLive ? e.mLiveX : e.CentreX();
+        const s32 y = e.mLive ? e.mLiveY : e.mY2;
+        if (!mud && e.mKind == EntityKind::eMudokon && !e.mGone && e.mBlind && e.mHalf == drill->mHalf && std::abs(y - drill->mY2) <= 45 && x >= x1 - 20 && x <= x2 + 20)
+        {
+            mud = &e;
+        }
+    }
+    if (!mud || mud->mGone)
+    {
+        return false;
+    }
+    mCalled = mud->mId;
+    if (++mCallWaits > 3000)
+    {
+        step = TaskStep::Failed("the blind Mudokon under the drill won't come out from under it");
+        return true;
+    }
+    mSinceLine++;
+    const s32 abeX = bot.Abe().mX;
+    const s32 mudX = mud->mLive ? mud->mLiveX : mud->CentreX();
+    const s32 toward = abeX < mudX ? -1 : 1;
+    if (mud->mFollowing)
+    {
+        // (clear of the drills on Abe's side of them: wait)
+        const bool clear = toward < 0 ? mudX < x1 - 21 : mudX > x2 + 21;
+        if (clear)
+        {
+            bot.Log("wait, said to the blind Mudokon at " + std::to_string(mudX) + ": out from under Drill#" + std::to_string(mDrill));
+            mSinceLine = 0;
+            mCalled = 0;
+            step = TaskStep::Do(Prim::Press(bot.SpeakWait(), 6));
+            return true;
+        }
+        step = TaskStep::Do(Prim::Wait(1));
+        return true;
+    }
+    // (not a word while the Slig is near it: only once it is off past the drills on the far side)
+    const bool sligAway = !slig || (toward < 0 ? slig->mX > x2 + 150 : slig->mX < x1 - 150);
+    const bool listening = mud->mState / 100 == 4;
+    // (at its work it hears a hello only between strokes, as RecruitTask has it)
+    const bool stroke = !listening && mud->mState / 100 == 1 && mud->mState % 100 > 2;
+    if (!sligAway || stroke || (mSaidHello && !listening && mSinceLine < 220) || (listening && mSinceLine < 30))
+    {
+        step = TaskStep::Do(Prim::Wait(1));
+        return true;
+    }
+    bot.Log("calling the blind Mudokon at " + std::to_string(mudX) + " out from under Drill#" + std::to_string(mDrill) + (listening ? ": follow me" : ": hello"));
+    mSinceLine = 0;
+    mSaidHello = !listening;
+    step = TaskStep::Do(Prim::Press(listening ? bot.SpeakFollow() : bot.SpeakHello(), 6));
+    return true;
+}
+
 TaskStep TrapSligTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const World& world = bot.GetWorld();
@@ -10863,6 +10931,10 @@ TaskStep TrapSligTask::Next(Bot& bot, const std::string& lastFailed)
 
         case 1: // until it walks in under
         {
+            if (CallMudOff(bot, x1, x2, slig, step))
+            {
+                return step;
+            }
             if (!slig)
             {
                 // (not about: its screen isn't this one, or it is gone)
