@@ -206,6 +206,12 @@ public:
     void Motion_24_EndSingleStep();
 
 public:
+    // For the bot: the switch that calls it in again once it is dead (0: none)
+    s16 SpawnSwitchId() const
+    {
+        return mTlvData.mSpawnSwitchId;
+    }
+
     s16 Brain_0_Calm_WalkAround();
     s16 Brain_1_Panic();
     s16 Brain_2_Slapped();

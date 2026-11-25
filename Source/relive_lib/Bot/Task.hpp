@@ -462,9 +462,10 @@ private:
 class SligLeverTask final : public Task
 {
 public:
-    SligLeverTask(u32 lever, s32 stand)
+    SligLeverTask(u32 lever, s32 stand, s32 from = -1)
         : mLever(lever)
         , mStand(stand)
+        , mFrom(from)
     {
     }
     std::string Name() const override
@@ -476,6 +477,8 @@ public:
 private:
     u32 mLever;
     s32 mStand;
+    // The cell he takes the Glukkon over from (-1: where he is)
+    s32 mFrom;
     bool mWasKnown = false;
     bool mWas = false;
     s32 mLost = 0;

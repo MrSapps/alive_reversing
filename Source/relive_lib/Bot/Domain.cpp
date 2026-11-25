@@ -262,12 +262,12 @@ static bool GateLeverFar(const NavGraph& nav, const World& world, const NavEdge&
     return false;
 }
 
-bool Domain::GlukkonWay(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, const Entity& lock, std::vector<Goap::Fact>* needs, std::vector<s32>* nodes, std::vector<bool>* hops, std::vector<bool>* lifts)
+bool Domain::GlukkonWay(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, const Entity& lock, std::vector<Goap::Fact>* needs, std::vector<s32>* nodes, std::vector<bool>* hops, std::vector<bool>* lifts, bool bringLifts)
 {
-    return GlukkonWayTo(nav, world, x, y, half, lock.mX1 + 3, lock.mX2 - 3, lock.mY2, needs, nodes, hops, lifts);
+    return GlukkonWayTo(nav, world, x, y, half, lock.mX1 + 3, lock.mX2 - 3, lock.mY2, needs, nodes, hops, lifts, bringLifts);
 }
 
-bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 x1, s32 x2, s32 toY, std::vector<Goap::Fact>* needs, std::vector<s32>* nodes, std::vector<bool>* hops, std::vector<bool>* lifts)
+bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 x1, s32 x2, s32 toY, std::vector<Goap::Fact>* needs, std::vector<s32>* nodes, std::vector<bool>* hops, std::vector<bool>* lifts, bool bringLifts)
 {
     const s32 start = nav.NodeAt(x, y, half, 12);
     if (start < 0)
@@ -286,6 +286,8 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
         // The switch the step waits on and the value it wants (0: none)
         s32 mSwitch = 0;
         s32 mValue = 0;
+        // The lift stop the lift has to be brought to first (-1: none)
+        s32 mLiftNeed = -1;
     };
     std::vector<Came> came(count);
     came[start].mCost = 0;
@@ -362,12 +364,18 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
             }
             // (onto a lift's stop on foot only where the lift is: there is no floor there without it. From another
             // cell of that stop it is: he is on the lift.)
+            // (or, with bringLifts, once Abe has brought it there: Key::LiftAt)
+            s32 liftNeed = -1;
             if (!lift && nav.Nodes()[to].mLiftStop >= 0 && nav.Nodes()[to].mLiftStop != at.mLiftStop)
             {
                 const NavFeature& stop = nav.Input().mFeatures[nav.Nodes()[to].mLiftStop];
                 if (!world.LiftAtStop(stop.mX1, stop.mX2, nav.Nodes()[to].mY, stop.mA != 0))
                 {
-                    return;
+                    if (!bringLifts)
+                    {
+                        return;
+                    }
+                    liftNeed = nav.Nodes()[to].mLiftStop;
                 }
             }
             // (a cell with a mine that is still there: once the mine is gone. Not with a gate to wait on too.)
@@ -402,7 +410,7 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
             {
                 return;
             }
-            const s32 cost = came[cur].mCost + 1 + (hop ? 2 : 0) + (lift ? 30 : 0) + (waits ? 1000 : 0) + (drill > 0 ? (kGlukkonDrillAhead + 60 - drill) / 6 : 0);
+            const s32 cost = came[cur].mCost + 1 + (hop ? 2 : 0) + (lift ? 30 : 0) + (waits ? 1000 : 0) + (liftNeed >= 0 ? 1000 : 0) + (drill > 0 ? (kGlukkonDrillAhead + 60 - drill) / 6 : 0);
             if (came[to].mCost < 0 || cost < came[to].mCost)
             {
                 came[to].mFrom = cur;
@@ -411,6 +419,7 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
                 came[to].mLift = lift;
                 came[to].mSwitch = waits ? sw : 0;
                 came[to].mValue = value;
+                came[to].mLiftNeed = liftNeed;
             }
         };
         for (s32 dir = -1; dir <= 1; dir += 2)
@@ -531,6 +540,10 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
         if (needs && came[n].mSwitch > 1)
         {
             needs->push_back({Key::Switch(came[n].mSwitch), came[n].mValue});
+        }
+        if (needs && came[n].mLiftNeed >= 0)
+        {
+            needs->push_back({Key::LiftAt(came[n].mLiftNeed), 1});
         }
         if (nodes)
         {
@@ -2829,6 +2842,21 @@ struct Domain::Builder final
 
     // An action for the planner, and the step it is
     void add(std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step);
+    // A Glukkon that can be had to do things: one about, or one a switch calls in that is not about yet, where it
+    // comes once that switch is on (mSpawn: that switch, 0 for none)
+    struct GlukkonSource final
+    {
+        s32 mX = 0;
+        s32 mY = 0;
+        bool mHalf = false;
+        bool mPossessed = false;
+        s32 mSpawn = 0;
+    };
+    std::vector<GlukkonSource> GlukkonSources() const;
+    // What a Glukkon is had to do (first, then what its way needs): by one he is in, from where he stands; else
+    // taken over from a cell of its screen, once no orb is over that screen. The cell goes in the step's mEdge, or
+    // with takeOverInOther in its mOther (as the node + 1).
+    void addForGlukkon(const GlukkonSource& glukkon, const std::string& what, const Goap::Fact& first, std::vector<Goap::Fact> needs, const std::vector<Goap::Fact>& gives, DomainStep step, bool takeOverInOther = false);
     // Being in the region of a cell
     Goap::Fact regionFact(s32 node) const
     {
@@ -5449,6 +5477,12 @@ void Domain::Builder::TrapDoorSligs()
                 {
                     continue;
                 }
+                // (not one whose beat never takes it over the door: Zulag 1's Slig #2004 walks 1025..1224, the doors
+                // are at 851 and 951, and "the Slig never was on the trap door" was tried for ever)
+                if (slig.mBeatMax > slig.mBeatMin && (door.mX2 < slig.mBeatMin - 10 || door.mX1 > slig.mBeatMax + 10))
+                {
+                    continue;
+                }
                 DomainStep drop;
                 drop.mKind = StepKind::eSligDrop;
                 drop.mEntity = lever.mId;
@@ -5810,73 +5844,182 @@ void Domain::Builder::NakedSligButtons()
     }
 }
 
+// The Glukkons about, and one a switch calls in that is not about yet (Zulag 1: the lever at 2400 calls one in
+// at 2337, and again each time it dies)
+std::vector<Domain::Builder::GlukkonSource> Domain::Builder::GlukkonSources() const
+{
+    std::vector<GlukkonSource> sources;
+    for (const GlukkonAt& glukkon : mWorld.mGlukkons)
+    {
+        sources.push_back({glukkon.mX, glukkon.mY, glukkon.mHalf, glukkon.mPossessed, glukkon.mSpawnSwitch});
+    }
+    for (const GlukkonSpawn& spawn : mWorld.mGlukkonSpawn)
+    {
+        bool about = false;
+        for (const GlukkonAt& glukkon : mWorld.mGlukkons)
+        {
+            about = about || glukkon.mSpawnSwitch == spawn.mSwitch;
+        }
+        if (!about)
+        {
+            sources.push_back({spawn.mX, spawn.mY, spawn.mHalf, false, spawn.mSwitch});
+        }
+    }
+    return sources;
+}
+
+void Domain::Builder::addForGlukkon(const GlukkonSource& glukkon, const std::string& what, const Goap::Fact& first, std::vector<Goap::Fact> needs, const std::vector<Goap::Fact>& gives, DomainStep step, bool takeOverInOther)
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    // (one a switch calls in: while that switch is on, which it is no more once it is dead)
+    if (glukkon.mSpawn > 1)
+    {
+        needs.push_back({Key::Switch(glukkon.mSpawn), 1});
+    }
+    if (glukkon.mPossessed)
+    {
+        // (from where he stands in his trance: a step of his own first is the Glukkon let go of. The
+        // Barracks' war room, planned as "off the ledge, then the last lock with the Glukkon".)
+        std::vector<Goap::Fact> pre{first};
+        if (mAbeNode >= 0)
+        {
+            pre.push_back(regionFact(mAbeNode));
+        }
+        pre.insert(pre.end(), needs.begin(), needs.end());
+        add(what, pre, gives, 300, step);
+        return;
+    }
+    const s32 cam = nav.CameraOf(glukkon.mX, glukkon.mY - 5);
+    std::vector<Goap::Fact> pre{first};
+    for (const Entity& orb : world.mEntities)
+    {
+        if (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone && nav.CameraOf(orb.mX1, orb.mY1) == cam)
+        {
+            pre.push_back({Key::Switch(World::HazardSwitch(orb.mId)), 1});
+        }
+    }
+    pre.insert(pre.end(), needs.begin(), needs.end());
+    // (one a switch calls in: from off its floor, where it can be: that floor is its Sligs'. Zulag 1: from 2262,460
+    // the second time, Abe was shot by the Slig that came down to the lift's floor.)
+    std::vector<s32> order;
+    for (s32 pass = 0; pass < 2; pass++)
+    {
+        for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+        {
+            const bool off = std::abs(nav.Nodes()[n].mY - glukkon.mY) > 40;
+            if (glukkon.mSpawn <= 1 ? pass == 0 : off == (pass == 0))
+            {
+                order.push_back(static_cast<s32>(n));
+            }
+        }
+    }
+    std::set<s32> from;
+    for (const s32 n : order)
+    {
+        const NavNode& node = nav.Nodes()[n];
+        if (node.mHalf != glukkon.mHalf || node.mHazard || nav.CameraOf(node.mX, node.mY - 5) != cam || !from.insert(mD.mRegions[n]).second)
+        {
+            continue;
+        }
+        if (takeOverInOther)
+        {
+            step.mOther = static_cast<u32>(n) + 1;
+        }
+        else
+        {
+            step.mEdge = static_cast<s32>(n);
+        }
+        std::vector<Goap::Fact> at{regionFact(static_cast<s32>(n))};
+        at.insert(at.end(), pre.begin(), pre.end());
+        add(what + " taken over from " + std::to_string(node.mX) + "," + std::to_string(node.mY), at, gives, 600, step);
+    }
+}
+
 // A voice lock with a Glukkon on its floor
 void Domain::Builder::VoiceLocks()
 {
     const NavGraph& nav = mNav;
     const World& world = mWorld;
-    s32& abeNode = mAbeNode;
-    Domain& d = mD;
-    // A voice lock with a Glukkon on its floor and nothing shut between them: the Glukkon is taken over from a
-    // cell of its screen, once no orb is over that screen, walked into the lock's box, and says what the lock
-    // wants said. One he is in already goes on to it as it is. (The walkthrough of the Barracks' war room: "possess
-    // General Dripik! Move him in front of the Glukkon Phone, say "Hey", then "Do it"".)
+    const std::vector<GlukkonSource> sources = GlukkonSources();
+    // A voice lock with a Glukkon on its floor and nothing shut between them: walked into the lock's box, it says
+    // what the lock wants said. (The walkthrough of the Barracks' war room: "possess General Dripik! Move him in
+    // front of the Glukkon Phone, say "Hey", then "Do it"".)
     for (const Entity& lock : world.mEntities)
     {
         if (lock.mKind != EntityKind::eVoiceLock || lock.mSwitch <= 1)
         {
             continue;
         }
-        for (const GlukkonAt& glukkon : world.mGlukkons)
+        for (const GlukkonSource& glukkon : sources)
         {
             std::vector<Goap::Fact> needs;
-            if (glukkon.mHalf != lock.mHalf || !GlukkonWay(nav, world, glukkon.mX, glukkon.mY, glukkon.mHalf, lock, &needs))
+            if (glukkon.mHalf != lock.mHalf || !GlukkonWay(nav, world, glukkon.mX, glukkon.mY, glukkon.mHalf, lock, &needs, nullptr, nullptr, nullptr, glukkon.mSpawn > 1))
             {
                 continue;
             }
             const s32 now = world.Switch(lock.mSwitch);
-            const std::vector<Goap::Fact> gives{{Key::Switch(lock.mSwitch), now ? 0 : 1}};
             DomainStep say;
             say.mKind = StepKind::eVoiceLock;
             say.mEntity = lock.mId;
             say.mEdge = -1;
-            const std::string what = "Answer VoiceLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with the Glukkon";
-            if (glukkon.mPossessed)
+            addForGlukkon(glukkon, "Answer VoiceLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with the Glukkon", {Key::Switch(lock.mSwitch), now}, needs, {{Key::Switch(lock.mSwitch), now ? 0 : 1}}, say);
+        }
+    }
+    // A mine in the way that a Glukkon a switch calls in again is walked onto: gone with it, and the next one is
+    // called in. ("At the end, have the Glukkon walk onto the mines, blowing one up in the process ... summon
+    // another Glukkon. With him, follow the same path as the last and blow up the other mine by the lever.")
+    for (const Entity& mine : world.mEntities)
+    {
+        if (mine.mKind != EntityKind::eMine || mine.mGone || mine.mSwitch <= 1)
+        {
+            continue;
+        }
+        for (const GlukkonSource& glukkon : sources)
+        {
+            const s32 step = NavGraph::GridStep(glukkon.mHalf);
+            std::vector<Goap::Fact> needs;
+            if (glukkon.mSpawn <= 1 || glukkon.mHalf != mine.mHalf || !GlukkonWayTo(nav, world, glukkon.mX, glukkon.mY, glukkon.mHalf, mine.CentreX() - step / 2, mine.CentreX() + step / 2, mine.mY2, &needs, nullptr, nullptr, nullptr, true))
             {
-                // (from where he stands in his trance: a step of his own first is the Glukkon let go of. The
-                // Barracks' war room, planned as "off the ledge, then the last lock with the Glukkon".)
-                std::vector<Goap::Fact> pre{{Key::Switch(lock.mSwitch), now}};
-                if (abeNode >= 0)
-                {
-                    pre.push_back(regionFact(abeNode));
-                }
-                pre.insert(pre.end(), needs.begin(), needs.end());
-                add(what, pre, gives, 300, say);
                 continue;
             }
-            const s32 cam = nav.CameraOf(glukkon.mX, glukkon.mY - 5);
-            std::vector<Goap::Fact> orbs;
-            for (const Entity& orb : world.mEntities)
+            std::vector<Goap::Fact> pre;
+            for (const Goap::Fact& need : needs)
             {
-                if (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone && nav.CameraOf(orb.mX1, orb.mY1) == cam)
+                if (need.mKey != Key::Switch(mine.mSwitch))
                 {
-                    orbs.push_back({Key::Switch(World::HazardSwitch(orb.mId)), 1});
+                    pre.push_back(need);
                 }
             }
-            std::set<s32> from;
-            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            DomainStep walk;
+            walk.mKind = StepKind::eVoiceLock;
+            walk.mEntity = mine.mId;
+            walk.mEdge = -1;
+            addForGlukkon(glukkon, "Blow up Mine#" + std::to_string(mine.mId) + " with the Glukkon", {Key::Switch(mine.mSwitch), 0}, pre, {{Key::Switch(mine.mSwitch), 1}, {Key::Switch(glukkon.mSpawn), 0}}, walk);
+        }
+    }
+    // A lift that one of them rides, brought to a stop by Abe riding it there (Key::LiftAt). ("With Abe, bring the
+    // lift back down, climb back up via the yellow ledges to the left, and summon another Glukkon.")
+    if (!world.mGlukkonSpawn.empty())
+    {
+        for (std::size_t i = 0; i < mEdges.size(); i++)
+        {
+            const NavEdge& e = mEdges[i];
+            const NavNode& from = nav.Nodes()[e.mFrom];
+            const NavNode& to = nav.Nodes()[e.mTo];
+            if (e.mKind != EdgeKind::eLift || from.mLiftStop < 0 || to.mLiftStop < 0)
             {
-                const NavNode& node = nav.Nodes()[n];
-                if (node.mHalf != lock.mHalf || node.mHazard || nav.CameraOf(node.mX, node.mY - 5) != cam || !from.insert(d.mRegions[n]).second)
-                {
-                    continue;
-                }
-                say.mEdge = static_cast<s32>(n);
-                std::vector<Goap::Fact> pre{regionFact(static_cast<s32>(n)), {Key::Switch(lock.mSwitch), now}};
-                pre.insert(pre.end(), orbs.begin(), orbs.end());
-                pre.insert(pre.end(), needs.begin(), needs.end());
-                add(what + " taken over from " + std::to_string(node.mX) + "," + std::to_string(node.mY), pre, gives, 600, say);
+                continue;
             }
+            const NavFeature& stop = nav.Input().mFeatures[from.mLiftStop];
+            if (!world.LiftAtStop(stop.mX1, stop.mX2, from.mY, stop.mA != 0))
+            {
+                continue;
+            }
+            DomainStep ride;
+            ride.mKind = StepKind::eCross;
+            ride.mEdge = static_cast<s32>(i);
+            add("Bring the lift from " + std::to_string(from.mX) + "," + std::to_string(from.mY) + " to " + std::to_string(to.mX) + "," + std::to_string(to.mY), {regionFact(e.mFrom)}, {regionFact(e.mTo), {Key::LiftAt(to.mLiftStop), 1}}, 150 + e.mCost, ride);
         }
     }
 }
@@ -6395,6 +6538,81 @@ void Domain::Builder::GlukkonCalls()
                         {{Key::Switch(lever.mSwitch), after}}, 400, order);
                     added = true;
                 }
+            }
+        }
+    }
+    // A lever on the floor under a Glukkon, with a Slig of that floor on its screen: the Glukkon stands over the
+    // floor on the side of the lever away from the Slig, and "Come here" brings the Slig along its floor under it
+    // past the lever, where it stops; "Do it" and it pulls it. (Zulag 1: "At the bottom, stand over the trapdoor.
+    // Get the bottom Slig's attention with "All o' ya" and have him "C'mere" to beside the lower lever, then "Do
+    // it" to pull it." Only a summoned Glukkon's: one that comes again.)
+    const std::vector<GlukkonSource> sources = GlukkonSources();
+    for (const Entity& lever : world.mEntities)
+    {
+        if (lever.mKind != EntityKind::eLever || lever.mSwitch <= 1 || lever.mGone)
+        {
+            continue;
+        }
+        const s32 now = world.Switch(lever.mSwitch);
+        const s32 after = lever.mOp == 0 ? 1 : lever.mOp == 1 ? 0 : (now ? 0 : 1);
+        const s32 cell = NavGraph::GridStep(lever.mHalf);
+        const s32 leverX = lever.CentreX();
+        const s32 cam = nav.CameraOf(leverX, lever.mY2 - 5);
+        if (now == after)
+        {
+            continue;
+        }
+        for (const Entity& slig : world.mEntities)
+        {
+            // (one of the floor, or one a call for help brings down onto it: "yell "Help" at the Slig Machine")
+            const bool help = slig.mSwitch > 1 && std::find(world.mGlukkonHelp.begin(), world.mGlukkonHelp.end(), slig.mSwitch) != world.mGlukkonHelp.end();
+            if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mState == 1 || (slig.mSwitch > 1 && !help) || slig.mHalf != lever.mHalf ||
+                (help ? (lever.mY2 - slig.mY2 < 0 || lever.mY2 - slig.mY2 > 100) : std::abs(slig.mY2 - lever.mY2) > 30) || nav.CameraOf(slig.CentreX(), lever.mY2 - 5) != cam || std::abs(slig.CentreX() - leverX) < cell)
+            {
+                continue;
+            }
+            const s32 side = slig.CentreX() < leverX ? 1 : -1;
+            for (const GlukkonSource& glukkon : sources)
+            {
+                if (glukkon.mSpawn <= 1 || glukkon.mHalf != lever.mHalf)
+                {
+                    continue;
+                }
+                // (the nearest cell over the floor past the lever, a cell or more past it)
+                s32 stand = -1;
+                for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+                {
+                    const NavNode& node = nav.Nodes()[n];
+                    const s32 past = (node.mX - leverX) * side;
+                    if (node.mHalf != lever.mHalf || node.mHazard || past < cell || past > 4 * cell || node.mY > lever.mY2 - 50 || node.mY < lever.mY2 - 160 || nav.CameraOf(node.mX, node.mY - 5) != cam)
+                    {
+                        continue;
+                    }
+                    if (stand < 0 || past < (nav.Nodes()[stand].mX - leverX) * side)
+                    {
+                        stand = static_cast<s32>(n);
+                    }
+                }
+                std::vector<Goap::Fact> needs;
+                if (stand < 0 || !GlukkonWayTo(nav, world, glukkon.mX, glukkon.mY, glukkon.mHalf, nav.Nodes()[stand].mX - 5, nav.Nodes()[stand].mX + 5, nav.Nodes()[stand].mY, &needs, nullptr, nullptr, nullptr, true))
+                {
+                    continue;
+                }
+                bool own = false;
+                for (const Goap::Fact& f : needs)
+                {
+                    own = own || f.mKey == Key::Switch(lever.mSwitch);
+                }
+                if (own)
+                {
+                    continue;
+                }
+                DomainStep order;
+                order.mKind = StepKind::eSligLever;
+                order.mEntity = lever.mId;
+                order.mEdge = stand;
+                addForGlukkon(glukkon, "Have the Slig under it pull Lever#" + std::to_string(lever.mId) + " sw" + std::to_string(lever.mSwitch) + (after ? " on" : " off") + " for the Glukkon at " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY),
+                              {Key::Switch(lever.mSwitch), now}, needs, {{Key::Switch(lever.mSwitch), after}}, order, true);
             }
         }
     }

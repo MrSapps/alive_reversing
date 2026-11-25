@@ -247,6 +247,11 @@ public:
     {
         return mRng;
     }
+    // The Glukkon he is in is sent to its end on purpose (onto a mine): its death is no death of his
+    void LetGlukkonGo()
+    {
+        mGlukkonLetGo = true;
+    }
     const World& GetWorld() const
     {
         return mWorld;

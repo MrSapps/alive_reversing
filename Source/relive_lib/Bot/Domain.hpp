@@ -58,6 +58,12 @@ inline u32 Calm(u32 entityId)
 {
     return 6000000 + entityId;
 }
+// A lift has been brought to a stop of it (the stop's feature) for a Glukkon to get on: only planned where a switch
+// calls Glukkons in (Zulag 1's lift at 2477, taken up by the first one)
+inline u32 LiftAt(s32 stop)
+{
+    return 7000000 + static_cast<u32>(stop);
+}
 // A blind Mudokon has been led out from under the drill a lever is to start (save_all: the Mines' path 4)
 inline u32 OffDrill(u32 entityId)
 {
@@ -310,11 +316,11 @@ struct Domain final
     static constexpr s32 kGlukkonDrillAhead = 300;
     // lifts: whether the step into each is a ride on a lift that a Slig works for it.
     static bool GlukkonWay(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, const Entity& lock, std::vector<Goap::Fact>* needs = nullptr, std::vector<s32>* nodes = nullptr,
-                           std::vector<bool>* hops = nullptr, std::vector<bool>* lifts = nullptr);
+                           std::vector<bool>* hops = nullptr, std::vector<bool>* lifts = nullptr, bool bringLifts = false);
     // The same to any cell with its middle in x1..x2 on the floor at toY. A mine on the way has to be gone first
     // and a trap door it is to drop through open: those are needs as a gate is.
     static bool GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 x1, s32 x2, s32 toY, std::vector<Goap::Fact>* needs = nullptr, std::vector<s32>* nodes = nullptr,
-                             std::vector<bool>* hops = nullptr, std::vector<bool>* lifts = nullptr);
+                             std::vector<bool>* hops = nullptr, std::vector<bool>* lifts = nullptr, bool bringLifts = false);
     // Nothing solid that is shut between two places of a floor (a slam door)
     static bool FloorOpen(const NavInput& in, const World& world, s32 x1, s32 x2, s32 y, bool half);
     // Whether a grenade that goes off there gets an orb at (x, y). By what was seen: one that lay on the floor 60

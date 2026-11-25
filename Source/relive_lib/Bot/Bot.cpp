@@ -249,7 +249,7 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
         case StepKind::eVoiceLock:
             return std::make_unique<VoiceLockTask>(step.mEntity, step.mEdge);
         case StepKind::eSligLever:
-            return std::make_unique<SligLeverTask>(step.mEntity, step.mEdge);
+            return std::make_unique<SligLeverTask>(step.mEntity, step.mEdge, step.mOther != 0 ? static_cast<s32>(step.mOther) - 1 : -1);
         case StepKind::eSligCall:
             return std::make_unique<SligCallTask>(step.mEntity, step.mOther, static_cast<u32>(step.mEdge));
         case StepKind::eLeadOff:
@@ -3384,11 +3384,11 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
     // (and a switch that brings a Glukkon in, which nothing known waits for: what it can be made to do is found once
     // it is there. Zulag 1's lever at 2400.)
     std::vector<Goap::Fact> worth = domain.Reachable();
-    for (const s32 sw : mWorld.mGlukkonSpawn)
+    for (const GlukkonSpawn& spawn : mWorld.mGlukkonSpawn)
     {
-        if (mWorld.Switch(sw) == 0)
+        if (mWorld.Switch(spawn.mSwitch) == 0)
         {
-            worth.push_back({Key::Switch(sw), 1});
+            worth.push_back({Key::Switch(spawn.mSwitch), 1});
         }
     }
     for (const Goap::Fact& fact : worth)

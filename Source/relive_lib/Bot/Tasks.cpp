@@ -7805,13 +7805,31 @@ static void GlukkonRide(Bot& bot, const GlukkonAt& me, s32 hereNode, GlukkonOrde
         step = TaskStep::Do(Prim::Wait(2));
         return;
     }
-    if (std::abs(me.mX - here.mX) > 4)
-    {
-        step = TaskStep::Do(Prim::Wait(2, me.mX < here.mX ? Btn::eRight : Btn::eLeft));
-        return;
-    }
     const NavFeature& stop = nav.Input().mFeatures[here.mLiftStop];
     const s32 mid = (stop.mX1 + stop.mX2) / 2;
+    // (where it stands: a cell past the middle, away from the Slig it has along, so that that one comes to the middle,
+    // where the lift is worked from. Stood on the lift's cell, the Slig stopped by its side short of the middle and
+    // "Do it" did nothing: Zulag 1's lift at 2477..2551.)
+    s32 standX = here.mX;
+    // (only in a path whose Glukkon a lever calls in, once "Come here" has been said a few times: at FeeCo's
+    // Executive Offices it also got the Slig there sooner, and the run from the Mines then stuck in the Barracks)
+    if (!VoiceLift(nav, world, hereNode) && orders.mSaid >= 3 && !world.mGlukkonSpawn.empty())
+    {
+        const SligAt* along = GlukkonsSlig(nav, world, me);
+        if (along && std::abs(along->mX - mid) >= NavGraph::GridStep(me.mHalf) / 2)
+        {
+            standX = mid + (along->mX < mid ? 1 : -1) * NavGraph::GridStep(me.mHalf);
+        }
+        else if (along)
+        {
+            standX = me.mX;
+        }
+    }
+    if (std::abs(me.mX - standX) > 4)
+    {
+        step = TaskStep::Do(Prim::Wait(2, me.mX < standX ? Btn::eRight : Btn::eLeft));
+        return;
+    }
     if (VoiceLift(nav, world, hereNode))
     {
         // (as with any voice lock: it says "Hey" as he comes into its box and takes his for 150 frames; 30 after
@@ -7907,6 +7925,11 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
     {
         me = g.mPossessed ? &g : me;
         any = &g;
+    }
+    // (a mine it is walked onto: its end is no death of his)
+    if (me && lock->mKind == EntityKind::eMine)
+    {
+        bot.LetGlukkonGo();
     }
     if ((world.Switch(lock->mSwitch) != 0) != mWas)
     {
@@ -8127,6 +8150,16 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return TaskStep::Do(Prim::Wait(4));
         }
+        // (one a switch that is on calls in: on its way. Zulag 1's comes a while after the lever at 2400.)
+        bool coming = false;
+        for (const GlukkonSpawn& spawn : world.mGlukkonSpawn)
+        {
+            coming = coming || world.Switch(spawn.mSwitch) != 0;
+        }
+        if (coming && (mLeft += 4) < 600)
+        {
+            return TaskStep::Do(Prim::Wait(4));
+        }
         return TaskStep::Failed("no Glukkon about");
     }
     TaskStep step;
@@ -8142,7 +8175,9 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
     // anywhere on the screen. Zulag 1: the one the lever at 2400 calls comes in right under him, and the way to the
     // place planned for, past the Slig of its floor, flipped with the screen shown, and he ran to and fro.)
     const NavGraph& nav = bot.Nav();
-    const bool onScreen = nav.CameraOf(any->mX, any->mY - 5) == nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5);
+    // (only in a path whose Glukkon a lever calls in: elsewhere the place planned for is where it was, and the run
+    // from the Mines went another way at FeeCo's Executive Offices)
+    const bool onScreen = !world.mGlukkonSpawn.empty() && nav.CameraOf(any->mX, any->mY - 5) == nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5);
     // (and on with the chant once it is begun there)
     const bool here = onScreen && ((mChanted > 0 && mChantHere) || (bot.Abe().mMove == Move::eIdle && SligSeesIn(bot, bot.Abe().mX, bot.Abe().mY, bot.Abe().mHalfScale) >= 60));
     mChantHere = here;
@@ -8394,6 +8429,27 @@ TaskStep SligLeverTask::Next(Bot& bot, const std::string& lastFailed)
         bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": no Slog for " + std::to_string(mClear) + " frames" + (spent ? " and no more to come" : "") + ": they are all dead");
         return TaskStep::Done();
     }
+    if (!me && mFrom >= 0 && bot.Abe().mMotion != 112)
+    {
+        // (to the cell it is taken over from, unless he is on its screen now)
+        const bool onScreen = !world.mGlukkons.empty() && nav.CameraOf(world.mGlukkons[0].mX, world.mGlukkons[0].mY - 5) == nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5);
+        if (!onScreen && bot.AbeNode() != mFrom)
+        {
+            if (!mGo)
+            {
+                mGo = GoToNode(mFrom);
+            }
+            TaskStep go;
+            if (!RunGo(mGo, bot, lastFailed, go))
+            {
+                return go;
+            }
+            if (go.mKind == TaskStep::Kind::eFailed)
+            {
+                return go;
+            }
+        }
+    }
     if (!me)
     {
         // (not in one yet. From off its floor, at a run: that floor is its Sligs'. "In the office, immediately run
@@ -8488,6 +8544,19 @@ TaskStep SligLeverTask::Next(Bot& bot, const std::string& lastFailed)
             Domain::FloorOpen(nav.Input(), world, s.mX, lever->CentreX(), me->mY + 4, me->mHalf))
         {
             slig = &s;
+        }
+    }
+    // (or, from over the lever's floor, the one of that floor on its screen nearest the lever: "Come here" brings
+    // it along under the Glukkon, past the lever, where it stops)
+    if (!slig && stand.mY < lever->mY2 - 40)
+    {
+        for (const SligAt& s : world.mSligs)
+        {
+            if (!s.mPossessed && !s.mAsleep && s.mHalf == me->mHalf && std::abs(s.mY - lever->mY2) <= 30 && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(me->mX, me->mY - 5) &&
+                (!slig || std::abs(s.mX - lever->CentreX()) < std::abs(slig->mX - lever->CentreX())))
+            {
+                slig = &s;
+            }
         }
     }
     if (mQuiet > 0)

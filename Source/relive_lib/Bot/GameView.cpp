@@ -24,6 +24,7 @@
 #include "../../AliveLibAE/MovingBomb.hpp"
 #include "../../AliveLibAE/MotionDetector.hpp"
 #include "../../AliveLibAE/Slig.hpp"
+#include "../../AliveLibAE/Glukkon.hpp"
 #include "../../AliveLibAE/EvilFart.hpp"
 #include "../../AliveLibAE/FlyingSlig.hpp"
 #include "../../AliveLibAE/Slog.hpp"
@@ -769,6 +770,37 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
 }
 
 
+// The ends of the beat the path's bounds with this id give a Slig (both 0 when there are none)
+static void SligBeat(BinaryPath& path, s32 boundId, s32& beatMin, s32& beatMax)
+{
+    const relive::Path_TLV* pLeft = nullptr;
+    const relive::Path_TLV* pRight = nullptr;
+    for (auto& cam : path.GetCameras())
+    {
+        if (!cam)
+        {
+            continue;
+        }
+        for (auto& upTlv : cam->mTlvs.mTlvs)
+        {
+            const relive::Path_TLV* pOther = upTlv.get();
+            if (pOther->mTlvType == ReliveTypes::eSligBoundLeft && static_cast<const relive::Path_SligBound*>(pOther)->mSligBoundId == boundId)
+            {
+                pLeft = pOther;
+            }
+            if (pOther->mTlvType == ReliveTypes::eSligBoundRight && static_cast<const relive::Path_SligBound*>(pOther)->mSligBoundId == boundId)
+            {
+                pRight = pOther;
+            }
+        }
+    }
+    if (pLeft && pRight && pLeft->mTopLeftX < pRight->mBottomRightX)
+    {
+        beatMin = pLeft->mTopLeftX;
+        beatMax = pRight->mBottomRightX;
+    }
+}
+
 static void BuildEntities(BinaryPath& path, World& world)
 {
     world.mEntities.clear();
@@ -818,7 +850,12 @@ static void BuildEntities(BinaryPath& path, World& world)
             }
             if (tlv.mTlvType == ReliveTypes::eGlukkon && static_cast<const relive::Path_Glukkon&>(tlv).mSpawnSwitchId > 1)
             {
-                world.mGlukkonSpawn.push_back(static_cast<const relive::Path_Glukkon&>(tlv).mSpawnSwitchId);
+                GlukkonSpawn spawn;
+                spawn.mSwitch = static_cast<const relive::Path_Glukkon&>(tlv).mSpawnSwitchId;
+                spawn.mX = (tlv.mTopLeftX + tlv.mBottomRightX) / 2;
+                spawn.mY = tlv.mBottomRightY;
+                spawn.mHalf = static_cast<const relive::Path_Glukkon&>(tlv).mScale == relive::reliveScale::eHalf;
+                world.mGlukkonSpawn.push_back(spawn);
             }
             if (tlv.mTlvType == ReliveTypes::eSligGetWings)
             {
@@ -1223,6 +1260,10 @@ static void BuildEntities(BinaryPath& path, World& world)
                     // mState 1: starts asleep. mOp 1: starts facing left.
                     e.mState = t.mStartState == relive::Path_Slig::StartState::Sleeping ? 1 : 0;
                     e.mOp = t.mFacing == relive::reliveXDirection::eLeft ? 1 : 0;
+                    if (GetGameType() == GameType::eAe)
+                    {
+                        SligBeat(path, t.mSligBoundId, e.mBeatMin, e.mBeatMax);
+                    }
                     break;
                 }
                 case ReliveTypes::eTeleporter:
@@ -1973,6 +2014,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             glukkon.mFacingLeft = pObj->GetAnimation().GetFlipX();
             glukkon.mPossessed = pObj == sControlledCharacter;
             glukkon.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
+            glukkon.mSpawnSwitch = static_cast<const ::Glukkon*>(pObj)->SpawnSwitchId();
             world.mGlukkons.push_back(glukkon);
         }
     }

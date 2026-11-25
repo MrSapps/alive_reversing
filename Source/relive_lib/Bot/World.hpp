@@ -120,6 +120,10 @@ struct Entity final
     // walks into a wall or falls
     bool mBlind = false;
 
+    // A Slig: the ends of its beat, from the path's bounds for it (both 0 when it has none)
+    s32 mBeatMin = 0;
+    s32 mBeatMax = 0;
+
     // Its TLV says it is gone for good: a Mudokon saved or dead
     bool mGone = false;
     // There is an object for it now, at mLiveX, mLiveY
@@ -410,6 +414,17 @@ struct GlukkonAt final
     bool mPossessed = false;
     // The game's motion number (Glukkon.hpp: 0 stands)
     s32 mMotion = 0;
+    // The switch that calls it in again once it is dead (0: none): the game puts it back to 0 as it dies
+    s32 mSpawnSwitch = 0;
+};
+
+// A Glukkon of the path that a switch calls in, and where it comes
+struct GlukkonSpawn final
+{
+    s32 mSwitch = 0;
+    s32 mX = 0;
+    s32 mY = 0;
+    bool mHalf = false;
 };
 
 // A Scrab that is about
@@ -531,7 +546,7 @@ struct World final
     std::vector<s32> mGlukkonHelp;
     // The switches that bring a Glukkon of the path in (its spawn switch): worth trying for what it can be made to do
     // (Zulag 1: the lever at 2400 calls the one at 2325, "pull the lever to summon a Glukkon")
-    std::vector<s32> mGlukkonSpawn;
+    std::vector<GlukkonSpawn> mGlukkonSpawn;
     // The naked Slig he has taken over (it is not among mCrawlers), where it is and the way it faces
     bool mCrawlerMine = false;
     s32 mCrawlerX = 0;
