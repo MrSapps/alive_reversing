@@ -57,6 +57,14 @@ public:
     // reload (see BaseMap::ReloadPathJsonRequest)
     std::vector<std::string> TakePathReloadRequests();
 
+    // A pad plugged in or woken up reads the ini and switches the controls between keyboard and
+    // gamepad, at whatever frame the event comes: a scripted run (-automation, the bot) must play the
+    // same on any machine, so it ignores that, as recording and playing back do.
+    void IgnoreJoystickHotplug()
+    {
+        mIgnoreJoystickHotplug = true;
+    }
+
     // pParent can be null, e.g. before the window exists
     static MessageBoxButton ShowMessageBox(const Window* pParent, const char_type* message, const char_type* title, MessageBoxType type = MessageBoxType::eStandard);
 
@@ -72,5 +80,6 @@ private:
     DisplaySettings mDisplaySettings;
     bool mQuitConfirmed = false;
     s32 mConnectedJoysticks = 0;
+    bool mIgnoreJoystickHotplug = false;
     std::vector<std::string> mPathReloadRequests;
 };

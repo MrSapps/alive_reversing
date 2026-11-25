@@ -992,6 +992,10 @@ void Engine::Run()
     }
 
     CmdLineRenderInit(mActiveModDisplayName);
+    if (mAutomation)
+    {
+        mSys->IgnoreJoystickHotplug();
+    }
 
     // Another hack till refactor branch replaces master
     GetGameAutoPlayer().Pause(true);

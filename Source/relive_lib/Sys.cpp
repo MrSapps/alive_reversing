@@ -680,7 +680,7 @@ Sys::PumpResult Sys::PumpEvents(BaseMap* pMap)
 #if AUTO_SWITCH_CONTROLLER // OG Change - Automatically switches active controller (gamepad/keyboard)
         // Auto switch off during recording or playback as reading the ini
         // file at random times will desync.
-        const bool allowAutoSwitch = !isRecording && !isPlaying;
+        const bool allowAutoSwitch = !isRecording && !isPlaying && !mIgnoreJoystickHotplug;
         if (allowAutoSwitch)
         {
             if (event.type == SDL_EVENT_JOYSTICK_ADDED)
