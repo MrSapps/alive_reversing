@@ -194,6 +194,7 @@ private:
     // With Mudokons to save, one on the car's floor ahead is not run over: stopped short of it (and of a UXB by it),
     // out, the UXB turned off, the Mudokon led back behind the car, and in again
     u32 mAhead = 0;
+    std::vector<u32> mAheadGroup;
     u32 mAheadUxb = 0;
     s32 mAsideExits = 0;
     s32 mUxbHeld = 0;
@@ -1244,6 +1245,11 @@ public:
     {
         mOffDrill = drillId;
     }
+    // Others standing with it go too ("all o' ya"): the place behind the car is that many cells further back
+    void LeadGroup(s32 others)
+    {
+        mGroup = others;
+    }
 
 private:
     // A blind Mudokon is walked to the portal's floor a straight stretch at a time: talked to from the side it
@@ -1265,6 +1271,7 @@ private:
     u32 mMud;
     u32 mPortal;
     u32 mOffDrill = 0;
+    s32 mGroup = 0;
     s32 mBehindDir = 0;
     s32 mCarHeld = 0;
     std::unique_ptr<GoToTask> mLedgeGo;
