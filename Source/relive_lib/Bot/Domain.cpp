@@ -5450,7 +5450,9 @@ void Domain::Builder::TrapDoorSligs()
     // 3600,313 that walks over the trap door at 3539, and the lever on the ledge over it)
     for (const Entity& lever : world.mEntities)
     {
-        if (lever.mKind != EntityKind::eLever || lever.mGone || lever.mSwitch <= 1)
+        // (or a pull ring over their own floor, between the doors: Zulag 5, "Sneak on the next screen behind the
+        // Sligs to the middle. Pull the ring when they're over the trapdoors to drop them to their doom.")
+        if ((lever.mKind != EntityKind::eLever && lever.mKind != EntityKind::ePullRing) || lever.mGone || lever.mSwitch <= 1)
         {
             continue;
         }
@@ -5473,7 +5475,9 @@ void Domain::Builder::TrapDoorSligs()
             const s32 dx = (door.mX1 + door.mX2) / 2;
             for (const Entity& slig : world.mEntities)
             {
-                if (slig.mKind != EntityKind::eSlig || slig.mGone || world.mFleechKilled.count(slig.mId) != 0 || slig.mState == 1 || slig.mHalf != door.mHalf || std::abs(slig.mY2 - door.mY1) > 40 || std::abs(slig.CentreX() - dx) > 250 || std::abs(nav.Nodes()[at].mY - door.mY1) < 40)
+                const bool sameFloor = std::abs(nav.Nodes()[at].mY - door.mY1) < 40;
+                const bool ringBeside = lever.mKind == EntityKind::ePullRing && sameFloor && (nav.Nodes()[at].mX < door.mX1 - 12 || nav.Nodes()[at].mX > door.mX2 + 12);
+                if (slig.mKind != EntityKind::eSlig || slig.mGone || world.mFleechKilled.count(slig.mId) != 0 || slig.mState == 1 || slig.mHalf != door.mHalf || std::abs(slig.mY2 - door.mY1) > 40 || std::abs(slig.CentreX() - dx) > 250 || (sameFloor && !ringBeside))
                 {
                     continue;
                 }
