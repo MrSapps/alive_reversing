@@ -1609,6 +1609,8 @@ static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode, std::ve
     return state;
 }
 
+static s32 SligSeesIn(const Bot& bot, s32 x, s32 y, bool half);
+
 TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
 {
     if (const SligAt* hush = bot.IsAe() ? HushSlig(bot) : nullptr)
@@ -3072,6 +3074,24 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 doorX2 = door.mX2;
             }
         }
+        // (the first such door along the floor from where he stands, whatever edge the way takes over it: one
+        // learnt from a dash goes over two)
+        {
+            const s32 wayDir = nav.Nodes()[first.mTo].mX >= nav.Nodes()[cur].mX ? 1 : -1;
+            const s32 cellW = NavGraph::GridStep(abe.mHalfScale);
+            for (s32 k = 0; k <= 4; k++)
+            {
+                const s32 n = nav.NodeAt(nav.Nodes()[cur].mX + wayDir * k * cellW, nav.Nodes()[cur].mY, abe.mHalfScale, 8);
+                if (n >= 0 && nav.Nodes()[n].mTrapDoor >= 0 && nav.Input().mFeatures[nav.Nodes()[n].mTrapDoor].mSwitch > 1 && (sw < 0 || nav.Input().mFeatures[nav.Nodes()[n].mTrapDoor].mSwitch == sw))
+                {
+                    const NavFeature& door = nav.Input().mFeatures[nav.Nodes()[n].mTrapDoor];
+                    sw = door.mSwitch;
+                    doorX1 = door.mX1;
+                    doorX2 = door.mX2;
+                    break;
+                }
+            }
+        }
         // (one that keeps turning over, or whose lever an angry Mudokon stands at: it pulls it as he comes near,
         // and again and again)
         bool angryLever = false;
@@ -3092,7 +3112,35 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             const bool shutNow = bot.GetWorld().Switch(sw) == value;
             // (on it already, or set off over it: on at once)
             const bool onIt = (mCycleSwitch == sw && mCycleOn) || (abe.mX >= doorX1 - 12 && abe.mX <= doorX2 + 12);
-            if (!shutNow || (!onIt && since > 3))
+            // (and from a door whose far side is a hop onto a Slig's floor, only with that floor clear for the hop:
+            // waited for on the door, it opened under him. Zulag 1's second, onto the Slig's floor at 1012.)
+            // (the hops off the door's cells that aren't onto another door of it: the one the way goes on by)
+            bool landingWatched = false;
+            bool hangsOff = false;
+            for (std::size_t n = 0; !onIt && n < nav.Nodes().size(); n++)
+            {
+                const NavNode& on = nav.Nodes()[n];
+                if (on.mTrapDoor < 0 || on.mY != nav.Nodes()[cur].mY || on.mX < std::min(doorX1, abe.mX) - 200 || on.mX > std::max(doorX2, abe.mX) + 200 || nav.Input().mFeatures[on.mTrapDoor].mSwitch != sw)
+                {
+                    continue;
+                }
+                for (s32 k = on.mFirstEdge; k < on.mFirstEdge + on.mEdgeCount; k++)
+                {
+                    const NavEdge& e = nav.Edges()[k];
+                    const NavNode& land = nav.Nodes()[e.mTo];
+                    if (e.mKind == EdgeKind::eHop && land.mTrapDoor < 0 && (land.mX - abe.mX) * ((doorX1 + doorX2) / 2 - abe.mX) > 0 && std::abs(land.mX - abe.mX) > std::abs((doorX1 + doorX2) / 2 - abe.mX))
+                    {
+                        landingWatched = landingWatched || SligSeesIn(bot, land.mX, land.mY, land.mHalf) < 90;
+                    }
+                    // (rolled off it to hang from the ledge beyond, out of sight: no need)
+                    if (e.mKind == EdgeKind::eFall && e.mHung)
+                    {
+                        hangsOff = true;
+                    }
+                }
+            }
+            landingWatched = landingWatched && !hangsOff;
+            if (!shutNow || (!onIt && (since > 3 || landingWatched)))
             {
                 if (mCycleWaits++ == 0)
                 {
@@ -4532,6 +4580,40 @@ TaskStep GoToTask::FallStep(Bot& bot, const std::string& lastFailed, const Way& 
     return TaskStep::Do(fall);
 }
 
+// Whether a cell is on a trap door whose switch keeps turning over, or whose lever an angry Mudokon stands at (it
+// pulls it as he comes near, and again and again): no place to stand and wait. Zulag 1's at 825 and 925.
+static bool OnCyclingDoor(const Bot& bot, const NavGraph& nav, s32 node)
+{
+    if (node < 0 || nav.Nodes()[node].mTrapDoor < 0)
+    {
+        return false;
+    }
+    const s32 sw = nav.Input().mFeatures[nav.Nodes()[node].mTrapDoor].mSwitch;
+    if (sw <= 1)
+    {
+        return false;
+    }
+    if (bot.SwitchCycles(sw, nullptr))
+    {
+        return true;
+    }
+    for (const Entity& lever : bot.GetWorld().mEntities)
+    {
+        if (lever.mKind != EntityKind::eLever || lever.mSwitch != sw)
+        {
+            continue;
+        }
+        for (const Entity& mud : bot.GetWorld().mEntities)
+        {
+            if (mud.mKind == EntityKind::eMudokon && !mud.mGone && Domain::AngryWorker(mud) && std::abs((mud.mLive ? mud.mLiveX : mud.CentreX()) - lever.CentreX()) < 60 && std::abs((mud.mLive ? mud.mLiveY : mud.mY2) - lever.mY2) < 40)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 // Frames before an awake Slig on the floor at (x, y) can see that spot: none while one is on its screen facing it; else
 // till one walking towards it comes onto its screen, or one walking away gets to its beat's end and comes back (two
 // pixels a frame, on the safe side). Being seen, not heard: QuietFrames is for talking, which a Slig facing that
@@ -4598,7 +4680,7 @@ TaskStep GoToTask::HopStep(Bot& bot, const std::string& lastFailed, const Way& w
         mSteps--;
         return TaskStep::Do(Prim::Wait(1));
     }
-    if (GateShutsOut(bot, nav, first.mTo) == 0 && nav.Input().mIsAe && !bot.GetWorld().mInvisible && !DrivenOn(bot, cur) && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && !nav.Nodes()[first.mTo].mHidden && mHopWaits < 600)
+    if (GateShutsOut(bot, nav, first.mTo) == 0 && nav.Input().mIsAe && !bot.GetWorld().mInvisible && !DrivenOn(bot, cur) && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && !nav.Nodes()[first.mTo].mHidden && mHopWaits < 600 && !mCycleOn && !OnCyclingDoor(bot, nav, cur))
     {
         const NavNode& to = nav.Nodes()[first.mTo];
         bool wait = false;

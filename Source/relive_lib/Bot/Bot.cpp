@@ -1534,6 +1534,23 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             *refused = __LINE__;
             return -1;
         }
+        // Off a trap door that keeps opening: rolled off to hang from the ledge beyond, out of sight, rather than a
+        // hop out onto a floor (Zulag 1's second door: hopping off it onto the Slig's floor he waited for the Slig
+        // on the door, and it opened under him)
+        {
+            const NavNode& on = know->mNav.Nodes()[e.mFrom];
+            if (on.mTrapDoor >= 0 && cycling.count(know->mNav.Input().mFeatures[on.mTrapDoor].mSwitch) != 0)
+            {
+                if (e.mKind == EdgeKind::eFall && e.mHung)
+                {
+                    return 5;
+                }
+                if (e.mKind == EdgeKind::eHop)
+                {
+                    return e.mCost + 400;
+                }
+            }
+        }
         // Onto a lift's platform, or riding it: only where the lift is now
         const NavNode& from = know->mNav.Nodes()[e.mFrom];
         const NavNode& to = know->mNav.Nodes()[e.mTo];

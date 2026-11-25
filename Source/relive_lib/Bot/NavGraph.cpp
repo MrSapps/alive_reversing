@@ -1842,6 +1842,46 @@ void NavGraph::Build(const NavInput& input)
                     AddEdge(edges, from, to, EdgeKind::eHop, kHopCost, trapOnly && barrier < 0 ? overTrap : barrier, left);
                 }
             }
+            // A hop that comes down short of the far floor, over a gap, and catches its ledge: he hangs from it, and
+            // pulls up (Zulag 1, by the mine at 1302 on the last cell before the gap at 1325..1375: "stand in front of
+            // the mine and hop over it. Pull up")
+            s32 ly0 = 0;
+            if ((hopLine < 0 || FloorNear(nx, n.mY, n.mHalf, 12, &ly0) < 0) && !n.mLow && !WallBetween(n.mX, n.mX + dir * step * 3, n.mY, n.mHalf))
+            {
+                for (const NavFeature& f : mInput.mFeatures)
+                {
+                    if (f.mKind != FeatureKind::eEdge || f.mHalf != n.mHalf || !(f.mDir == 2 || (f.mDir == 0) == (dir < 0)) || std::abs(f.mY1 - n.mY) > 12)
+                    {
+                        continue;
+                    }
+                    const s32 nearX = dir > 0 ? f.mX1 : f.mX2;
+                    const s32 off = (nearX - n.mX) * dir;
+                    // (a cell or so off: no hop, rolled off the end it catches him all the same. Zulag 1's second trap
+                    // door, off its end at 977 to the ledge at 1000: "roll over it to end up hanging from the far
+                    // ledge. Wait for the Slig to come and go again and climb up.")
+                    // (only off a trap door: elsewhere such a roll-off took ways the runs had no need of, and the run
+                    // from the Mines stuck in Bonewerkz)
+                    const bool rollOff = off >= step / 2 && off < 2 * step && FloorNear(nx, n.mY, n.mHalf, 12, &ly0) < 0 && n.mTrapDoor >= 0;
+                    // (and the hop only over a hazard on the last cell before the gap: the mine at 1302)
+                    const s32 overLine = FloorNear(nx, n.mY, n.mHalf, 12, &ly0);
+                    const s32 over = overLine >= 0 ? NodeOnLine(overLine, nx) : -1;
+                    const bool overHazard = over >= 0 && mNodes[over].mHazard;
+                    if (((off < 2 * step || off > 4 * step) || !overHazard) && !rollOff)
+                    {
+                        continue;
+                    }
+                    s32 ly = 0;
+                    const s32 lx = (f.mX1 + f.mX2) / 2 + dir * step / 2;
+                    const s32 ledgeLine = FloorNear(lx, f.mY1, n.mHalf, 12, &ly);
+                    const s32 ledge = ledgeLine >= 0 ? NodeOnLine(ledgeLine, lx) : -1;
+                    if (ledge >= 0 && std::abs(mNodes[ledge].mX - lx) <= step && !mNodes[ledge].mHazard)
+                    {
+                        AddEdge(edges, from, ledge, rollOff ? EdgeKind::eFall : EdgeKind::eHop, kHopCost + 60, -1, left);
+                        edges.back().mHung = true;
+                        edges.back().mCrouched = rollOff;
+                    }
+                }
+            }
         }
 
         // (low only for a drill that goes by over his head, with no ceiling there: he can stand while it is away,
