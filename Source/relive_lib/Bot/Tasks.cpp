@@ -6502,8 +6502,23 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
     }
     if (rock)
     {
-        const s32 left = nav.NodeAt(rock->mX - cell, rock->mY, rock->mHalf, 12);
-        const s32 right = nav.NodeAt(rock->mX + cell, rock->mY, rock->mHalf, 12);
+        s32 left = nav.NodeAt(rock->mX - cell, rock->mY, rock->mHalf, 12);
+        s32 right = nav.NodeAt(rock->mX + cell, rock->mY, rock->mHalf, 12);
+        // (not from a cell a hoist goes down from, where there is another: down to pick them up there, he went over
+        // the edge. Zulag 5's bones at 1061 by the ledge's end at 1037, the Slog under it.)
+        const auto hoistsDown = [&nav](s32 node)
+        {
+            bool down = false;
+            for (const NavEdge& e : nav.Edges())
+            {
+                down = down || (e.mFrom == node && e.mKind == EdgeKind::eHoistDown);
+            }
+            return down;
+        };
+        if (left >= 0 && right >= 0 && hoistsDown(left) != hoistsDown(right))
+        {
+            (hoistsDown(left) ? left : right) = -1;
+        }
         // Out of the shadow he went back into from a boom machine's button: when the Slig that stands guard has
         // just turned its back again, and sneaked all the way (a walk is heard, and it turns at once: the
         // Barracks' path 7, shot at 664 three cells from the grenade)
@@ -6692,6 +6707,29 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
                 (best < 0 || (e.mX - down.mX) * dir < (nav.Edges()[best].mX - down.mX) * dir))
             {
                 best = static_cast<s32>(i);
+            }
+        }
+        // (and only once the Slogs of that floor have come under him, behind where he comes down: a Slog follows
+        // him along its floor from under the ledge. Jumped at once, it was coming back from the far end and met
+        // him as he landed.)
+        if (slog && mSlogWaits < 600)
+        {
+            const s32 dir = left ? -1 : 1;
+            bool behind = true;
+            bool seen = false;
+            for (const SlogAt& sl : world.mSlogs)
+            {
+                if (!sl.mAsleep && std::abs(sl.mY - down.mY) <= 30 && std::abs(sl.mX - down.mX) < 400)
+                {
+                    seen = true;
+                    behind = behind && (sl.mX - down.mX) * dir < -2 * cell && sl.mMotion == 0;
+                }
+            }
+            if (!seen || !behind)
+            {
+                mJumps--;
+                mSlogWaits += 2;
+                return TaskStep::Do(Prim::Wait(2));
             }
         }
         if (best >= 0)

@@ -154,6 +154,7 @@ private:
     // The way the jump through the sack went, and on and off a Slog's floor after it
     bool mJumpLeft = false;
     bool mEscape = false;
+    s32 mSlogWaits = 0;
     // Meat with a Paramite on the sack's level: what the first sack drops is left for it, and the meat to keep
     // is had from another sack of that level while it eats (mBaitX: the first sack)
     bool mBaited = false;
