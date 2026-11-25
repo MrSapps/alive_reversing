@@ -4431,6 +4431,48 @@ TaskStep GoToTask::FallStep(Bot& bot, const std::string& lastFailed, const Way& 
     return TaskStep::Do(fall);
 }
 
+// Frames before an awake Slig on the floor at (x, y) can see that spot: none while one is on its screen facing it; else
+// till one walking towards it comes onto its screen, or one walking away gets to its beat's end and comes back (two
+// pixels a frame, on the safe side). Being seen, not heard: QuietFrames is for talking, which a Slig facing that
+// way hears from any distance.
+static s32 SligSeesIn(const Bot& bot, s32 x, s32 y, bool half)
+{
+    const NavGraph& nav = bot.Nav();
+    const s32 camW = nav.Input().mCamW;
+    const s32 x1 = (x / camW) * camW;
+    const s32 x2 = x1 + camW;
+    s32 best = 100000;
+    for (const SligAt& slig : bot.GetWorld().mSligs)
+    {
+        if (slig.mAsleep || slig.mPossessed || slig.mHalf != half || std::abs(slig.mY - y) > 45 || std::abs(slig.mX - x) > 1500)
+        {
+            continue;
+        }
+        const bool onScreen = slig.mX >= x1 && slig.mX < x2;
+        const bool toward = slig.mFacingLeft == (slig.mX > x);
+        const s32 edge = slig.mX >= x2 ? x2 : x1;
+        s32 t = 0;
+        if (onScreen && toward)
+        {
+            return 0;
+        }
+        if (toward)
+        {
+            t = std::abs(slig.mX - edge) / 2;
+        }
+        else
+        {
+            const bool known = slig.mBeatMax > slig.mBeatMin;
+            const s32 end = !known ? slig.mX : slig.mFacingLeft ? slig.mBeatMin : slig.mBeatMax;
+            const bool endOn = end >= x1 && end < x2;
+            t = std::abs(slig.mX - end) / 2 + (onScreen || endOn ? 0 : std::abs(end - (end >= x2 ? x2 : x1)) / 2);
+            t = known ? t : std::min(t, 60);
+        }
+        best = std::min(best, t);
+    }
+    return best;
+}
+
 TaskStep GoToTask::HopStep(Bot& bot, const std::string& lastFailed, const Way& way)
 {
     const AbeState& abe = way.mAbe;
@@ -4467,6 +4509,10 @@ TaskStep GoToTask::HopStep(Bot& bot, const std::string& lastFailed, const Way& w
             }
             wait = !HopOnBack(slig.mFacingLeft == (to.mX < slig.mX), static_cast<s32>(abe.mFrame), mHopFaced) || wait;
         }
+        // (with Mudokons to save, a back turned isn't enough: one that stops at the end of its beat turns again
+        // soon, and seen below it shoots, at a Mudokon in the way too. Down only with quiet for what comes after.
+        // The Mines' path 5: down off the ledge at 2312,620 with the Slig at 2587.)
+        wait = wait || (bot.SavesMudokons() && SligSeesIn(bot, to.mX, to.mY, to.mHalf) < 120);
         if (wait)
         {
             if (mHopWaits++ == 0)
@@ -4675,6 +4721,15 @@ TaskStep GoToTask::HoistDownStep(Bot& bot, const std::string& lastFailed, const 
                 return TaskStep::Do(Prim::Wait(2));
             }
         }
+    }
+    // (with Mudokons to save, down onto a Slig's floor anywhere only with quiet for what comes after: seen there it
+    // shoots, at a Mudokon in the way too. The Mines' path 5, down off the ledge at 2312,620 with the Slig at
+    // 2587.)
+    if (nav.Input().mIsAe && bot.SavesMudokons() && SligSeesIn(bot, land.mX, land.mY, land.mHalf) < 120 && mDropWait < 3000)
+    {
+        mDropWait += 2;
+        mSteps--;
+        return TaskStep::Do(Prim::Wait(2));
     }
     mDropWait = 0;
     mLastEdge = path[0];
@@ -5583,7 +5638,7 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
         // with the Slig walking up, he was seen going back and shot at, the Mudokon with him. Till then off its
         // floor: the walkthrough's "when the Slig has come and gone, hop over the beam ... then quickly run and
         // jump back up to the ledge")
-        if (!mAside && uxb && !uxb->mGone && bot.QuietFrames(uxb->CentreX(), uxb->mY2, uxb->mHalf) < 260 && (mUxbHeld += 6) < 6000)
+        if (!mAside && uxb && !uxb->mGone && SligSeesIn(bot, uxb->CentreX(), uxb->mY2, uxb->mHalf) < 110 && (mUxbHeld += 6) < 6000)
         {
             const s32 abeNode = bot.AbeNode();
             const s32 floorY = uxb->mY2;
@@ -5603,6 +5658,11 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
                     return goStep;
                 }
                 mGo.reset();
+            }
+            // (all the way up: hanging from the ledge he is in plain sight of the floor below)
+            if (bot.Abe().mMove == Move::eHang)
+            {
+                return TaskStep::Do(Prim::Press(Btn::eUp));
             }
             return TaskStep::Do(Prim::Wait(6));
         }
@@ -9105,7 +9165,7 @@ static bool HoldForSlig(Bot& bot, const Entity& mud, s32 need, std::unique_ptr<G
     // With Mudokons to save, off the Slig's floor before it is in sight, not once it is coming: the climb takes a
     // hundred frames, and seen on the way up he is shot at, and the Mudokon by him with him (the Mines' path 5,
     // the ledge at 2312,620 with the Slig stopping at 2587)
-    const bool early = bot.SavesMudokons() && abeNode >= 0 && std::abs(nav.Nodes()[abeNode].mY - y) <= 45 && bot.QuietFrames(bot.Abe().mX, bot.Abe().mY, mud.mHalf) < 200;
+    const bool early = bot.SavesMudokons() && abeNode >= 0 && std::abs(nav.Nodes()[abeNode].mY - y) <= 45 && SligSeesIn(bot, bot.Abe().mX, bot.Abe().mY, mud.mHalf) < 200;
     coming = coming || early;
     // On his way to the Mudokon behind a Slig's back: on he goes, to be there when it is off the screen
     if (go && !coming)
