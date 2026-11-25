@@ -5967,7 +5967,9 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
         for (const Entity& mud : world.mEntities)
         {
             const s32 d = ((mud.mLive ? mud.mLiveX : mud.CentreX()) - x) * dir;
-            if (mud.mKind == EntityKind::eMudokon && mud.mBlind && !mud.mGone && mud.mHalf == car->mHalf && std::abs((mud.mLive ? mud.mLiveY : mud.mY2) - y) <= 25 && d > 0 && d < nearD && std::find(mLed.begin(), mLed.end(), mud.mId) == mLed.end())
+            // (one led behind it before is no exception: the next "follow me" is heard by all on the screen, and the
+            // Mines' path 5's top floor had one walk back to the car and be run over)
+            if (mud.mKind == EntityKind::eMudokon && mud.mBlind && !mud.mGone && mud.mHalf == car->mHalf && std::abs((mud.mLive ? mud.mLiveY : mud.mY2) - y) <= 25 && d > -cell / 2 && d < nearD)
             {
                 near = &mud;
                 nearD = d;
@@ -5991,13 +5993,16 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
         const bool nextScreen = near && mudCam >= 0 && (nav.CameraOf(x, y - 5) == mudCam || nav.CameraOf(x + 2 * cell * dir, y - 5) == mudCam);
         if (near && (nextScreen || stopD <= 3 * cell))
         {
-            // (blind ones standing with it, within three cells beyond it: led along with it)
+            // (and every other blind one on its floor and screen, either side of the car: a follow me is heard by
+            // all of them there, and one led on its own had the others walk back into the car's way. The Mines'
+            // path 5: the two at 2925 and 2950, and the top floor's three.)
             mAheadGroup.clear();
             const s32 nearX = near->mLive ? near->mLiveX : near->CentreX();
+            const s32 nearCam = nav.CameraOf(nearX, y - 5);
             for (const Entity& other : world.mEntities)
             {
                 const s32 ox = other.mLive ? other.mLiveX : other.CentreX();
-                if (&other != near && other.mKind == EntityKind::eMudokon && other.mBlind && !other.mGone && other.mHalf == car->mHalf && std::abs((other.mLive ? other.mLiveY : other.mY2) - y) <= 25 && (ox - nearX) * dir >= 0 && std::abs(ox - nearX) <= 3 * cell && std::find(mLed.begin(), mLed.end(), other.mId) == mLed.end())
+                if (&other != near && other.mKind == EntityKind::eMudokon && other.mBlind && !other.mGone && other.mHalf == car->mHalf && std::abs((other.mLive ? other.mLiveY : other.mY2) - y) <= 25 && (nav.CameraOf(ox, y - 5) == nearCam || ((ox - nearX) * dir >= 0 && std::abs(ox - nearX) <= 3 * cell)))
                 {
                     mAheadGroup.push_back(other.mId);
                 }
