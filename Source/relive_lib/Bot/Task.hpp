@@ -1265,6 +1265,7 @@ private:
     u32 mPortal;
     u32 mOffDrill = 0;
     s32 mBehindDir = 0;
+    s32 mCarHeld = 0;
     std::unique_ptr<GoToTask> mGo;
     std::unique_ptr<RecruitTask> mRecruit;
     std::unique_ptr<UseTask> mUse;

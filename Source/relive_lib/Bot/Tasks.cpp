@@ -9056,12 +9056,22 @@ static bool HoldForSlig(Bot& bot, const Entity& mud, s32 need, std::unique_ptr<G
     // With every Slig's back to him he can stay where he is (it will be off the screen in a moment); with one
     // coming he is better off in a shadow
     bool coming = false;
+    // (the side the nearest one coming is on: a shadow over there, in its beat, is no hiding place. The Mines'
+    // path 5: the shadow right of the blind Mudokon at 2487 is where the Slig at 2587 turns.)
+    s32 comingSide = 0;
+    s32 comingDist = 1 << 30;
     for (const SligAt& slig : bot.GetWorld().mSligs)
     {
         if (!slig.mAsleep && !slig.mPossessed && slig.mHalf == mud.mHalf && std::abs(slig.mY - y) <= 45 && std::abs(slig.mX - x) < 1500)
         {
             // (one whose ways aren't known yet may turn any moment)
-            coming = coming || slig.mFacingLeft == (slig.mX > bot.Abe().mX) || !bot.KnowsBeat(slig);
+            const bool thisComing = slig.mFacingLeft == (slig.mX > bot.Abe().mX) || !bot.KnowsBeat(slig);
+            coming = coming || thisComing;
+            if (thisComing && std::abs(slig.mX - bot.Abe().mX) < comingDist)
+            {
+                comingDist = std::abs(slig.mX - bot.Abe().mX);
+                comingSide = slig.mX > bot.Abe().mX ? 1 : -1;
+            }
         }
     }
     // On his way to the Mudokon behind a Slig's back: on he goes, to be there when it is off the screen
@@ -9073,11 +9083,13 @@ static bool HoldForSlig(Bot& bot, const Entity& mud, s32 need, std::unique_ptr<G
     {
         const NavGraph* graph = &nav;
         const s32 line = nav.Nodes()[abeNode].mLine;
+        const s32 abeX = bot.Abe().mX;
+        const bool away = bot.SavesMudokons();
         // Well inside it: whoever follows him stops a cell short, and should be out of sight too
-        const auto shadow = [graph, line](s32 n)
+        const auto shadow = [graph, line, abeX, comingSide, away](s32 n)
         {
             const NavNode& node = graph->Nodes()[n];
-            if (!node.mHidden || node.mLine != line)
+            if (!node.mHidden || node.mLine != line || (away && comingSide != 0 && (node.mX - abeX) * comingSide > 0))
             {
                 return false;
             }
@@ -9091,6 +9103,23 @@ static bool HoldForSlig(Bot& bot, const Entity& mud, s32 need, std::unique_ptr<G
         if (nav.FindPath(abeNode, shadow, bot.EdgeCostFn(), way) && way.size() <= 12)
         {
             go = std::make_unique<GoToTask>("into the shadow", shadow);
+            step = go->Next(bot, "");
+            if (step.mKind == TaskStep::Kind::ePrim)
+            {
+                return true;
+            }
+            go.reset();
+        }
+        // (no shadow out of its way: off its floor, as the walkthrough waits on the ledge over the Mines' path 5's
+        // blind Mudokon "when the Slig has come and gone")
+        const s32 floorY = y;
+        const auto off = [graph, floorY](s32 n)
+        {
+            return std::abs(graph->Nodes()[n].mY - floorY) > 45;
+        };
+        if (away && nav.FindPath(abeNode, off, bot.EdgeCostFn(), way) && way.size() <= 8)
+        {
+            go = std::make_unique<GoToTask>("off the Slig's floor", off);
             step = go->Next(bot, "");
             if (step.mKind == TaskStep::Kind::ePrim)
             {
@@ -11255,6 +11284,12 @@ bool RescueTask::LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, co
                 mBlindDir = -mBehindDir;
                 mBlindTrap = -1;
                 mBlindRide = -1;
+                // (begun only with quiet enough for all of it: hello, its answer, follow me, and its walk back past the
+                // car. Off the Slig's floor till then. The Mines' path 5: a Slig comes onto the screen at 2587.)
+                if (mBlindTries == 0 && HoldForSlig(bot, mud, 330, mGo, mCarHeld, step))
+                {
+                    return false;
+                }
                 mBlindStop = nav.NodeAt(carX - mBehindDir * 2 * cell, mud.mLive ? mud.mLiveY : mud.mY2, mud.mHalf, 12);
                 if (mBlindStop < 0 || ++mBlindTries > 8)
                 {
