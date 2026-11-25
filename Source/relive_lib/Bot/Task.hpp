@@ -1806,9 +1806,10 @@ private:
 class SlogRingTask final : public Task
 {
 public:
-    SlogRingTask(u32 ring, s32 at)
+    SlogRingTask(u32 ring, s32 at, bool byBone = false)
         : mRing(ring)
         , mAt(at)
+        , mByBone(byBone)
     {
     }
     ~SlogRingTask() override;
@@ -1821,6 +1822,8 @@ public:
 private:
     u32 mRing;
     s32 mAt;
+    // With a bone tossed over the far trap door (the far Slog's), not by shutting them away
+    bool mByBone;
     s32 mPhase = 0;
     s32 mFrames = 0;
     s32 mGone = 0;

@@ -252,6 +252,17 @@ public:
     {
         mGlukkonLetGo = true;
     }
+    // A bone tossed over a ring's trap door for a Slog to eat beyond it (SlogRingTask): kept over a replan, which
+    // the bone gone from his hand brings
+    void NoteRingBone(u32 ring)
+    {
+        mRingBone = ring;
+        mRingBoneFrame = mAbe.mFrame;
+    }
+    bool RingBoneRecent(u32 ring) const
+    {
+        return mRingBone == ring && mAbe.mFrame >= mRingBoneFrame && mAbe.mFrame - mRingBoneFrame < 400;
+    }
     const World& GetWorld() const
     {
         return mWorld;
@@ -717,6 +728,8 @@ private:
     bool mInGlukkon = false;
     // The bot chanted him out of it itself: its going is no loss
     bool mGlukkonLetGo = false;
+    u32 mRingBone = 0;
+    u32 mRingBoneFrame = 0;
     s32 mDeadFrames = 0;
     s32 mStartWaits = 0;
     bool mThrowPending = false;

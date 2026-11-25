@@ -13643,7 +13643,13 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
     // ring, pulled as it comes back over that door from its meal. ("From the center upper platform, toss down a
     // bone, then climb down and get under the pull ring. When the Slog is finishing his meal and starts to run
     // back towards you, pull the ring to send him crashing down.")
-    if (mPhase == 0 && world.mRocks > 0 && !world.CarriesMeat() && mBoneTries < 3)
+    // (the bone tossed just now, before a replan that began this task anew: down to the ring)
+    if (mPhase == 0 && mByBone && bot.RingBoneRecent(mRing))
+    {
+        mPhase = 3;
+    }
+    // (one in hand is no longer counted among them)
+    if (mPhase == 0 && mByBone && (world.mRocks > 0 || mBoneInHand) && !world.CarriesMeat() && mBoneTries < 3)
     {
         s32 over = -1;
         for (std::size_t n = 0; n < nav.Nodes().size(); n++)
@@ -13678,7 +13684,7 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
         {
             nearest = !nearest || std::abs(sl->mX - under.mX) < std::abs(nearest->mX - under.mX) ? sl : nearest;
         }
-        if (over >= 0 && nearest && std::abs(nearest->mX - under.mX) <= 160)
+        if (over >= 0 && nearest && (std::abs(nearest->mX - under.mX) <= 160 || mBoneInHand))
         {
             // (beyond the trap door on the side away from where it is, or the right one)
             const NavFeature* far = nullptr;
@@ -13712,6 +13718,7 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
                 mBoneInHand = false;
                 mBoneTries++;
                 mPhase = 3;
+                bot.NoteRingBone(mRing);
                 mGo.reset();
                 return TaskStep::Do(Prim::Wait(6, Btn::eThrow | BlowMineTask::AimBits(static_cast<ThrowSpot::Kind>((aim & 255) / 2), left)));
             }
@@ -13893,7 +13900,7 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
     {
         // (along the ring's floor at a run: walked across the trap door from where he came down, he was at the ring
         // as the big Slog was already on its way)
-        if (bot.AbeNode() != mAt && std::abs(bot.Abe().mY - under.mY) <= 5 && std::abs(bot.Abe().mX - under.mX) <= 150 && std::abs(bot.Abe().mX - under.mX) > 6)
+        if (bot.AbeNode() != mAt && bot.AbeNode() >= 0 && nav.Nodes()[bot.AbeNode()].mLine == under.mLine && std::abs(bot.Abe().mX - under.mX) > 6)
         {
             // (a stretch of four cells or six from a stand is run and slid to a stop: shorter, the pilot walks it)
             Prim run = Prim::MoveTo(under.mX, Gait::eRun);
@@ -13906,13 +13913,12 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
             // (down onto the ring's floor first, the nearest cell of it, and the rest of the way at a run)
             if (!mGo)
             {
+                // (its own stretch of floor, between the trap doors: not beyond a slam door)
                 const s32 at = mAt;
-                const s32 ux = under.mX;
-                const s32 uy = under.mY;
-                mGo = std::make_unique<GoToTask>("down to the ring's floor", [&bot, at, ux, uy](s32 n)
+                const s32 line = under.mLine;
+                mGo = std::make_unique<GoToTask>("down to the ring's floor", [&bot, at, line](s32 n)
                                                  {
-                                                     const NavNode& node = bot.Nav().Nodes()[n];
-                                                     return n == at || (std::abs(node.mY - uy) <= 5 && std::abs(node.mX - ux) <= 125);
+                                                     return n == at || bot.Nav().Nodes()[n].mLine == line;
                                                  });
                 mGo->SetHurry(true);
             }

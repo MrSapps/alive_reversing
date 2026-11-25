@@ -3055,6 +3055,46 @@ Domain Domain::Builder::Run()
     ParamiteFleeches();
     Scrabs();
     DrillsOverMudokons();
+    // Mudokons led to work wheels together past a Slog that a ring can drop: with it dead, not fed. A bone keeps it
+    // a short while, which does for Abe on his own but not for leading a group by. (Zulag 5: the big Slog by the
+    // bone sack, fed, was taken as out of the way of the wheels' Mudokons.) Only once no Slogs by a ring are left:
+    // before that it reordered what comes first, and the Sloggies' drop failed.
+    bool ringSlogsLeft = false;
+    for (const Goap::Action& a : mD.mActions)
+    {
+        ringSlogsLeft = ringSlogsLeft || a.mName.rfind("Drop the Slogs through", 0) == 0;
+    }
+    for (const Entity& slog : ringSlogsLeft ? std::vector<Entity>{} : mWorld.mEntities)
+    {
+        if (slog.mKind != EntityKind::eSlog || slog.mGone || slog.mSwitch <= 1)
+        {
+            continue;
+        }
+        const Goap::Fact dead{Key::Mud(slog.mId), 2};
+        bool kills = false;
+        for (const Goap::Action& a : mD.mActions)
+        {
+            kills = kills || std::find(a.mEffects.begin(), a.mEffects.end(), dead) != a.mEffects.end();
+        }
+        if (!kills)
+        {
+            continue;
+        }
+        for (Goap::Action& a : mD.mActions)
+        {
+            if (a.mName.rfind("Work together", 0) != 0)
+            {
+                continue;
+            }
+            for (Goap::Fact& f : a.mPre)
+            {
+                if (f.mKey == Key::Switch(slog.mSwitch) && f.mValue == 1)
+                {
+                    f = dead;
+                }
+            }
+        }
+    }
     return mD;
 }
 
@@ -5562,8 +5602,11 @@ void Domain::Builder::TrapDoorSligs()
                 pre.insert(pre.end(), one.second.begin(), one.second.end());
                 // (with a bone to toss it over the far trap door with, where there are any: SlogRingTask)
                 const bool bones = !world.CarriesMeat();
+                // (mOther 1: by the bone over the far trap door, SlogRingTask)
+                DomainStep farDrop = drop;
+                farDrop.mOther = bones ? 1 : 0;
                 // (cheap: it is rid of for good, where a bone keeps it only for a while)
-                add("Drop Slog " + std::to_string(one.first.mKey - Key::Switch(World::HazardSwitch(0))) + " through the trap doors of PullRing#" + std::to_string(ring.mId), pre, {one.first}, 40, drop);
+                add("Drop Slog " + std::to_string(one.first.mKey - Key::Switch(World::HazardSwitch(0))) + " through the trap doors of PullRing#" + std::to_string(ring.mId), pre, {one.first, {Key::Mud(one.first.mKey - Key::Switch(World::HazardSwitch(0))), 2}}, 40, farDrop);
                 if (bones)
                 {
                     d.mActions.back().mSpend = {Key::kRocks, 1};

@@ -345,7 +345,7 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
         case StepKind::eSligDrop:
             return std::make_unique<SligDropTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eSlogRing:
-            return std::make_unique<SlogRingTask>(step.mEntity, step.mEdge);
+            return std::make_unique<SlogRingTask>(step.mEntity, step.mEdge, step.mOther == 1);
         case StepKind::eStepOn:
         {
             return std::make_unique<StepOnTask>(step.mEntity, step.mEdge);
@@ -4533,7 +4533,8 @@ std::unique_ptr<Task> Bot::MakeReflex()
         s32 later = 0;
         for (std::size_t i = 1; i < mKeptPlan.size(); i++)
         {
-            later += mKeptPlan[i].rfind("Throw a bone away", 0) == 0 ? 2 : mKeptPlan[i].rfind("Throw a bone", 0) == 0 ? 1 : 0;
+            // (and the one a Slog's drop through a ring's trap doors is tossed over the far one with: SlogRingTask)
+            later += mKeptPlan[i].rfind("Throw a bone away", 0) == 0 ? 2 : mKeptPlan[i].rfind("Throw a bone", 0) == 0 || mKeptPlan[i].rfind("Drop Slog ", 0) == 0 ? 1 : 0;
             // (past a sack on the way there are as many again)
             if (mKeptPlan[i].rfind("Get bones", 0) == 0)
             {
