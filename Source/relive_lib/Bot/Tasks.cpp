@@ -1610,6 +1610,7 @@ static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode, std::ve
 }
 
 static s32 SligSeesIn(const Bot& bot, s32 x, s32 y, bool half);
+static bool OnCyclingDoor(const Bot& bot, const NavGraph& nav, s32 node);
 
 TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
 {
@@ -1769,6 +1770,28 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 return TaskStep::Do(Prim::Wait(1));
             }
             mSlogHangs = 0;
+        }
+        // Up only where no Slig sees the top as he comes up, on whatever floor it is: Zulag 1's at 1187 at the end of
+        // its beat faces across the gap to 1387 ("Pull up ... once the Slig returns and leaves again")
+        // (only where no Slig is on the floor he comes up onto: one that is, the rule below times)
+        const SligAt* onTop = nullptr;
+        if (top >= 0)
+        {
+            UpBehind(nav, bot.GetWorld(), top, &onTop);
+        }
+        const s32 onTopNode = onTop ? nav.NodeAt(onTop->mX, onTop->mY, onTop->mHalf, 30) : -1;
+        // (and only after a hop or a roll off a trap door that ends hung across a gap, the edges only Zulag 1 has:
+        // other hangs are the rule's below, and taken for these the run from the Mines stuck in the Barracks)
+        const bool caughtAcross = mLastEdge >= 0 && nav.Edges()[mLastEdge].mHung && (nav.Edges()[mLastEdge].mKind == EdgeKind::eHop || (nav.Edges()[mLastEdge].mKind == EdgeKind::eFall && nav.Nodes()[nav.Edges()[mLastEdge].mFrom].mTrapDoor >= 0)) && std::abs(nav.Nodes()[nav.Edges()[mLastEdge].mFrom].mY - nav.Nodes()[nav.Edges()[mLastEdge].mTo].mY) <= 12;
+        const bool noneOnTop = caughtAcross && top >= 0 && (onTop == nullptr || onTopNode < 0 || nav.Nodes()[onTopNode].mLine != nav.Nodes()[top].mLine);
+        if (!down && top >= 0 && nav.Input().mIsAe && noneOnTop && SligSeesIn(bot, nav.Nodes()[top].mX, nav.Nodes()[top].mY, nav.Nodes()[top].mHalf) < 40 && mHangSeenWaits < 3000)
+        {
+            if (mHangSeenWaits++ == 0)
+            {
+                bot.Log("hung from " + std::to_string(nav.Nodes()[top].mX) + "," + std::to_string(nav.Nodes()[top].mY) + " in a Slig's sight: up once it has turned away");
+            }
+            mSteps--;
+            return TaskStep::Do(Prim::Wait(2));
         }
         // Up onto a floor a Slig stands guard on: only as it begins to turn its back
         if (!down && top >= 0 && nav.Input().mIsAe)
@@ -3111,7 +3134,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         {
             const bool shutNow = bot.GetWorld().Switch(sw) == value;
             // (on it already, or set off over it: on at once)
-            const bool onIt = (mCycleSwitch == sw && mCycleOn) || (abe.mX >= doorX1 - 12 && abe.mX <= doorX2 + 12);
+            // (or on any such door at all: there's no waiting on one for the next, which a timer turns over with it.
+            // Zulag 1's three at 1625..1775, hopped one after another: "hop 4 times to safety")
+            const bool onIt = (mCycleSwitch == sw && mCycleOn) || (abe.mX >= doorX1 - 12 && abe.mX <= doorX2 + 12) || OnCyclingDoor(bot, nav, cur);
             // (and from a door whose far side is a hop onto a Slig's floor, only with that floor clear for the hop:
             // waited for on the door, it opened under him. Zulag 1's second, onto the Slig's floor at 1012.)
             // (the hops off the door's cells that aren't onto another door of it: the one the way goes on by)
@@ -3176,6 +3201,13 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     }
                     break;
                 }
+                // (never over a mine: those the way hops, a hop at a time. "When the trapdoors close, hold the Triangle
+                // button to hop 4 times to safety", Zulag 1's mines between the doors at 1625..1775. Run at, one went off.)
+                if (nav.Nodes()[n].mHazard)
+                {
+                    beyond = -1;
+                    break;
+                }
                 // (into a low place at a roll: the tunnel between Zulag 1's doors)
                 if (nav.Nodes()[n].mLow && rollFrom < 0)
                 {
@@ -3184,6 +3216,42 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 if (dir > 0 ? x > doorX2 + 4 : x < doorX1 - 4)
                 {
                     beyond = x;
+                }
+            }
+            // (a row of them with mines between, the way a hop at a time: the hop held down, one after another with no
+            // stop, to the first cell past the last door. "When the trapdoors close, hold the Triangle button to hop 4
+            // times to safety": a hop as a step of its own each, the doors were open again by the third.)
+            if (beyond < 0 && first.mKind == EdgeKind::eHop && !(abe.mX >= doorX1 - 12 && abe.mX <= doorX2 + 12))
+            {
+                const s32 hopLen = 3 * cell;
+                s32 hops = 0;
+                s32 hx = nav.Nodes()[curNode].mX;
+                for (s32 k = 1; k <= 6; k++)
+                {
+                    hx += dir * hopLen;
+                    const s32 n = nav.NodeAt(hx, nav.Nodes()[curNode].mY, abe.mHalfScale, 10);
+                    if (n < 0 || nav.Nodes()[n].mHazard)
+                    {
+                        break;
+                    }
+                    if (!OnCyclingDoor(bot, nav, n))
+                    {
+                        hops = k;
+                        break;
+                    }
+                }
+                if (hops > 1)
+                {
+                    if (abe.mFacingLeft != (dir < 0))
+                    {
+                        return TaskStep::Do(Prim::Face(dir < 0));
+                    }
+                    bot.Log("hopping " + std::to_string(hops) + " times over the trap doors, the hop held");
+                    mLastEdge = path[0];
+                    mCycleDashTo = hx;
+                    mCycleDashDir = dir;
+                    mCycleGoalX = nav.Nodes()[nav.Edges()[path.back()].mTo].mX;
+                    return TaskStep::Do(Prim::Wait(hops * 20 - 6, Btn::eHop));
                 }
             }
             if (beyond >= 0)

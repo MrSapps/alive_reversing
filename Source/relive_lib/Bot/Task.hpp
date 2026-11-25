@@ -954,6 +954,7 @@ private:
     // Frames waited in a shadow for the Sligs of its floor to walk away
     s32 mShadowWaits = 0;
     // Over what a switch that keeps turning over shuts (see Next): waits for it, and whether he is on it now
+    s32 mHangSeenWaits = 0;
     s32 mCycleWaits = 0;
     s32 mCycleSwitch = -1;
     bool mCycleOn = false;
