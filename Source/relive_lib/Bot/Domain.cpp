@@ -5560,8 +5560,14 @@ void Domain::Builder::TrapDoorSligs()
             {
                 std::vector<Goap::Fact> pre{regionFact(over)};
                 pre.insert(pre.end(), one.second.begin(), one.second.end());
+                // (with a bone to toss it over the far trap door with, where there are any: SlogRingTask)
+                const bool bones = !world.CarriesMeat();
                 // (cheap: it is rid of for good, where a bone keeps it only for a while)
-                add("Drop Slog " + std::to_string(one.first.mKey - Key::Switch(World::HazardSwitch(0))) + " through the trap doors of PullRing#" + std::to_string(ring.mId), pre, {one.first}, 200, drop);
+                add("Drop Slog " + std::to_string(one.first.mKey - Key::Switch(World::HazardSwitch(0))) + " through the trap doors of PullRing#" + std::to_string(ring.mId), pre, {one.first}, 40, drop);
+                if (bones)
+                {
+                    d.mActions.back().mSpend = {Key::kRocks, 1};
+                }
             }
         }
     }

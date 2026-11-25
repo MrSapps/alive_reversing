@@ -13639,6 +13639,88 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
         }
         return TaskStep::Do(Prim::Wait(1));
     }
+    // With bones: from the floor over the ring, one tossed beyond a trap door as a Slog is near, then down to the
+    // ring, pulled as it comes back over that door from its meal. ("From the center upper platform, toss down a
+    // bone, then climb down and get under the pull ring. When the Slog is finishing his meal and starts to run
+    // back towards you, pull the ring to send him crashing down.")
+    if (mPhase == 0 && world.mRocks > 0 && !world.CarriesMeat() && mBoneTries < 3)
+    {
+        s32 over = -1;
+        for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+        {
+            const NavNode& node = nav.Nodes()[n];
+            if (node.mHalf == under.mHalf && !node.mHazard && node.mY <= under.mY - 60 && node.mY >= under.mY - 160 && nav.CameraOf(node.mX, node.mY - 5) == cam &&
+                (over < 0 || std::abs(node.mX - under.mX) < std::abs(nav.Nodes()[over].mX - under.mX)))
+            {
+                over = static_cast<s32>(n);
+            }
+        }
+        if (over >= 0 && bot.AbeNode() != over)
+        {
+            if (!mGo)
+            {
+                mGo = GoToNode(over);
+            }
+            TaskStep go;
+            if (!RunGo(mGo, bot, lastFailed, go))
+            {
+                return go;
+            }
+            mGo.reset();
+            if (go.mKind == TaskStep::Kind::eFailed)
+            {
+                return go;
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        const SlogAt* nearest = nullptr;
+        for (const SlogAt* sl : slogs)
+        {
+            nearest = !nearest || std::abs(sl->mX - under.mX) < std::abs(nearest->mX - under.mX) ? sl : nearest;
+        }
+        if (over >= 0 && nearest && std::abs(nearest->mX - under.mX) <= 160)
+        {
+            // (beyond the trap door on the side away from where it is, or the right one)
+            const NavFeature* far = nullptr;
+            for (const NavFeature& door : nav.Input().mFeatures)
+            {
+                if (door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring->mSwitch && door.mHalf == under.mHalf && std::abs(door.mY1 - under.mY) < 40 &&
+                    (!far || ((door.mX1 + door.mX2) / 2 - under.mX) * (nearest->mX - under.mX) < 0))
+                {
+                    far = &door;
+                }
+            }
+            u32 aim = 0;
+            s32 frames = 0;
+            s32 downX = 0;
+            const bool right = far && (far->mX1 + far->mX2) / 2 > under.mX;
+            const s32 x1 = far ? (right ? far->mX2 + 10 : far->mX1 - 100) : 0;
+            const s32 x2 = far ? (right ? far->mX2 + 100 : far->mX1 - 10) : 0;
+            if (far && Domain::BoneThrow(nav, over, x1, x2, under.mY, aim, frames, &downX))
+            {
+                const bool left = aim % 2 == 1;
+                if (bot.Abe().mFacingLeft != left)
+                {
+                    return TaskStep::Do(Prim::Face(left));
+                }
+                if (!mBoneInHand)
+                {
+                    mBoneInHand = true;
+                    bot.Log("a bone over the trap door of PullRing#" + std::to_string(mRing) + " to " + std::to_string(downX) + ", the Slog at " + std::to_string(nearest->mX));
+                    return TaskStep::Do(Prim::Wait(8, Btn::eThrow));
+                }
+                mBoneInHand = false;
+                mBoneTries++;
+                mPhase = 3;
+                mGo.reset();
+                return TaskStep::Do(Prim::Wait(6, Btn::eThrow | BlowMineTask::AimBits(static_cast<ThrowSpot::Kind>((aim & 255) / 2), left)));
+            }
+        }
+        if (over >= 0)
+        {
+            return TaskStep::Do(Prim::Wait(2));
+        }
+    }
     if (mPhase == 0)
     {
         // Shut away: each one well off the ring with something solid between

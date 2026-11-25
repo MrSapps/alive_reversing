@@ -1834,6 +1834,8 @@ private:
     s32 mOver = -1;
     std::set<u32> mSeenIds;
     bool mSeenAny = false;
+    bool mBoneInHand = false;
+    s32 mBoneTries = 0;
     // The side of the slam door that shuts them away that faces the ring
     s32 mDoorX = 0;
     std::unique_ptr<GoToTask> mGo;
