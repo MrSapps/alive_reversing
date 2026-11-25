@@ -8107,6 +8107,26 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     return TaskStep::Do(Prim::Wait(2, dir));
                 }
+                // (a summoned one: a Slig of its floor behind it is told to come first, and runs into the gap after
+                // it. "Have him follow you to the next screen, and hop over the gap to make the Slig run through it
+                // and fall to his death." Left behind, the second one's Slig walked the floor Abe was on.)
+                if (!world.mGlukkonSpawn.empty() && mGapCalls < 2)
+                {
+                    const SligAt* behind = nullptr;
+                    for (const SligAt& s : world.mSligs)
+                    {
+                        if (!s.mPossessed && !s.mAsleep && s.mHalf == me->mHalf && std::abs(s.mY - me->mY) <= 20 && (s.mX < me->mX) != left && std::abs(s.mX - me->mX) <= 300)
+                        {
+                            behind = &s;
+                        }
+                    }
+                    if (behind)
+                    {
+                        mGapCalls++;
+                        bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": \"Come here\" to the Slig at " + std::to_string(behind->mX) + " before the jump");
+                        return TaskStep::Do(Prim::Wait(mGapCalls == 1 ? 3 : 20, mGapCalls == 1 ? Btn::eSpeak1 : Btn::eSpeak2));
+                    }
+                }
                 bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": a jump to " + std::to_string(next.mX));
                 return TaskStep::Do(Prim::Wait(3, dir | Btn::eHop));
             }

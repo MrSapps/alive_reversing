@@ -1314,7 +1314,21 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
     }
     // (which of the reasons below ruled the last edge out, by its line here: for the log of a way not found)
     s32* refused = &mRefusedAt;
-    const auto base = [refused, know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge, dangerLet, abeX, cycling](const NavEdge& e) -> s32
+    // (the floors a lift is kept at for a summoned Glukkon whose errand is still to come: not ridden away from by Abe.
+    // Zulag 1: brought down for the third one, he rode it back up as his way to where he takes it over.)
+    std::vector<s32> keepLiftAt;
+    for (const std::string& step : mWorld.mGlukkonSpawn.empty() ? std::vector<std::string>{} : mKeptPlan)
+    {
+        if (step.find("with the Glukkon") != std::string::npos || step.find("Slig under it") != std::string::npos)
+        {
+            for (const GlukkonSpawn& spawn : mWorld.mGlukkonSpawn)
+            {
+                keepLiftAt.push_back(spawn.mY);
+            }
+            break;
+        }
+    }
+    const auto base = [refused, know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge, dangerLet, abeX, cycling, keepLiftAt](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
         if (know->mBannedEdges.count(idx))
@@ -1658,6 +1672,17 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 if (!para.mPossessed && !para.Hidden() && para.mHalf == from.mHalf && std::abs(para.mY - from.mY) <= 40 && std::abs(para.mX - from.mX) < 700)
                 {
                     return 20;
+                }
+            }
+        }
+        if (e.mKind == EdgeKind::eLift && from.mLiftStop >= 0)
+        {
+            for (const s32 y : keepLiftAt)
+            {
+                if (std::abs(from.mY - y) <= 30)
+                {
+                    *refused = __LINE__;
+                    return -1;
                 }
             }
         }
