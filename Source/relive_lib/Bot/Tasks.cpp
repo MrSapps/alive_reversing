@@ -5569,12 +5569,53 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Failed("no such entity");
     }
-    if (++mSteps > 900)
+    if (!mAhead && ++mSteps > 900)
     {
         return TaskStep::Failed("the car didn't get there");
     }
     const NavNode& dest = nav.Nodes()[mDest];
     const s32 cell = NavGraph::GridStep(car->mHalf);
+    if (car->mState == 0 && mAhead)
+    {
+        // Out by the Mudokon ahead: the UXB by it off first, then it is led back behind the car
+        const Entity* uxb = mAheadUxb ? world.Find(mAheadUxb) : nullptr;
+        if (!mAside)
+        {
+            if (uxb && !uxb->mGone)
+            {
+                mAside = std::make_unique<DisarmTask>(uxb->CentreX(), uxb->mY2, uxb->mHalf, -1);
+            }
+            else
+            {
+                mAheadUxb = 0;
+                auto lead = std::make_unique<RescueTask>(mAhead, mCar);
+                lead->LeadOffDrill(mCar);
+                mAside = std::move(lead);
+            }
+        }
+        const TaskStep step = mAside->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mAside.reset();
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return TaskStep::Failed("the Mudokon on the car's way: " + step.mWhy);
+        }
+        if (mAheadUxb)
+        {
+            mAheadUxb = 0;
+            return Next(bot, "");
+        }
+        bot.Log("Mudokon#" + std::to_string(mAhead) + " is behind the mine car: on");
+        mLed.push_back(mAhead);
+        mAhead = 0;
+        mEnters = 0;
+        mKey = 0;
+        mDud.clear();
+        return Next(bot, "");
+    }
     if (car->mState == 0)
     {
         if (mExits > 0)
@@ -5616,6 +5657,53 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
     const bool moved = std::abs(x - mLastX) + std::abs(y - mLastY) > 2;
     mLastX = x;
     mLastY = y;
+    // A blind Mudokon to save on its floor ahead (or a UXB just short of one): stopped short of it, and out
+    // (before it moves too: in again short of a UXB, the first push would set it off)
+    if (!mAhead && bot.SavesMudokons() && (mKey == Btn::eRight || mKey == Btn::eLeft || (mKey == 0 && std::abs(dest.mY - y) <= 12) || (mKey == 0 && dest.mX != x)))
+    {
+        const s32 dir = mKey == Btn::eRight ? 1 : mKey == Btn::eLeft ? -1 : (dest.mX >= x ? 1 : -1);
+        const Entity* near = nullptr;
+        s32 nearD = 5 * cell + 1;
+        for (const Entity& mud : world.mEntities)
+        {
+            const s32 d = ((mud.mLive ? mud.mLiveX : mud.CentreX()) - x) * dir;
+            if (mud.mKind == EntityKind::eMudokon && mud.mBlind && !mud.mGone && mud.mHalf == car->mHalf && std::abs((mud.mLive ? mud.mLiveY : mud.mY2) - y) <= 25 && d > 0 && d < nearD && std::find(mLed.begin(), mLed.end(), mud.mId) == mLed.end())
+            {
+                near = &mud;
+                nearD = d;
+            }
+        }
+        s32 stopD = nearD;
+        u32 uxbId = 0;
+        for (const Entity& uxb : near ? world.mEntities : std::vector<Entity>{})
+        {
+            const s32 d = (uxb.CentreX() - x) * dir;
+            if (uxb.mKind == EntityKind::eUxb && !uxb.mGone && std::abs(uxb.mY2 - y) <= 25 && d > 0 && d <= nearD && d < stopD)
+            {
+                stopD = d;
+                uxbId = uxb.mId;
+            }
+        }
+        if (near && stopD <= 3 * cell)
+        {
+            mAhead = near->mId;
+            mAheadUxb = uxbId;
+            mAsideExits = 0;
+            bot.Log("Mudokon#" + std::to_string(near->mId) + " on the mine car's way at " + std::to_string(x + nearD * dir) + (uxbId ? " (a UXB short of it)" : "") + ": stopping the car");
+        }
+    }
+    if (mAhead)
+    {
+        if (moved)
+        {
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        if (++mAsideExits > 8)
+        {
+            return TaskStep::Failed("couldn't get out of the car short of the Mudokon");
+        }
+        return TaskStep::Do(Prim::Wait(8, Btn::eAction));
+    }
     if (std::abs(x - dest.mX) <= cell / 2 + 2 && std::abs(y - dest.mY) <= 12)
     {
         if (moved)
@@ -10598,7 +10686,7 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
         const Entity* drill = world.Find(mOffDrill);
         const s32 mx = mud->mLive ? mud->mLiveX : mud->CentreX();
         const s32 my = mud->mLive ? mud->mLiveY : mud->mY2;
-        if (!drill || (mBlindPhase == 0 && !mRecruit && !Domain::UnderDrill(*drill, *mud, mx, my)))
+        if (!drill || (mBlindPhase == 0 && !mRecruit && OffDone(*drill, *mud, mx, my)))
         {
             return TaskStep::Done();
         }
@@ -11131,7 +11219,7 @@ bool RescueTask::LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, co
             if (mOffDrill)
             {
                 const Entity* drill = world.Find(mOffDrill);
-                if (!drill || !Domain::UnderDrill(*drill, mud, mudX, mud.mLive ? mud.mLiveY : mud.mY2))
+                if (!drill || OffDone(*drill, mud, mudX, mud.mLive ? mud.mLiveY : mud.mY2))
                 {
                     bot.Log("the blind Mudokon is out from under Drill#" + std::to_string(mOffDrill) + " at " + std::to_string(mudX));
                     step = TaskStep::Done();
@@ -11144,6 +11232,31 @@ bool RescueTask::LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, co
                 return false;
             }
             std::vector<s32> way;
+            // (behind a mine car: back along its floor to two cells past the car)
+            const Entity* car = mOffDrill ? world.Find(mOffDrill) : nullptr;
+            if (car && car->mKind == EntityKind::eMineCar)
+            {
+                const s32 carX = car->mLive ? car->mLiveX : car->CentreX();
+                if (mBehindDir == 0)
+                {
+                    mBehindDir = mudX > carX ? 1 : -1;
+                }
+                mBlindDir = -mBehindDir;
+                mBlindTrap = -1;
+                mBlindRide = -1;
+                mBlindStop = nav.NodeAt(carX - mBehindDir * 2 * cell, mud.mLive ? mud.mLiveY : mud.mY2, mud.mHalf, 12);
+                if (mBlindStop < 0 || ++mBlindTries > 8)
+                {
+                    step = TaskStep::Failed("nowhere behind the mine car for the blind Mudokon");
+                    return false;
+                }
+                bot.Log("leading the blind Mudokon from " + std::to_string(mudX) + " back past the mine car at " + std::to_string(carX) + " to " + std::to_string(nav.Nodes()[mBlindStop].mX));
+                mRecruit = std::make_unique<RecruitTask>(mMud);
+                mRecruit->SetSide(mBlindDir);
+                mBlindPhase = 1;
+                mBlindAhead = false;
+                return LeadBlind(bot, mud, portal, lastFailed, step);
+            }
             // (out from under a drill it is led by the way it will go once all is open, only as far as is clear)
             if (!Domain::BlindWay(nav, world, mudNode, portal, mOffDrill == 0, way))
             {

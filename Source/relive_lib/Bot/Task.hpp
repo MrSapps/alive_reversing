@@ -190,6 +190,13 @@ private:
     // The way the car last went: not straight back that way while anything else moves it
     u32 mWent = 0;
     s32 mExits = 0;
+    // With Mudokons to save, one on the car's floor ahead is not run over: stopped short of it (and of a UXB by it),
+    // out, the UXB turned off, the Mudokon led back behind the car, and in again
+    u32 mAhead = 0;
+    u32 mAheadUxb = 0;
+    s32 mAsideExits = 0;
+    std::unique_ptr<Task> mAside;
+    std::vector<u32> mLed;
 };
 
 // Throw rocks at a mine until it goes off: from one place after another, keeping what missed and what killed
@@ -1242,9 +1249,21 @@ private:
     // True once it is there, else step is what to do.
     bool LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, const std::string& lastFailed, TaskStep& step);
 
+    // Led off far enough: out from under the drill, or behind the mine car (a cell past it, away from where it was)
+    bool OffDone(const Entity& off, const Entity& mud, s32 x, s32 y)
+    {
+        if (off.mKind == EntityKind::eMineCar)
+        {
+            const s32 carX = off.mLive ? off.mLiveX : off.CentreX();
+            return mBehindDir != 0 && (x - carX) * mBehindDir <= -NavGraph::GridStep(mud.mHalf);
+        }
+        return !Domain::UnderDrill(off, mud, x, y);
+    }
+
     u32 mMud;
     u32 mPortal;
     u32 mOffDrill = 0;
+    s32 mBehindDir = 0;
     std::unique_ptr<GoToTask> mGo;
     std::unique_ptr<RecruitTask> mRecruit;
     std::unique_ptr<UseTask> mUse;
