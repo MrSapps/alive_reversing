@@ -13530,9 +13530,18 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
     std::vector<const SlogAt*> slogs;
     for (const SlogAt& s : world.mSlogs)
     {
-        if (std::abs(s.mY - under.mY) <= 30 && std::abs(s.mX - under.mX) <= 450)
+        if (std::abs(s.mY - under.mY) <= 30 && std::abs(s.mX - under.mX) <= 600)
         {
             slogs.push_back(&s);
+        }
+    }
+    // (the ones seen near the ring while at this: what is gone at the end is those. The big Slog in its pen, on the
+    // screen next door, was taken for one of the Sloggies.)
+    for (const Entity& e : world.mEntities)
+    {
+        if (e.mKind == EntityKind::eSlog && !e.mGone && e.mLive && std::abs(e.mLiveY - under.mY) <= 30 && std::abs(e.mLiveX - under.mX) <= 200)
+        {
+            mSeenIds.insert(e.mId);
         }
     }
     // (the danger of their floor let for the way down to the ring and the wait there)
@@ -13550,6 +13559,60 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
     }
     // (none seen counts only with him on the ring's screen: off it they are not loaded)
     const bool here = nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5) == cam;
+    mSeenAny = mSeenAny || !slogs.empty();
+    // (one that has not been seen yet is fetched: over its floor to where it is, until it sees him and follows.
+    // "Go right across the top. The Slog will chase you.")
+    if (!mSeenAny)
+    {
+        // (only for one that starts away from the ring: those by it are seen as he comes to its screen)
+        s32 slogX = 0;
+        bool nearOne = false;
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eSlog && !e.mGone && world.mFleechKilled.count(e.mId) == 0 && std::abs(e.mY2 - under.mY) <= 40 && std::abs(e.CentreX() - under.mX) <= 600)
+            {
+                nearOne = nearOne || std::abs(e.CentreX() - under.mX) <= 200;
+                slogX = e.mLive && e.mLiveX != 0 ? e.mLiveX : e.CentreX();
+            }
+        }
+        if (slogX == 0)
+        {
+            return TaskStep::Failed("no Slog for the ring");
+        }
+        mSeenAny = nearOne;
+    }
+    if (!mSeenAny)
+    {
+        s32 slogX = 0;
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eSlog && !e.mGone && world.mFleechKilled.count(e.mId) == 0 && std::abs(e.mY2 - under.mY) <= 40 && std::abs(e.CentreX() - under.mX) <= 600)
+            {
+                slogX = e.mLive && e.mLiveX != 0 ? e.mLiveX : e.CentreX();
+            }
+        }
+        if (!mGo)
+        {
+            const s32 uy = under.mY;
+            mGo = std::make_unique<GoToTask>("over the floor to the Slog", [&bot, slogX, uy](s32 n)
+                                             {
+                                                 const NavNode& node = bot.Nav().Nodes()[n];
+                                                 return node.mY <= uy - 60 && node.mY >= uy - 160 && std::abs(node.mX - slogX) <= 300 &&
+                                                        bot.Nav().CameraOf(node.mX, node.mY - 5) == bot.Nav().CameraOf(slogX, uy - 5);
+                                             });
+        }
+        TaskStep go;
+        if (!RunGo(mGo, bot, lastFailed, go))
+        {
+            return go;
+        }
+        mGo.reset();
+        if (go.mKind == TaskStep::Kind::eFailed)
+        {
+            return go;
+        }
+        return TaskStep::Do(Prim::Wait(2));
+    }
     if (slogs.empty() && here)
     {
         if ((mGone += 1) > 40)
@@ -13557,7 +13620,7 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
             bot.Log("the Slogs under PullRing#" + std::to_string(mRing) + " are gone");
             for (const Entity& e : world.mEntities)
             {
-                if (e.mKind == EntityKind::eSlog && !e.mGone && std::abs(e.mY2 - under.mY) <= 40 && std::abs(e.CentreX() - under.mX) <= 200)
+                if (e.mKind == EntityKind::eSlog && !e.mGone && mSeenIds.count(e.mId) != 0)
                 {
                     bot.FleechKilled(e.mId);
                 }
@@ -13746,11 +13809,29 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
     }
     if (mPhase == 3)
     {
+        // (along the ring's floor at a run: walked across the trap door from where he came down, he was at the ring
+        // as the big Slog was already on its way)
+        if (bot.AbeNode() != mAt && std::abs(bot.Abe().mY - under.mY) <= 5 && std::abs(bot.Abe().mX - under.mX) <= 150 && std::abs(bot.Abe().mX - under.mX) > 6)
+        {
+            // (a stretch of four cells or six from a stand is run and slid to a stop: shorter, the pilot walks it)
+            Prim run = Prim::MoveTo(under.mX, Gait::eRun);
+            const s32 cells = std::abs(under.mX - bot.Abe().mX) / NavGraph::GridStep(under.mHalf);
+            run.mSlide = bot.Abe().mMove == Move::eIdle && bot.Abe().Settled() && cells >= 4 && cells <= 8 && cells % 2 == 0;
+            return TaskStep::Do(run);
+        }
         if (bot.AbeNode() != mAt)
         {
+            // (down onto the ring's floor first, the nearest cell of it, and the rest of the way at a run)
             if (!mGo)
             {
-                mGo = GoToNode(mAt);
+                const s32 at = mAt;
+                const s32 ux = under.mX;
+                const s32 uy = under.mY;
+                mGo = std::make_unique<GoToTask>("down to the ring's floor", [&bot, at, ux, uy](s32 n)
+                                                 {
+                                                     const NavNode& node = bot.Nav().Nodes()[n];
+                                                     return n == at || (std::abs(node.mY - uy) <= 5 && std::abs(node.mX - ux) <= 125);
+                                                 });
                 mGo->SetHurry(true);
             }
             TaskStep go;

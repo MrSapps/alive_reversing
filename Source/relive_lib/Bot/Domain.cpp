@@ -5474,13 +5474,52 @@ void Domain::Builder::TrapDoorSligs()
         {
             continue;
         }
-        std::vector<Goap::Fact> gives;
+        // (one action for each Slog of that floor: those further off once what is shut between them and the trap
+        // doors is open. Zulag 5's Slog by the bone sack, let out by lever 140: "toss down a bone, then climb down
+        // and get under the pull ring ... pull the ring to send him crashing down.")
+        std::vector<std::pair<Goap::Fact, std::vector<Goap::Fact>>> each;
         for (const Entity& slog : world.mEntities)
         {
-            if (slog.mKind == EntityKind::eSlog && !slog.mGone && world.mFleechKilled.count(slog.mId) == 0 && slog.mHalf == under.mHalf && std::abs(slog.mY2 - under.mY) <= 40 && std::abs(slog.CentreX() - under.mX) <= 200)
+            if (slog.mKind != EntityKind::eSlog || slog.mGone || world.mFleechKilled.count(slog.mId) != 0 || slog.mHalf != under.mHalf || std::abs(slog.mY2 - under.mY) > 40 || std::abs(slog.CentreX() - under.mX) > 600)
             {
-                gives.push_back({Key::Switch(World::HazardSwitch(slog.mId)), 1});
+                continue;
             }
+            // (by the nearest such ring to it only: Zulag 5's Sloggies are the pit ring's, not the Sligs')
+            bool nearer = false;
+            for (const Entity& other : world.mEntities)
+            {
+                if (other.mKind == EntityKind::ePullRing && other.mId != ring.mId && !other.mGone && other.mHalf == ring.mHalf && std::abs(other.CentreX() - slog.CentreX()) < std::abs(ring.CentreX() - slog.CentreX()))
+                {
+                    const s32 ou = UseNode(nav, other, nullptr);
+                    nearer = nearer || (ou >= 0 && std::abs(nav.Nodes()[ou].mY - under.mY) < 40);
+                }
+            }
+            if (nearer)
+            {
+                continue;
+            }
+            std::vector<Goap::Fact> opens;
+            if (std::abs(slog.CentreX() - under.mX) > 200)
+            {
+                // (the nearest of the ring's trap doors on its side)
+                s32 doorEdge = under.mX;
+                for (const NavFeature& door : nav.Input().mFeatures)
+                {
+                    if (door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring.mSwitch && door.mHalf == under.mHalf && std::abs(door.mY1 - under.mY) < 40 && (door.mX1 - under.mX) * (slog.CentreX() - under.mX) > 0)
+                    {
+                        doorEdge = slog.CentreX() < under.mX ? door.mX1 : door.mX2;
+                    }
+                }
+                for (const NavFeature& f : nav.Input().mFeatures)
+                {
+                    const s32 fx = (f.mX1 + f.mX2) / 2;
+                    if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == under.mHalf && f.mY1 <= under.mY + 4 && f.mY2 >= under.mY - 40 && fx > std::min(slog.CentreX(), doorEdge) && fx < std::max(slog.CentreX(), doorEdge))
+                    {
+                        opens.push_back({Key::Switch(f.mSwitch), f.mStartClosed ? 1 : 0});
+                    }
+                }
+            }
+            each.push_back({{Key::Switch(World::HazardSwitch(slog.mId)), 1}, opens});
         }
         // (from the nearest cell over the floor on the ring's screen)
         s32 over = -1;
@@ -5494,7 +5533,7 @@ void Domain::Builder::TrapDoorSligs()
                 over = static_cast<s32>(n);
             }
         }
-        if (gives.empty() || over < 0)
+        if (each.empty() || over < 0)
         {
             continue;
         }
@@ -5502,7 +5541,29 @@ void Domain::Builder::TrapDoorSligs()
         drop.mKind = StepKind::eSlogRing;
         drop.mEntity = ring.mId;
         drop.mEdge = at;
-        add("Drop the Slogs through the trap doors of PullRing#" + std::to_string(ring.mId), {regionFact(over)}, gives, 900, drop);
+        // (the near ones together, as one; each further one by itself)
+        std::vector<Goap::Fact> near;
+        for (const auto& one : each)
+        {
+            if (one.second.empty())
+            {
+                near.push_back(one.first);
+            }
+        }
+        if (!near.empty())
+        {
+            add("Drop the Slogs through the trap doors of PullRing#" + std::to_string(ring.mId), {regionFact(over)}, near, 900, drop);
+        }
+        for (const auto& one : each)
+        {
+            if (!one.second.empty())
+            {
+                std::vector<Goap::Fact> pre{regionFact(over)};
+                pre.insert(pre.end(), one.second.begin(), one.second.end());
+                // (cheap: it is rid of for good, where a bone keeps it only for a while)
+                add("Drop Slog " + std::to_string(one.first.mKey - Key::Switch(World::HazardSwitch(0))) + " through the trap doors of PullRing#" + std::to_string(ring.mId), pre, {one.first}, 200, drop);
+            }
+        }
     }
     // A Slig that walks over a trap door a lever opens: the lever is pulled as it is on the door, and until it
     // has gone down nothing is crossed onto its floor near there (AO's Rupture Farms, path 16: the Slig at
