@@ -3167,6 +3167,13 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 const s32 n = nav.NodeAt(x, nav.Nodes()[curNode].mY, abe.mHalfScale, 8);
                 if (n < 0)
                 {
+                    // (a gap past the door, with a ledge to catch beyond it: rolled on off its end in the one go, to
+                    // hang there. Stopped on Zulag 1's second door to roll off it, it opened under him.)
+                    if (hangsOff)
+                    {
+                        beyond = x;
+                        rollFrom = rollFrom >= 0 ? rollFrom : nav.Nodes()[curNode].mX;
+                    }
                     break;
                 }
                 // (into a low place at a roll: the tunnel between Zulag 1's doors)
