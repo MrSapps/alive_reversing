@@ -58,6 +58,11 @@ inline u32 Calm(u32 entityId)
 {
     return 6000000 + entityId;
 }
+// A blind Mudokon has been led out from under the drill a lever is to start (save_all: the Mines' path 4)
+inline u32 OffDrill(u32 entityId)
+{
+    return 7000000 + entityId;
+}
 } // namespace Key
 
 enum class StepKind : u8
@@ -119,6 +124,8 @@ enum class StepKind : u8
     eSligCall,      // pull lever mEntity, which makes Slig mOther level with him on a floor of its own; at a run to the
                     // foot of the hoist up to that floor and up to hang there unseen until the Slig has walked off
                     // it, up, take it over, have it pull lever mEdge (an entity id, 0: none) and burst it
+    eLeadOff,       // lead the blind Mudokon mEntity (its portal mOther) out from under Drill mEdge (an entity id), and
+                    // leave it there
     eSorry,         // say sorry to the Mudokon mEntity that works a lever in anger, so that it leaves it be
     ePantsSlig,     // kill Slig mEntity with the Slig a Glukkon calls: hello from node mEdge, the gate's lever mOther
     eTimedDoor,     // use the lever mEntity (to the value mOther) and at once cross the edge mEdge, which a trap door
@@ -339,7 +346,7 @@ struct Domain final
     // Whether a cell is on that Slig's floor, near enough for it to shoot him there
     static bool OnFlierTargetsFloor(const NavGraph& nav, const FlierTarget& target, s32 node);
 
-    static Domain Build(const NavGraph& nav, const World& world, s32 abeNode, const std::function<bool(s32 edge)>& edgeUsable, bool kills = false);
+    static Domain Build(const NavGraph& nav, const World& world, s32 abeNode, const std::function<bool(s32 edge)>& edgeUsable, bool kills = false, bool saves = false);
     // Build's working (Domain.cpp)
     struct Builder;
     // The cell Abe uses a lever, ring or wheel from, or stands at for a portal: -1 if there's none. faceLeft is the way to face.
@@ -494,6 +501,11 @@ struct Domain final
     // The switches that have to be on before a lever is pulled, where the order matters (Fleeches: see the .cpp)
     static std::vector<s32> PulledFirst(const NavGraph& nav, const World& world, const Entity& lever);
     static s32 UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s32 firstSide = -1);
+    // Whether a Mudokon at x, y is where the drill would get it once it is going
+    static bool UnderDrill(const Entity& drill, const Entity& mud, s32 x, s32 y)
+    {
+        return mud.mHalf == drill.mHalf && x >= drill.mX1 - 20 && x <= drill.mX2 + 20 && y >= drill.mY1 && y - (mud.mHalf ? 30 : 60) <= drill.mY2;
+    }
     // The floor (its line) an awake Slig of the map walks that the cell is on (one not gone, not asleep, not a
     // spawner's), or -1
     static s32 SligBeat(const NavGraph& nav, const World& world, s32 node);

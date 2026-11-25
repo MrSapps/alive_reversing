@@ -252,6 +252,12 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<SligLeverTask>(step.mEntity, step.mEdge);
         case StepKind::eSligCall:
             return std::make_unique<SligCallTask>(step.mEntity, step.mOther, static_cast<u32>(step.mEdge));
+        case StepKind::eLeadOff:
+        {
+            auto lead = std::make_unique<RescueTask>(step.mEntity, step.mOther);
+            lead->LeadOffDrill(static_cast<u32>(step.mEdge));
+            return lead;
+        }
         case StepKind::eSorry:
         {
             auto sorry = std::make_unique<RecruitTask>(step.mEntity);
@@ -3139,7 +3145,7 @@ Domain Bot::BuildDomain(const PathKnowledge* know, s32 abeNode)
         return true;
     };
     mWorld.mExitUses = mKnow->mExitUses;
-    Domain domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll);
+    Domain domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll, SavesMudokons());
     // A flying Slig that was to be got rid of before its stretch is gone into (FeatureKind::eDanger), with no fart
     // that can be got flown at it: got by as it is after all. The Mines' path 2 has a Brew machine and a flying
     // Slig, and the machine is past the Slig.
@@ -3182,7 +3188,7 @@ Domain Bot::BuildDomain(const PathKnowledge* know, s32 abeNode)
     }
     if (passed)
     {
-        domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll);
+        domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll, SavesMudokons());
     }
     return domain;
 }

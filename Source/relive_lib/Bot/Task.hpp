@@ -1186,6 +1186,11 @@ public:
     {
         mSorryOnly = only;
     }
+    // Its way to the Mudokon has him crouched (under a drill, in a tunnel): he stays down
+    bool Ducked() const
+    {
+        return mGo && (mGo->Ducked() || mGo->Disarming());
+    }
 
 private:
     u32 mMud;
@@ -1218,9 +1223,18 @@ public:
     }
     std::string Name() const override
     {
+        if (mOffDrill)
+        {
+            return "Lead Mudokon#" + std::to_string(mMud) + " from under Drill#" + std::to_string(mOffDrill);
+        }
         return "Rescue Mudokon#" + std::to_string(mMud) + " via BirdPortal#" + std::to_string(mPortal);
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+    // Only as far along its way to the portal as takes it out from under the drill, and left there
+    void LeadOffDrill(u32 drillId)
+    {
+        mOffDrill = drillId;
+    }
 
 private:
     // A blind Mudokon is walked to the portal's floor a straight stretch at a time: talked to from the side it
@@ -1230,6 +1244,7 @@ private:
 
     u32 mMud;
     u32 mPortal;
+    u32 mOffDrill = 0;
     std::unique_ptr<GoToTask> mGo;
     std::unique_ptr<RecruitTask> mRecruit;
     std::unique_ptr<UseTask> mUse;

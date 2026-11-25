@@ -2776,12 +2776,13 @@ static const s32 kMineCarFloor = 11;
 // Domain::Build's working: what it has worked out so far, shared between the parts of the path it goes through
 struct Domain::Builder final
 {
-    Builder(const NavGraph& navIn, const World& worldIn, s32 abeNodeIn, const std::function<bool(s32 edge)>& edgeUsableIn, bool killsIn)
+    Builder(const NavGraph& navIn, const World& worldIn, s32 abeNodeIn, const std::function<bool(s32 edge)>& edgeUsableIn, bool killsIn, bool savesIn)
         : mNav(navIn)
         , mWorld(worldIn)
         , mAbeNode(abeNodeIn)
         , mEdgeUsable(edgeUsableIn)
         , mKills(killsIn)
+        , mSaves(savesIn)
         , mEdges(navIn.Edges())
     {
     }
@@ -2824,6 +2825,7 @@ struct Domain::Builder final
     void FootSwitchGates();
     void ParamiteFleeches();
     void Scrabs();
+    void DrillsOverMudokons();
 
     // An action for the planner, and the step it is
     void add(std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step);
@@ -2840,6 +2842,7 @@ struct Domain::Builder final
     s32 mAbeNode;
     const std::function<bool(s32 edge)>& mEdgeUsable;
     bool mKills;
+    bool mSaves;
     const std::vector<NavEdge>& mEdges;
     Domain mD;
     s32 mRegionCount = 0;
@@ -2990,9 +2993,9 @@ bool Domain::Builder::packBars(s32 target) const
         return entries && !open;
 }
 
-Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const std::function<bool(s32 edge)>& edgeUsable, bool kills)
+Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const std::function<bool(s32 edge)>& edgeUsable, bool kills, bool saves)
 {
-    Builder b(nav, world, abeNode, edgeUsable, kills);
+    Builder b(nav, world, abeNode, edgeUsable, kills, saves);
     return b.Run();
 }
 
@@ -3023,6 +3026,7 @@ Domain Domain::Builder::Run()
     FootSwitchGates();
     ParamiteFleeches();
     Scrabs();
+    DrillsOverMudokons();
     return mD;
 }
 
@@ -7434,6 +7438,69 @@ void Domain::Builder::ParamiteFleeches()
 }
 
 // Scrabs got out of the way without a Scrab's death
+void Domain::Builder::DrillsOverMudokons()
+{
+    // A lever that starts a drill over a blind Mudokon: with Mudokons to save, it is led out from under it first
+    // (the Mines' path 4: Lever#11000 at 637,1500 starts the drill over the ledge of the two blind ones at 512 and
+    // 637,1400. The walkthrough: "have the 2 blind Mudokons 'Follow me' right until they drop down to your level.
+    // Be sure to have them 'Wait' once they're both down. ... Go left again and pull the lever".)
+    if (!mSaves)
+    {
+        return;
+    }
+    const World& world = mWorld;
+    Domain& d = mD;
+    std::set<u32> led;
+    const std::size_t count = d.mActions.size();
+    for (std::size_t i = 0; i < count; i++)
+    {
+        const DomainStep step = d.mSteps[d.mActions[i].mTag];
+        const Entity* lever = step.mKind == StepKind::eUse ? world.Find(step.mEntity) : nullptr;
+        if (!lever || lever->mSwitch <= 1)
+        {
+            continue;
+        }
+        for (const Entity& drill : world.mEntities)
+        {
+            if (drill.mKind != EntityKind::eDrill || drill.mSwitch != lever->mSwitch || world.SweepRuns(drill))
+            {
+                continue;
+            }
+            for (const Entity& mud : world.mEntities)
+            {
+                const s32 x = mud.mLive ? mud.mLiveX : mud.CentreX();
+                const s32 y = mud.mLive ? mud.mLiveY : mud.mY2;
+                if (mud.mKind != EntityKind::eMudokon || mud.mGone || !mud.mBlind || !Domain::UnderDrill(drill, mud, x, y))
+                {
+                    continue;
+                }
+                // (by the way to the portal its rescue would take)
+                u32 portal = 0;
+                for (const Goap::Action& a : d.mActions)
+                {
+                    const DomainStep& rescue = d.mSteps[a.mTag];
+                    portal = portal ? portal : (rescue.mKind == StepKind::eRescue && rescue.mEntity == mud.mId ? rescue.mOther : 0);
+                }
+                const s32 node = UseNode(mNav, mud, nullptr);
+                if (!portal || node < 0)
+                {
+                    continue;
+                }
+                d.mActions[i].mPre.push_back({Key::OffDrill(mud.mId), 1});
+                if (led.insert(mud.mId).second)
+                {
+                    DomainStep off;
+                    off.mKind = StepKind::eLeadOff;
+                    off.mEntity = mud.mId;
+                    off.mOther = portal;
+                    off.mEdge = static_cast<s32>(drill.mId);
+                    add("Lead Mudokon#" + std::to_string(mud.mId) + " from under Drill#" + std::to_string(drill.mId), {regionFact(node), {Key::Mud(mud.mId), 0}, {Key::OffDrill(mud.mId), 0}}, {{Key::OffDrill(mud.mId), 1}}, 400, off);
+                }
+            }
+        }
+    }
+}
+
 void Domain::Builder::Scrabs()
 {
     const NavGraph& nav = mNav;

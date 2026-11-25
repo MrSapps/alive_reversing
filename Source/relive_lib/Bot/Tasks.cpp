@@ -2253,6 +2253,18 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             u32 drill = 0;
             if (onWay && !slig.mAsleep && !slig.mPossessed && TrapSligTask::Find(nav, bot.GetWorld(), slig, ring, drill))
             {
+                // (not with a Mudokon to be saved under it too: the Mines' path 4, the blind one by the ring at
+                // 487,1920. The walkthrough leads it off first.)
+                const Entity* drillEntity = bot.GetWorld().Find(drill);
+                bool mudUnder = false;
+                for (const Entity& mud : bot.GetWorld().mEntities)
+                {
+                    mudUnder = mudUnder || (bot.SavesMudokons() && drillEntity && mud.mKind == EntityKind::eMudokon && !mud.mGone && Domain::UnderDrill(*drillEntity, mud, mud.mLive ? mud.mLiveX : mud.CentreX(), mud.mLive ? mud.mLiveY : mud.mY2));
+                }
+                if (mudUnder)
+                {
+                    continue;
+                }
                 mTrapTried = true;
                 bot.Log("a Slig at " + std::to_string(slig.mX) + "," + std::to_string(slig.mY) + " walks under Drill#" + std::to_string(drill) + ": dropping that on it first");
                 mStop = std::make_unique<TrapSligTask>(ring, drill);
@@ -8544,7 +8556,7 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 const s32 x = mud.mLive ? mud.mLiveX : mud.CentreX();
                 const s32 y = mud.mLive ? mud.mLiveY : mud.mY2;
-                if (mud.mKind == EntityKind::eMudokon && !mud.mGone && mud.mHalf == drill.mHalf && x >= drill.mX1 - 20 && x <= drill.mX2 + 20 && y >= drill.mY1 && y - (mud.mHalf ? 30 : 60) <= drill.mY2)
+                if (mud.mKind == EntityKind::eMudokon && !mud.mGone && Domain::UnderDrill(drill, mud, x, y))
                 {
                     return TaskStep::Failed("it starts a drill where a Mudokon stands");
                 }
@@ -10580,6 +10592,17 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Done();
     }
+    // Led only out from under a drill: done once it stands clear of it, between two stretches
+    if (mOffDrill)
+    {
+        const Entity* drill = world.Find(mOffDrill);
+        const s32 mx = mud->mLive ? mud->mLiveX : mud->CentreX();
+        const s32 my = mud->mLive ? mud->mLiveY : mud->mY2;
+        if (!drill || (mBlindPhase == 0 && !mRecruit && !Domain::UnderDrill(*drill, *mud, mx, my)))
+        {
+            return TaskStep::Done();
+        }
+    }
     // A drill at work between a blind Mudokon and its portal, on the floor it runs along once that opens: stopped
     // first (the Mines' path 4: one between the drills at 1575, 1650 and 1725, its portal at 1812, their levers
     // on the ledge over them)
@@ -10596,7 +10619,7 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
             return TaskStep::Failed("couldn't stop the drill between the Mudokon and its portal: " + step.mWhy);
         }
     }
-    if (mud->mBlind && mPhase < 4 && bot.AbeNode() >= 0 && abe.Settled())
+    if (mud->mBlind && !mOffDrill && mPhase < 4 && bot.AbeNode() >= 0 && abe.Settled())
     {
         const s32 mx = mud->mLive ? mud->mLiveX : mud->CentreX();
         const s32 my = mud->mLive ? mud->mLiveY : mud->mY2;
@@ -10635,7 +10658,7 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
     }
     // (crouched on his way where there is no room to stand: the way there knows when he can get up)
     mNoStand = abe.mMove == Move::eCrouch && (mNoStand || lastFailed.find("no reaction") != std::string::npos);
-    if (abe.mMove == Move::eCrouch && !mNoStand && !(mGo && (mGo->Disarming() || mGo->Ducked())) && !GoToTask::SweepOver(bot.Nav(), bot.GetWorld(), bot.AbeNode()))
+    if (abe.mMove == Move::eCrouch && !mNoStand && !(mGo && (mGo->Disarming() || mGo->Ducked())) && !(mRecruit && mRecruit->Ducked()) && !GoToTask::SweepOver(bot.Nav(), bot.GetWorld(), bot.AbeNode()))
     {
         return TaskStep::Do(Prim::Press(Btn::eUp));
     }
@@ -11032,13 +11055,25 @@ bool RescueTask::LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, co
     {
         case 0: // where to next
         {
+            // (led only out from under a drill: it stands clear of it now)
+            if (mOffDrill)
+            {
+                const Entity* drill = world.Find(mOffDrill);
+                if (!drill || !Domain::UnderDrill(*drill, mud, mudX, mud.mLive ? mud.mLiveY : mud.mY2))
+                {
+                    bot.Log("the blind Mudokon is out from under Drill#" + std::to_string(mOffDrill) + " at " + std::to_string(mudX));
+                    step = TaskStep::Done();
+                    return false;
+                }
+            }
             if (mudNode < 0)
             {
                 step = TaskStep::Failed("the blind Mudokon isn't on a floor");
                 return false;
             }
             std::vector<s32> way;
-            if (!Domain::BlindWay(nav, world, mudNode, portal, true, way))
+            // (out from under a drill it is led by the way it will go once all is open, only as far as is clear)
+            if (!Domain::BlindWay(nav, world, mudNode, portal, mOffDrill == 0, way))
             {
                 step = TaskStep::Failed("no way for the blind Mudokon to the portal's floor");
                 return false;
@@ -11058,11 +11093,18 @@ bool RescueTask::LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, co
             mBlindTrap = -1;
             mBlindRide = -1;
             mBlindStop = found;
+            const Entity* offDrill = mOffDrill ? world.Find(mOffDrill) : nullptr;
             for (s32 idx : way)
             {
                 const NavEdge& e = nav.Edges()[idx];
                 const NavNode& from = nav.Nodes()[e.mFrom];
                 const NavNode& to = nav.Nodes()[e.mTo];
+                // (to the first cell clear of the drill: told to wait there)
+                if (offDrill && !Domain::UnderDrill(*offDrill, mud, to.mX, to.mY))
+                {
+                    mBlindStop = e.mTo;
+                    break;
+                }
                 if (e.mKind == EdgeKind::eFall && from.mTrapDoor >= 0 && e.mFeature == from.mTrapDoor)
                 {
                     mBlindStop = e.mFrom;
