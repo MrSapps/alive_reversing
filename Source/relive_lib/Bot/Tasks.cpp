@@ -5687,7 +5687,8 @@ TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
         // (stopped on the screen before its own, as the walkthrough leaves the car: driven onto its screen the car
         // wakes the Sligs there, and they shoot it. The Mines' path 5: "Get him behind the mine car on the left".)
         const s32 mudCam = near ? nav.CameraOf(x + nearD * dir, y - 5) : -1;
-        const bool nextScreen = near && mudCam >= 0 && nav.CameraOf(x, y - 5) != mudCam && nav.CameraOf(x + 2 * cell * dir, y - 5) == mudCam;
+        // (and on its screen already, got back into after a retry: no further)
+        const bool nextScreen = near && mudCam >= 0 && (nav.CameraOf(x, y - 5) == mudCam || nav.CameraOf(x + 2 * cell * dir, y - 5) == mudCam);
         if (near && (nextScreen || stopD <= 3 * cell))
         {
             mAhead = near->mId;
@@ -9074,6 +9075,11 @@ static bool HoldForSlig(Bot& bot, const Entity& mud, s32 need, std::unique_ptr<G
             }
         }
     }
+    // With Mudokons to save, off the Slig's floor before it is in sight, not once it is coming: the climb takes a
+    // hundred frames, and seen on the way up he is shot at, and the Mudokon by him with him (the Mines' path 5,
+    // the ledge at 2312,620 with the Slig stopping at 2587)
+    const bool early = bot.SavesMudokons() && abeNode >= 0 && std::abs(nav.Nodes()[abeNode].mY - y) <= 45 && bot.QuietFrames(bot.Abe().mX, bot.Abe().mY, mud.mHalf) < 200;
+    coming = coming || early;
     // On his way to the Mudokon behind a Slig's back: on he goes, to be there when it is off the screen
     if (go && !coming)
     {
@@ -11286,9 +11292,19 @@ bool RescueTask::LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, co
                 mBlindRide = -1;
                 // (begun only with quiet enough for all of it: hello, its answer, follow me, and its walk back past the
                 // car. Off the Slig's floor till then. The Mines' path 5: a Slig comes onto the screen at 2587.)
-                if (mBlindTries == 0 && HoldForSlig(bot, mud, 330, mGo, mCarHeld, step))
+                if (mBlindTries == 0)
                 {
-                    return false;
+                    const s32 mudY = mud.mLive ? mud.mLiveY : mud.mY2;
+                    // (up on a ledge HoldForSlig leaves him be: he waits there)
+                    if (std::abs(bot.Abe().mY - mudY) > 45 && bot.QuietFrames(mudX, mudY, mud.mHalf) < 330 && (mCarHeld += 6) < 6000)
+                    {
+                        step = TaskStep::Do(Prim::Wait(6));
+                        return false;
+                    }
+                    if (HoldForSlig(bot, mud, 330, mGo, mCarHeld, step))
+                    {
+                        return false;
+                    }
                 }
                 mBlindStop = nav.NodeAt(carX - mBehindDir * 2 * cell, mud.mLive ? mud.mLiveY : mud.mY2, mud.mHalf, 12);
                 if (mBlindStop < 0 || ++mBlindTries > 8)
