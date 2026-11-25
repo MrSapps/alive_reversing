@@ -365,6 +365,28 @@ public:
     {
         mWorld.mNoBomb.insert(id);
     }
+    // A switch (below 256) that something other than him keeps turning over: three changes or more in the last 600
+    // frames. sinceChange: frames since its last. (Zulag 1: the angry Mudokon at its lever opens the trap doors
+    // of switch 158 again and again.)
+    bool SwitchCycles(s32 sw, s32* sinceChange) const
+    {
+        if (sw < 0 || sw >= 256)
+        {
+            return false;
+        }
+        s32 recent = 0;
+        s32 last = -1;
+        for (u32 at : mSwitchFlips[sw])
+        {
+            recent += at <= mAbe.mFrame && mAbe.mFrame - at < 600 ? 1 : 0;
+            last = at <= mAbe.mFrame ? static_cast<s32>(at) : last;
+        }
+        if (sinceChange)
+        {
+            *sinceChange = last < 0 ? 100000 : static_cast<s32>(mAbe.mFrame) - last;
+        }
+        return recent >= 3;
+    }
     // Whether an edge of this path's graph is one he was stopped on and keeps off
     bool Banned(s32 edge) const
     {
@@ -681,6 +703,9 @@ private:
     std::map<std::string, s32> mActionDeaths;
     std::string mPlanText;
     s8 mLastSwitches[256] = {};
+    // Each switch as it was last frame, and the frames it changed on (the last few: SwitchCycles)
+    s8 mSeenSwitches[256] = {};
+    std::vector<u32> mSwitchFlips[256];
     // He is in a Glukkon (or was a moment ago, and is in his trance still: it is in a teleporter)
     // Until this frame nothing is held for a beam: he is on a run past a Greeter (GreeterDash)
     u32 mGreeterDashUntil = 0;

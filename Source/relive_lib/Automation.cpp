@@ -28,6 +28,8 @@
 #include "../AliveLibAE/MainMenu.hpp"
 #include "../AliveLibAE/PauseMenu.hpp"
 #include "../AliveLibAE/QuikSave.hpp"
+#include "data_conversion/AEQuicksaveJson.hpp"
+#include "nlohmann/json.hpp"
 #include "../AliveLibAO/Abe.hpp"
 #include "../AliveLibAO/MainMenu.hpp"
 #include "../AliveLibAO/PauseMenu.hpp"
@@ -377,7 +379,12 @@ static bool CheckCommand(const Automation::Command& command, std::string& error)
         {
             return CheckCameraArgs(command, 1, error);
         }
-        error = "expected: wait_until in_game, or wait_until camera <level> <path> <camera>";
+        // (any camera of that path)
+        if (argCount == 3 && command.mArgs[0] == "path")
+        {
+            return expectNumber(command.mArgs[2], 1);
+        }
+        error = "expected: wait_until in_game, wait_until camera <level> <path> <camera>, or wait_until path <level> <path>";
         return false;
     }
 
@@ -495,6 +502,11 @@ static bool CheckCommand(const Automation::Command& command, std::string& error)
     if (name == "quicksave")
     {
         return expectArgs(0, "quicksave");
+    }
+
+    if (name == "save_game" || name == "load_game")
+    {
+        return expectArgs(1, name == "save_game" ? "save_game <file.json>" : "load_game <file.json>");
     }
 
     if (name == "quickload")
@@ -1141,6 +1153,24 @@ bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFr
         return true;
     }
 
+    if (name == "save_game")
+    {
+        // A quicksave written to a file, as the pause menu saves (AE): a later run starts from it with load_game
+        if (!betweenFrames)
+        {
+            return false;
+        }
+        if (GetGameType() != GameType::eAe)
+        {
+            Fail(command, "save_game is AE only");
+            return false;
+        }
+        QuikSave::DoQuicksave(map);
+        nlohmann::json j;
+        to_json(j, QuikSave::gActiveQuicksaveData);
+        return SaveText(args[0], j.dump());
+    }
+
     if (name == "restore_check")
     {
         return RestoreCheck(command, map, betweenFrames);
@@ -1390,7 +1420,7 @@ bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFr
         return true;
     }
 
-    if (name == "quickload")
+    if (name == "quickload" || name == "load_game")
     {
         // The restore loads in the background and changes camera, so wait for the next quiet frame
         if (mStep == 0)
@@ -1398,6 +1428,23 @@ bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFr
             if (!betweenFrames)
             {
                 return false;
+            }
+            // (load_game: the quicksave from a file save_game wrote, then the same as quickload)
+            if (name == "load_game")
+            {
+                if (GetGameType() != GameType::eAe)
+                {
+                    Fail(command, "load_game is AE only");
+                    return false;
+                }
+                const std::string text = mFs.LoadToString(args[0].c_str());
+                if (text.empty())
+                {
+                    Fail(command, "can't read " + args[0]);
+                    return false;
+                }
+                QuikSave::gActiveQuicksaveData = {};
+                from_json(nlohmann::json::parse(text), QuikSave::gActiveQuicksaveData);
             }
             map.mRestoreKeepsInput = true;
             if (GetGameType() == GameType::eAe)
@@ -1878,6 +1925,11 @@ bool Automation::WaitUntil(const Command& command, BaseMap& map, bool betweenFra
     if (command.mArgs[0] == "in_game")
     {
         return sControlledCharacter && map.mCurrentLevel != EReliveLevelIds::eMenu;
+    }
+
+    if (command.mArgs[0] == "path")
+    {
+        return map.mCurrentLevel == LevelFromName(command.mArgs[1]) && map.mCurrentPath == std::stoi(command.mArgs[2]) && sControlledCharacter && map.mCamState == BaseMap::CamChangeStates::eInactive_0;
     }
 
     return map.mCurrentLevel == LevelFromName(command.mArgs[1])

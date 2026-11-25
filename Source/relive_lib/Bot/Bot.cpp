@@ -1206,6 +1206,26 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
     const bool timedRun = TimedRunOn();
     const s32 abeX = mAbe.mX;
     const s32 dangerLet = mAbe.mFrame <= mDangerLetUntil && mDangerLetUntil <= mAbe.mFrame + 10 ? mDangerLet : 0;
+    // (switches that keep turning over by themselves, or that an angry Mudokon at the lever turns over as he comes
+    // near: what they shut is no bar, it is crossed just after they shut, GoToTask. Zulag 1's trap doors.)
+    std::set<s32> cycling;
+    for (s32 i = 2; i < 256; i++)
+    {
+        if (SwitchCycles(i, nullptr))
+        {
+            cycling.insert(i);
+        }
+    }
+    for (const Entity& lever : mWorld.mEntities)
+    {
+        for (const Entity& mud : lever.mKind == EntityKind::eLever ? mWorld.mEntities : std::vector<Entity>{})
+        {
+            if (mud.mKind == EntityKind::eMudokon && !mud.mGone && Domain::AngryWorker(mud) && std::abs((mud.mLive ? mud.mLiveX : mud.CentreX()) - lever.CentreX()) < 60 && std::abs((mud.mLive ? mud.mLiveY : mud.mY2) - lever.mY2) < 40)
+            {
+                cycling.insert(lever.mSwitch);
+            }
+        }
+    }
     const s32 fleeEdge = mFleeEdge >= 0 && mAbe.mFrame - mFleeFrame < 300 && mFleeEdge < static_cast<s32>(know->mNav.Edges().size()) ? mFleeEdge : -1;
     // (the power to go unseen in hand makes a Scrab's floor a way like any other, unless it is kept for a step of
     // the plan that is not at hand yet)
@@ -1294,7 +1314,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
     }
     // (which of the reasons below ruled the last edge out, by its line here: for the log of a way not found)
     s32* refused = &mRefusedAt;
-    const auto base = [refused, know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge, dangerLet, abeX](const NavEdge& e) -> s32
+    const auto base = [refused, know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge, dangerLet, abeX, cycling](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
         if (know->mBannedEdges.count(idx))
@@ -1509,7 +1529,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         // Shut now
         s32 condSwitch = 0;
         s32 condValue = 0;
-        if (know->mNav.Condition(e, &condSwitch, &condValue) && world->Switch(condSwitch) != condValue && !(condSwitch == dangerLet && dangerLet != 0))
+        if (know->mNav.Condition(e, &condSwitch, &condValue) && world->Switch(condSwitch) != condValue && !(condSwitch == dangerLet && dangerLet != 0) && cycling.count(condSwitch) == 0)
         {
             *refused = __LINE__;
             return -1;
@@ -4959,6 +4979,24 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         mIsAe = GetGameType() == GameType::eAe;
         EnsureKnowledge(map);
         GameView::ReadWorld(map, mWorld);
+        for (s32 i = 0; i < 256; i++)
+        {
+            std::vector<u32>& flips = mSwitchFlips[i];
+            // (a rewind takes the frame back: what was after it never happened)
+            while (!flips.empty() && flips.back() > mAbe.mFrame)
+            {
+                flips.pop_back();
+            }
+            if (mWorld.mSwitches[i] != mSeenSwitches[i])
+            {
+                mSeenSwitches[i] = mWorld.mSwitches[i];
+                flips.push_back(mAbe.mFrame);
+                if (flips.size() > 8)
+                {
+                    flips.erase(flips.begin());
+                }
+            }
+        }
         mWorld.mFleeing = mFleeFrame != 0 && mAbe.mFrame - mFleeFrame < 300;
         // (and for as long as they are still about, wherever they are: up on a ledge over them the run is not over.
         // Bonewerkz' Executive Office: off their floor at 1637,100, with a drill set going by his coming up and the

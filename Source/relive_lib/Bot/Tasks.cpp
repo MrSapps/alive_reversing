@@ -3044,6 +3044,107 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             return TaskStep::Do(Prim::Wait(1));
         }
     }
+    // (past where this step was to end, on that dash: it is done, and the next step goes on from here)
+    if (mCycleDashTo >= 0 && (abe.mX - mCycleGoalX) * mCycleDashDir >= 0)
+    {
+        mCycleDashTo = -1;
+        return TaskStep::Done();
+    }
+    // Across what a switch that keeps turning over shuts (trap doors an angry Mudokon's lever opens again and again:
+    // Zulag 1's at 825 and 925): onto it only just after it has shut, and on over the rest of it at once. ("Roll
+    // into the tunnel when the trapdoor is closed. Wait for the trapdoor ahead to close again and roll over it.")
+    {
+        s32 sw = -1;
+        s32 value = 0;
+        s32 since = 0;
+        // (the trap door the next few edges go onto: its switch, shut at 0, and how far it reaches. Not an edge
+        // condition: the map has the doors as floor.)
+        s32 doorX1 = 0;
+        s32 doorX2 = 0;
+        for (std::size_t i = 0; i < path.size() && i < 4 && sw < 0; i++)
+        {
+            const NavNode& node = nav.Nodes()[nav.Edges()[path[i]].mTo];
+            if (node.mTrapDoor >= 0 && nav.Input().mFeatures[node.mTrapDoor].mSwitch > 1)
+            {
+                const NavFeature& door = nav.Input().mFeatures[node.mTrapDoor];
+                sw = door.mSwitch;
+                doorX1 = door.mX1;
+                doorX2 = door.mX2;
+            }
+        }
+        // (one that keeps turning over, or whose lever an angry Mudokon stands at: it pulls it as he comes near,
+        // and again and again)
+        bool angryLever = false;
+        for (const Entity& lever : sw > 1 ? bot.GetWorld().mEntities : std::vector<Entity>{})
+        {
+            if (lever.mKind != EntityKind::eLever || lever.mSwitch != sw)
+            {
+                continue;
+            }
+            for (const Entity& mud : bot.GetWorld().mEntities)
+            {
+                angryLever = angryLever || (mud.mKind == EntityKind::eMudokon && !mud.mGone && Domain::AngryWorker(mud) && std::abs((mud.mLive ? mud.mLiveX : mud.CentreX()) - lever.CentreX()) < 60 && std::abs((mud.mLive ? mud.mLiveY : mud.mY2) - lever.mY2) < 40);
+            }
+        }
+        const bool cycles = sw > 1 && bot.SwitchCycles(sw, &since);
+        if (sw > 1 && (cycles || angryLever))
+        {
+            const bool shutNow = bot.GetWorld().Switch(sw) == value;
+            // (on it already, or set off over it: on at once)
+            const bool onIt = (mCycleSwitch == sw && mCycleOn) || (abe.mX >= doorX1 - 12 && abe.mX <= doorX2 + 12);
+            if (!shutNow || (!onIt && since > 3))
+            {
+                if (mCycleWaits++ == 0)
+                {
+                    bot.Log("the trap doors of switch " + std::to_string(sw) + " open again and again: across them just after they shut");
+                }
+                mCycleOn = false;
+                if (mCycleWaits < 3000)
+                {
+                    mSteps--;
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+            }
+            mCycleSwitch = sw;
+            mCycleOn = true;
+            // In one go to the first cell past it along the way: at a run, and on from where the way rolls at a roll
+            // (sneaking, a cell at a time, he was still on the first door when they opened again 36 frames on)
+            const s32 dir = (doorX1 + doorX2) / 2 > abe.mX ? 1 : -1;
+            const s32 cell = NavGraph::GridStep(abe.mHalfScale);
+            s32 rollFrom = -1;
+            s32 beyond = -1;
+            const s32 curNode = cur;
+            for (s32 x = nav.Nodes()[curNode].mX + dir * cell, steps = 0; steps < 10 && beyond < 0; x += dir * cell, steps++)
+            {
+                const s32 n = nav.NodeAt(x, nav.Nodes()[curNode].mY, abe.mHalfScale, 8);
+                if (n < 0)
+                {
+                    break;
+                }
+                // (into a low place at a roll: the tunnel between Zulag 1's doors)
+                if (nav.Nodes()[n].mLow && rollFrom < 0)
+                {
+                    rollFrom = x - dir * cell;
+                }
+                if (dir > 0 ? x > doorX2 + 4 : x < doorX1 - 4)
+                {
+                    beyond = x;
+                }
+            }
+            if (beyond >= 0)
+            {
+                mLastEdge = path[0];
+                mCycleDashTo = beyond;
+                mCycleDashDir = dir;
+                mCycleGoalX = nav.Nodes()[nav.Edges()[path.back()].mTo].mX;
+                return TaskStep::Do(rollFrom >= 0 ? Prim::RunRoll(rollFrom, beyond) : Prim::MoveTo(beyond, Gait::eRun));
+            }
+        }
+        else
+        {
+            mCycleOn = false;
+        }
+    }
     // (what the step for the edge in hand is worked out from)
     const Way way{abe, nav, cur, path, atGoal, led, zOther, sweepStop, sweepWalk, sweepRoll, wasDucked, first, overGap};
     switch (first.mKind)

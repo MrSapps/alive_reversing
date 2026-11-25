@@ -953,6 +953,14 @@ private:
     s32 mHopWaits = 0;
     // Frames waited in a shadow for the Sligs of its floor to walk away
     s32 mShadowWaits = 0;
+    // Over what a switch that keeps turning over shuts (see Next): waits for it, and whether he is on it now
+    s32 mCycleWaits = 0;
+    s32 mCycleSwitch = -1;
+    bool mCycleOn = false;
+    // The dash over it: where to, which way, and where the step in hand was to end
+    s32 mCycleDashTo = -1;
+    s32 mCycleDashDir = 0;
+    s32 mCycleGoalX = 0;
     // Frames a move through Sligs' sight was put off for a Greeter's beam
     s32 mGreeterWaits = 0;
     // For each Slig about (as World::mSligs has them): the frame it last did anything but stand
