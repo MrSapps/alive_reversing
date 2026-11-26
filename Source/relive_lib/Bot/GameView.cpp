@@ -321,6 +321,8 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
     in.mPath = pathId;
     s32 brews = 0;
     std::vector<std::array<s32, 3>> movers;
+    // The lift points a lift starts at (x, id), the ones that only say so too
+    std::vector<std::pair<s32, s32>> liftStarts;
     // The switches of the path's voice locks (what a Glukkon's "Do it" sets)
     std::vector<s32> voice;
     const bool isAe = GetGameType() == GameType::eAe;
@@ -609,6 +611,10 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                 }
                 case ReliveTypes::eLiftPoint:
                 {
+                    if (static_cast<const relive::Path_LiftPoint&>(tlv).mIsStartPoint)
+                    {
+                        liftStarts.push_back({tlv.mTopLeftX, static_cast<const relive::Path_LiftPoint&>(tlv).mLiftPointId});
+                    }
                     // (not one that only says where the lift starts: it is no floor, and the lift does not stop
                     // there again. The brewery's first hub: its lift starts at 820 between the floors at 980 and
                     // 420, and a ride "to 820" went past it for 2,000 frames.)
@@ -705,6 +711,25 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
         if (end)
         {
             end->mSwitch = mover[0];
+        }
+    }
+    // A lift none of whose points says it starts there is made at the first of them the game loads, which is the
+    // one he comes to (Factory::LiftPointAE, "default to original"): unseen, it is taken to be at any of them.
+    // (Zulag 7's lift at 800 from 200 down to 380, come to from above.)
+    for (NavFeature& f : in.mFeatures)
+    {
+        if (f.mKind != FeatureKind::eLiftStop)
+        {
+            continue;
+        }
+        bool started = false;
+        for (const std::pair<s32, s32>& start : liftStarts)
+        {
+            started = started || (std::abs(start.first - f.mX1) < 5 && start.second == f.mB);
+        }
+        if (!started)
+        {
+            f.mA = 1;
         }
     }
     // A flying Slig's stretch is what its track goes along, down to the floor under it. Only where a Brew is to

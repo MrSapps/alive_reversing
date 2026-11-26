@@ -381,6 +381,18 @@ public:
     {
         mWorld.mNoBomb.insert(id);
     }
+    // A switch something else turns over (below 256): how long it was as it is now, the last time it was (0: not
+    // seen yet)
+    s32 SwitchLasted(s32 sw) const
+    {
+        if (sw < 0 || sw >= 256 || mSwitchFlips[sw].size() < 3)
+        {
+            return 0;
+        }
+        const std::vector<u32>& f = mSwitchFlips[sw];
+        const s32 lasted = static_cast<s32>(f[f.size() - 2] - f[f.size() - 3]);
+        return lasted > 0 && lasted < 600 && static_cast<s32>(mAbe.mFrame) - static_cast<s32>(f.back()) < 600 ? lasted : 0;
+    }
     // A switch something else turns over (below 256): its last turn and the frames between its last two
     bool SwitchRhythm(s32 sw, s32* last, s32* period) const
     {
@@ -608,6 +620,13 @@ public:
         mRunUntil = GoToTask::HurryUntil(static_cast<s32>(mAbe.mFrame), frames);
         mRunPath = mAbe.mLevel * 1000 + mAbe.mPath;
     }
+    // A switch that keeps turning over, or whose lever an angry Mudokon works
+    bool SwitchTurns(s32 sw) const;
+    // One whose lever an angry Mudokon works
+    bool WorkerTurns(s32 sw) const;
+    // A cell that is no place to stop on: on a trap door of such a switch, or within reach of an electric wall of
+    // one (Zulag 6)
+    bool NoStopAt(s32 node) const;
     bool TimedRunOn() const
     {
         return mTimedRun || mFlierRun || GoToTask::HurryOn(static_cast<s32>(mAbe.mFrame), mRunUntil, mRunPath, mAbe.mLevel * 1000 + mAbe.mPath);

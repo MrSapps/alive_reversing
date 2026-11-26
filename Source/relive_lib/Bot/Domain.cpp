@@ -2893,6 +2893,10 @@ struct Domain::Builder final
     std::vector<std::pair<s32, s32>> mFollows;
     std::map<std::tuple<s32, s32, s32>, std::pair<s32, std::size_t>> mCheapest;
     std::set<s32> mLooseLines;
+    // Switches an angry Mudokon keeps turning over at its lever: the Mudokon's id
+    std::map<s32, u32> mCycledBy;
+    // (where on those lines the Slogs are: x, and whether half-scale)
+    std::multimap<s32, std::pair<s32, bool>> mLooseAt;
     std::map<s32, std::vector<u32>> mZapLines;
     std::map<u32, FleechLure> mLures;
     std::set<s32> mLetOut;
@@ -3216,6 +3220,20 @@ void Domain::Builder::Crossings()
     // And where a thing falls over and over on to such a floor, a bone thrown under it puts the Slog there for
     // as long as it eats. (Bonewerkz' first annex: "Hit the bone sack, pick up the bone and throw it so that the
     // Slog gets crushed by the falling boxes".)
+    for (const Entity& lever : world.mEntities)
+    {
+        if (lever.mKind != EntityKind::eLever || lever.mSwitch <= 1)
+        {
+            continue;
+        }
+        for (const Entity& mud : world.mEntities)
+        {
+            if (AngryWorker(mud) && std::abs((mud.mLive ? mud.mLiveX : mud.CentreX()) - lever.CentreX()) < 60 && std::abs((mud.mLive ? mud.mLiveY : mud.mY2) - lever.mY2) < 40)
+            {
+                mCycledBy[lever.mSwitch] = mud.mId;
+            }
+        }
+    }
     for (const SlogAt& slog : world.mSlogs)
     {
         const s32 at = slog.mChasing && !slog.mAsleep && !world.SlogFed(slog) ? nav.NodeAt(slog.mX, slog.mY, false, 30) : -1;
@@ -3229,6 +3247,7 @@ void Domain::Builder::Crossings()
         if (at >= 0 && !penned)
         {
             looseLines.insert(nav.Nodes()[at].mLine);
+            mLooseAt.insert({nav.Nodes()[at].mLine, {slog.mX, nav.Nodes()[at].mHalf}});
         }
     }
     d.mStart.Set(Key::kSlogLoose, looseLines.empty() ? 0 : 1);
@@ -3405,7 +3424,22 @@ void Domain::Builder::Crossings()
         std::vector<Goap::Fact> pre{regionFact(e.mFrom)};
         if (barrier)
         {
-            pre.push_back({Key::Switch(condSwitch), condValue});
+            // (an electric wall whose lever an angry Mudokon keeps pulling is off by turns: crossed while he is at
+            // it, when it is off (the GoToTask times it). Zulag 6: "Walk through the electric fences when turned
+            // off. At least the pattern is predictable", two walls on floor 880 of switch 33, one on when the other
+            // is off, and the angry worker at lever 33.)
+            // (and so is a trap door of such a lever: open by turns, gone through when it is. Zulag 6's top floor:
+            // "stand over the right edge of the trapdoors, so you'll drop down")
+            const bool trapDoor = e.mFeature >= 0 && nav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eTrapDoor && nav.Input().mFeatures[e.mFeature].mSwitch == condSwitch;
+            const auto worker = nav.BeamOf(e) >= 0 || trapDoor ? mCycledBy.find(condSwitch) : mCycledBy.end();
+            if (worker != mCycledBy.end())
+            {
+                pre.push_back({Key::Calm(worker->second), 0});
+            }
+            else
+            {
+                pre.push_back({Key::Switch(condSwitch), condValue});
+            }
         }
         s32 throughGate = 0;
         // On along a floor that Sligs walk under a security orb (they are not to be taken over), from the side of
@@ -3542,7 +3576,19 @@ void Domain::Builder::Crossings()
             }
         }
         // (down onto a floor a Slog that is after him is loose on: not while it is)
-        if (looseLines.count(nav.Nodes()[e.mTo].mLine) != 0 && nav.Nodes()[e.mFrom].mLine != nav.Nodes()[e.mTo].mLine)
+        // (a Slog shut away from where he comes down, by a gate that is shut now, is not loose there: Zulag 8, whose
+        // one long floor is cut into pens by slam doors that only the Mudokons' levers open)
+        bool looseThere = false;
+        if (nav.Nodes()[e.mFrom].mLine != nav.Nodes()[e.mTo].mLine)
+        {
+            const NavNode& to = nav.Nodes()[e.mTo];
+            const auto range = mLooseAt.equal_range(to.mLine);
+            for (auto it = range.first; it != range.second; ++it)
+            {
+                looseThere = looseThere || FloorOpen(nav.Input(), world, it->second.first, to.mX, to.mY, it->second.second);
+            }
+        }
+        if (looseThere)
         {
             pre.push_back({Key::kSlogLoose, 0});
         }

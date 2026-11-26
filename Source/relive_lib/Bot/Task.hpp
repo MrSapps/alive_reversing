@@ -151,6 +151,8 @@ private:
     s32 mJumps = 0;
     s32 mWaits = 0;
     s32 mPicks = 0;
+    // Lying rocks that would not be picked up (where they lie): left be, and the sack jumped at instead
+    std::vector<std::pair<s32, s32>> mUnpicked;
     // The way the jump through the sack went, and on and off a Slog's floor after it
     bool mJumpLeft = false;
     bool mEscape = false;
@@ -1094,6 +1096,10 @@ private:
     // Frames waited for a Slog under the ledge to leap up, and whether it was in the air the frame before
     s32 mSlogWaits = 0;
     bool mSlogUp = false;
+    // For each Slog of the world's list: how many frames it has been in its leap up (-1: not leaping)
+    std::vector<s32> mLeapAge;
+    // Frames waited at an electric wall that an angry Mudokon's lever turns on and off
+    s32 mFenceWaits = 0;
     // Frames waited for a lift that is on its way to the stop he would walk onto, and where it was last
     // Pulling the lever that sends a lift to the stop the way goes onto
     // (also a lever pulled for a gate on the way, leading: mGateCalls)
@@ -2621,10 +2627,11 @@ private:
 class SlogFleeTask final : public Task
 {
 public:
-    SlogFleeTask(s32 refuge, bool left, s32 fromX)
+    SlogFleeTask(s32 refuge, bool left, s32 fromX, s32 jumpEdge = -1)
         : mRefuge(refuge)
         , mLeft(left)
         , mFromX(fromX)
+        , mJumpEdge(jumpEdge)
     {
     }
     std::string Name() const override
@@ -2638,6 +2645,9 @@ private:
     bool mLeft = false;
     // Where on its floor the way off starts
     s32 mFromX = 0;
+    // The way off is a running jump at a ledge (-1: not): taken out of the run, and the run is not stopped first
+    s32 mJumpEdge = -1;
+    bool mJumped = false;
     s32 mHeld = 0;
     // The way off is a teleporter set off by a foot switch: -1 not looked at yet, 1 run over without a stop
     s32 mThrough = -1;

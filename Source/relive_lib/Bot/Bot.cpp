@@ -127,6 +127,62 @@ u32 Bot::SpeakWait() const
     return Btn::eSpeak3;
 }
 
+bool Bot::SwitchTurns(s32 sw) const
+{
+    if (sw <= 1)
+    {
+        return false;
+    }
+    return SwitchCycles(sw, nullptr) || WorkerTurns(sw);
+}
+
+bool Bot::WorkerTurns(s32 sw) const
+{
+    if (sw <= 1)
+    {
+        return false;
+    }
+    for (const Entity& lever : mWorld.mEntities)
+    {
+        if (lever.mKind != EntityKind::eLever || lever.mSwitch != sw)
+        {
+            continue;
+        }
+        for (const Entity& mud : mWorld.mEntities)
+        {
+            if (Domain::AngryWorker(mud) && std::abs((mud.mLive ? mud.mLiveX : mud.CentreX()) - lever.CentreX()) < 60 && std::abs((mud.mLive ? mud.mLiveY : mud.mY2) - lever.mY2) < 40)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool Bot::NoStopAt(s32 node) const
+{
+    if (!mKnow || node < 0 || node >= static_cast<s32>(mKnow->mNav.Nodes().size()))
+    {
+        return false;
+    }
+    const NavGraph& nav = mKnow->mNav;
+    const NavNode& at = nav.Nodes()[node];
+    if (at.mTrapDoor >= 0 && SwitchTurns(nav.Input().mFeatures[at.mTrapDoor].mSwitch))
+    {
+        return true;
+    }
+    // (the game's wall gets what is within 4 of where the map puts it, and he is some 12 to a side)
+    const s32 reach = 4 + (at.mHalf ? 6 : 12);
+    for (const NavFeature& f : nav.Input().mFeatures)
+    {
+        if (f.mKind == FeatureKind::eBarrier && f.mBeam && f.mHalf == at.mHalf && f.mY1 <= at.mY && f.mY2 >= at.mY - 40 && std::abs(at.mX - f.mX1) <= reach && WorkerTurns(f.mSwitch))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& action)
 {
     const DomainStep& step = domain.mSteps[action.mTag];
@@ -141,9 +197,14 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             // wants a few cells to get going. (Terminal 4's cage: the gate by the lever is two crossings a cell
             // apart, then the hoist; walked, the Slogs had him under it.)
             // (at a run from Slogs the same)
-            if ((TimedRunOn() || mWorld.mFleeing) && step.mOther == 0 && !mKeptPlan.empty() && mKeptPlan[0] == action.mName && (mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eWalk || mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eRoll))
+            // (and so are the ones that follow a crossing that ends where there is no stopping: on a trap door an
+            // angry Mudokon's lever opens again and again, or by an electric wall it turns on. Zulag 6's top floor:
+            // through the wall at 900, over the doors of 925..1026 and down through them, stopped at 912 between
+            // wall and doors, he was got as the wall came on.)
+            const bool noStop = NoStopAt(to);
+            if ((TimedRunOn() || mWorld.mFleeing || noStop) && step.mOther == 0 && !mKeptPlan.empty() && mKeptPlan[0] == action.mName && (mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eWalk || mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eRoll))
             {
-                for (std::size_t i = 1; i < mKeptPlan.size() && mKeptPlan[i].rfind("Cross ", 0) == 0; i++)
+                for (std::size_t i = 1; i < mKeptPlan.size() && mKeptPlan[i].rfind("Cross ", 0) == 0 && (TimedRunOn() || mWorld.mFleeing || NoStopAt(to)); i++)
                 {
                     const DomainStep* next = nullptr;
                     for (const Goap::Action& other : domain.mActions)
@@ -4330,7 +4391,7 @@ std::unique_ptr<Task> Bot::MakeSlogFlee()
         mFleeEdge = lastEdge >= 0 && nav.Edges()[lastEdge].mKind == EdgeKind::eRunJump ? lastEdge : -1;
         mFleeFrame = mAbe.mFrame;
         mWorld.mFleeing = true;
-        return std::make_unique<SlogFleeTask>(refuge, left, fromX);
+        return std::make_unique<SlogFleeTask>(refuge, left, fromX, mFleeEdge);
     }
     return nullptr;
 }

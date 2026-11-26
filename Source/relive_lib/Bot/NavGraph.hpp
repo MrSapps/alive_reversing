@@ -259,6 +259,8 @@ public:
     // Whether an edge can only be taken while a switch has a value (through a slam door, an electric wall, a door
     // that starts shut): which switch, and the value that lets Abe through
     bool Condition(const NavEdge& edge, s32* switchId, s32* openValue) const;
+    // The electric wall that edge's condition is (its feature), or -1: through the wall, or out of a cell in it
+    s32 BeamOf(const NavEdge& edge) const;
 
     // What doing an edge really led to: it goes there from now on
     void LearnEdge(s32 edgeIdx, s32 actualTo);

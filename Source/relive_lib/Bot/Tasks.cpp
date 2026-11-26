@@ -2379,6 +2379,20 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             drill = drill ? drill : SweepOver(nav, world, nav.Edges()[path[0]].mTo);
             const std::size_t count = std::min(out + 1, path.size());
+            // (and the walk stops short of the next drill along the way, which is timed on its own from there.
+            // Zulag 7's first screen, two drills side by side: timed under the first at 550, he walked on into the
+            // second at 625 at the bottom of its stroke.)
+            {
+                std::size_t next = out + 1;
+                while (next < path.size() && next < 40 && !SweepOver(nav, world, nav.Edges()[path[next]].mTo))
+                {
+                    next++;
+                }
+                if (next < path.size() && next < 40)
+                {
+                    sweepStop = std::min(sweepStop, next);
+                }
+            }
             sweepWalk = true;
             // Its lever, if that can be got to without going past it: no timing needed then
             const Entity* lever = !inside && mStops < 2 && bot.MayStopSweep() ? StopFor(bot, *drill, cur) : nullptr;
@@ -2742,18 +2756,54 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                             ? 1
                             : 0;
             }
-            if (pack >= 2)
+            // (unless they are all under the ledge, facing from the way he goes, and all just up in a leap: down
+            // and away as they come down, and they are 24 frames turning before they come after him. Zulag 8's
+            // second pen: its two Slogs leap side by side under the ledge of 1187,620, the floor they are on is
+            // the way on, and the cell beside the ledge keeps him from going over them. 20 frames a leap,
+            // measured, and as long to be down and off at a run.)
+            const bool goesLeft = down.mX < from.mX;
+            const std::vector<SlogAt>& slogs = bot.GetWorld().mSlogs;
+            // (one already in a leap when first seen: how far into it is not known, so not taken for one just up)
+            const bool fresh = mLeapAge.size() != slogs.size();
+            if (fresh)
+            {
+                mLeapAge.assign(slogs.size(), -1);
+            }
+            bool allUp = pack >= 2;
+            for (std::size_t i = 0; i < slogs.size(); i++)
+            {
+                const SlogAt& slog = slogs[i];
+                // (Motion_19_JumpUpwards)
+                mLeapAge[i] = slog.mMotion != 19 ? -1 : fresh ? 100 : mLeapAge[i] + 1;
+                const bool inPack = !slog.mAsleep && slog.mChasing && !bot.GetWorld().SlogFed(slog) && std::abs(slog.mY - under->mY) <= 30 && std::abs(slog.mX - under->mX) < 700 &&
+                                    !Domain::WallBetween(nav, slog.mX, down.mX, down.mY, down.mHalf) && !Domain::GateBetween(nav, bot.GetWorld(), slog.mX, down.mX, down.mY, down.mHalf);
+                if (inPack)
+                {
+                    const bool behind = goesLeft ? slog.mX >= from.mX - 10 * scale : slog.mX <= from.mX + 10 * scale;
+                    allUp = allUp && behind && slog.mFacesLeft != goesLeft && mLeapAge[i] >= 0 && mLeapAge[i] <= 4;
+                }
+            }
+            if (pack >= 2 && !(allUp && abe.Settled() && abe.mFacingLeft == goesLeft))
             {
                 if (mSlogWaits++ == 0)
                 {
-                    bot.Log(std::to_string(pack) + " Slogs awake under this ledge: not down among them");
+                    bot.Log(std::to_string(pack) + " Slogs awake under this ledge: leaving as they all leap up, facing away");
                 }
-                if (mSlogWaits > 90)
+                if (mSlogWaits > 900)
                 {
                     return TaskStep::Failed("Slogs awake on the floor under the ledge");
                 }
                 mSteps--;
+                if (abe.Settled() && abe.mFacingLeft != goesLeft)
+                {
+                    return TaskStep::Do(Prim::Wait(1, goesLeft ? Btn::eLeft : Btn::eRight));
+                }
                 return TaskStep::Do(Prim::Wait(1));
+            }
+            if (pack >= 2)
+            {
+                bot.Log("off the ledge as the Slogs under it leap up");
+                under = nullptr;
             }
         }
         if (under && mSlogWaits < 400)
@@ -3140,13 +3190,34 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             for (s32 k = 0; k <= 4; k++)
             {
                 const s32 n = nav.NodeAt(nav.Nodes()[cur].mX + wayDir * k * cellW, nav.Nodes()[cur].mY, abe.mHalfScale, 8);
-                if (n >= 0 && nav.Nodes()[n].mTrapDoor >= 0 && nav.Input().mFeatures[nav.Nodes()[n].mTrapDoor].mSwitch > 1 && (sw < 0 || nav.Input().mFeatures[nav.Nodes()[n].mTrapDoor].mSwitch == sw))
+                // (one the way gets to: not one past where this way ends. Zulag 6's top floor, the way only to the
+                // cell before its wall, and he was dashed over the doors beyond it to the Slig's side.)
+                const s32 endX = nav.Nodes()[nav.Edges()[path.back()].mTo].mX;
+                const bool reached = n >= 0 && nav.Nodes()[n].mTrapDoor >= 0 &&
+                                     (wayDir > 0 ? endX >= nav.Input().mFeatures[nav.Nodes()[n].mTrapDoor].mX1 : endX <= nav.Input().mFeatures[nav.Nodes()[n].mTrapDoor].mX2);
+                if (reached && nav.Input().mFeatures[nav.Nodes()[n].mTrapDoor].mSwitch > 1 && (sw < 0 || nav.Input().mFeatures[nav.Nodes()[n].mTrapDoor].mSwitch == sw))
                 {
                     const NavFeature& door = nav.Input().mFeatures[nav.Nodes()[n].mTrapDoor];
                     sw = door.mSwitch;
                     doorX1 = door.mX1;
                     doorX2 = door.mX2;
                     break;
+                }
+            }
+        }
+        // (and the doors of that switch that touch it, as one: Zulag 6's top floor has two side by side at
+        // 925..976 and 975..1026, and the dash over the first stopped on the second)
+        for (bool grew = sw > 1; grew;)
+        {
+            grew = false;
+            for (const NavFeature& f : nav.Input().mFeatures)
+            {
+                if (f.mKind == FeatureKind::eTrapDoor && f.mSwitch == sw && f.mHalf == abe.mHalfScale && std::abs(f.mY1 - nav.Nodes()[cur].mY) <= 30 && f.mX1 <= doorX2 + 5 && f.mX2 >= doorX1 - 5 &&
+                    (f.mX1 < doorX1 || f.mX2 > doorX2))
+                {
+                    doorX1 = std::min(doorX1, f.mX1);
+                    doorX2 = std::max(doorX2, f.mX2);
+                    grew = true;
                 }
             }
         }
@@ -3165,6 +3236,42 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
         }
         const bool cycles = sw > 1 && bot.SwitchCycles(sw, &since);
+        // Down through them, not over: the way falls through one of them when they open. Onto them by the way while
+        // they are shut, and stood on until they open. (Zulag 6's top floor: "stand over the right edge of the
+        // trapdoors, so you'll drop down to the Mudokon below", the walls of the same switch off while they are
+        // shut; dashed over them, he was on the far side with the Slig.)
+        if (sw > 1 && (cycles || angryLever))
+        {
+            bool drops = false;
+            s32 standX = 0;
+            for (std::size_t i = 0; i < path.size() && i < 8 && !drops; i++)
+            {
+                const NavEdge& e = nav.Edges()[path[i]];
+                drops = e.mKind == EdgeKind::eFall && e.mFeature >= 0 && nav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eTrapDoor && nav.Input().mFeatures[e.mFeature].mSwitch == sw;
+                // (stood on over where the fall comes down: not every door of a row has floor under it. "Stand over
+                // the right edge of the trapdoors", the left of Zulag 6's two is over a drop to the death)
+                standX = drops ? nav.Nodes()[e.mTo].mX : 0;
+            }
+            if (drops && OnCyclingDoor(bot, nav, cur) && abe.mOnGround && mCycleWaits < 3000)
+            {
+                const s32 stand = nav.NodeAt(standX, nav.Nodes()[cur].mY, abe.mHalfScale, 8);
+                if (stand >= 0 && stand != cur && OnCyclingDoor(bot, nav, stand) && bot.GetWorld().Switch(sw) == (nav.Input().mFeatures[nav.Nodes()[cur].mTrapDoor].mStartClosed ? 0 : 1) && abe.Settled())
+                {
+                    return TaskStep::Do(Prim::MoveTo(standX, Gait::eWalk));
+                }
+                if (mCycleWaits++ == 0)
+                {
+                    bot.Log("on the trap doors of switch " + std::to_string(sw) + ": down with them as they open");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (drops)
+            {
+                // (on to them by the way, as for any floor: what is to be timed on it is timed below)
+                sw = -1;
+            }
+        }
         if (sw > 1 && (cycles || angryLever))
         {
             const bool shutNow = bot.GetWorld().Switch(sw) == value;
@@ -3253,6 +3360,29 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     beyond = x;
                 }
             }
+            // (and on past an electric wall of the same switch just beyond them, off while they are shut, to the first
+            // cell it does not reach: the game's wall gets what is within 4 of where the map puts it, and he is some
+            // 12 to a side. Zulag 6's top floor: the doors of switch 36 at 925..1026 and its walls at 900 and 1050,
+            // stopped at 1037 past the doors he was got as they all came on again.)
+            if (beyond >= 0)
+            {
+                const s32 reach = 4 + (abe.mHalfScale ? 6 : 12);
+                for (s32 extra = 0; extra < 4; extra++)
+                {
+                    bool near = false;
+                    for (const NavFeature& f : nav.Input().mFeatures)
+                    {
+                        near = near || (f.mKind == FeatureKind::eBarrier && f.mBeam && f.mSwitch == sw && f.mHalf == abe.mHalfScale && f.mY1 <= nav.Nodes()[curNode].mY && f.mY2 >= nav.Nodes()[curNode].mY - 40 &&
+                                        std::abs(beyond - f.mX1) <= reach);
+                    }
+                    const s32 next = nav.NodeAt(beyond + dir * cell, nav.Nodes()[curNode].mY, abe.mHalfScale, 8);
+                    if (!near || next < 0)
+                    {
+                        break;
+                    }
+                    beyond += dir * cell;
+                }
+            }
             // (a row of them with mines between, the way a hop at a time: the hop held down, one after another with no
             // stop, to the first cell past the last door. "When the trapdoors close, hold the Triangle button to hop 4
             // times to safety": a hop as a step of its own each, the doors were open again by the third.)
@@ -3301,6 +3431,89 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         else
         {
             mCycleOn = false;
+        }
+    }
+    // An electric wall on the way that an angry Mudokon at its lever turns on and off, or that turns over by
+    // itself: through it just after it has gone off, from the cell before it, and not walked into on the way to
+    // that cell. (Zulag 6: "Walk through the electric fences when turned off. At least the pattern is
+    // predictable", the two of switch 33 on floor 880, one on while the other is off.)
+    {
+        const World& world = bot.GetWorld();
+        for (std::size_t k = 0; k < path.size() && k < 8; k++)
+        {
+            const NavEdge& e = nav.Edges()[path[k]];
+            s32 sw = 0;
+            s32 open = 0;
+            const s32 wall = nav.BeamOf(e);
+            if (wall < 0 || !nav.Condition(e, &sw, &open) || sw <= 1)
+            {
+                continue;
+            }
+            // (only an angry Mudokon's: a switch that turns over because he pulls it himself, luring Slogs into its
+            // walls as in the Mines' path 3, is his to time)
+            s32 since = 100000;
+            bot.SwitchCycles(sw, &since);
+            bool turns = false;
+            for (const Entity& lever : world.mEntities)
+            {
+                if (lever.mKind != EntityKind::eLever || lever.mSwitch != sw)
+                {
+                    continue;
+                }
+                for (const Entity& mud : world.mEntities)
+                {
+                    turns = turns || (Domain::AngryWorker(mud) && std::abs((mud.mLive ? mud.mLiveX : mud.CentreX()) - lever.CentreX()) < 60 && std::abs((mud.mLive ? mud.mLiveY : mud.mY2) - lever.mY2) < 40);
+                }
+            }
+            if (!turns)
+            {
+                continue;
+            }
+            // (just off, with time in hand to be past it at a walk before it is on again: by the beat it has been
+            // seen to keep, or, with none seen yet, only at once)
+            // (the wall is where the map puts it, its left edge, and gets what is within 4 of that; he is some 12
+            // to a side, half that at half scale)
+            const NavFeature& beam = nav.Input().mFeatures[wall];
+            const s32 reach = 4 + (nav.Nodes()[e.mFrom].mHalf ? 6 : 12);
+            const s32 farX = beam.mX1 + (nav.Nodes()[e.mTo].mX < nav.Nodes()[e.mFrom].mX ? -reach : reach);
+            const s32 scale = nav.Nodes()[e.mFrom].mHalf ? 2 : 1;
+            const s32 need = (std::abs(farX - abe.mX) * scale + 4) * 10 / 27 + 4;
+            // (by how long it stayed off the time before: an angry Mudokon's on and off are not as long as each other)
+            const s32 lasts = bot.SwitchLasted(sw);
+            const bool justOff = world.Switch(sw) == open && (lasts > 0 ? lasts - since >= need : since <= 3);
+            if (justOff)
+            {
+                // (and the next on the way may be another of the same switch, which this one being off has on)
+                continue;
+            }
+            // (the wait is where the wall does not reach him when it comes on: the game's wall gets what is within
+            // 4 of it, and his own width is some 12 to a side, so the cell next to it is no place to stand. Zulag
+            // 6: waited for the wall of 1050,460 at 1037, he was got as it came on.)
+            const auto clear = [&](s32 n)
+            {
+                return std::abs(nav.Nodes()[n].mX - beam.mX1) > reach;
+            };
+            std::size_t waitAt = k;
+            while (waitAt > 0 && !clear(nav.Edges()[path[waitAt]].mFrom))
+            {
+                waitAt--;
+            }
+            if (waitAt > 0)
+            {
+                // (up to the cell before it, and there the wait)
+                path.resize(waitAt);
+                break;
+            }
+            if (mFenceWaits++ == 0)
+            {
+                bot.Log("an electric wall that an angry Mudokon's lever turns on and off (switch " + std::to_string(sw) + "): through it just after it goes off");
+            }
+            if (mFenceWaits < 3000)
+            {
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            break;
         }
     }
     // (what the step for the edge in hand is worked out from)
@@ -6480,7 +6693,12 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
         {
             continue;
         }
-        if (r.mHalf == sack->mHalf && std::abs(r.mX - sack->CentreX()) < 500 && std::abs(r.mY - nav.Nodes()[cur].mY) < 200)
+        bool unpicked = false;
+        for (const std::pair<s32, s32>& u : mUnpicked)
+        {
+            unpicked = unpicked || (std::abs(u.first - r.mX) <= 12 && std::abs(u.second - r.mY) <= 12);
+        }
+        if (!unpicked && r.mHalf == sack->mHalf && std::abs(r.mX - sack->CentreX()) < 500 && std::abs(r.mY - nav.Nodes()[cur].mY) < 200)
         {
             rock = &r;
         }
@@ -6605,8 +6823,17 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return TaskStep::Do(Prim::Press(Btn::eDown));
         }
+        // (one that will not come up, left be for the sack itself: Bonewerkz' path 4, a rock thrown at a mine
+        // lay near the sack at 2537 and the pick was tried for good)
         if (++mPicks > 6)
         {
+            if (rock && mUnpicked.size() < 4)
+            {
+                bot.Log("the rock at " + std::to_string(rock->mX) + "," + std::to_string(rock->mY) + " won't be picked up: the sack instead");
+                mUnpicked.push_back({rock->mX, rock->mY});
+                mPicks = 0;
+                return abe.mMove == Move::eCrouch ? TaskStep::Do(Prim::Press(Btn::eUp)) : Next(bot, "");
+            }
             return TaskStep::Failed("the rocks wouldn't be picked up");
         }
         return TaskStep::Do(Prim::Press(Btn::eAction, 20));
@@ -17861,14 +18088,41 @@ TaskStep SlogFleeTask::Next(Bot& bot, const std::string& lastFailed)
         // (past it and still here: the old way, back to the plate)
         mThrough = 0;
     }
+    // (a running jump at a ledge: from the run he is in, as soon as he is on his feet and running the way of it,
+    // when the take-off is ahead. Stopped where its run-up begins and off again from a stand, the Slogs had him:
+    // Zulag 8's second pen, down off the ledge of 1187,620 as they leapt and caught at 1312, the stop.)
+    if (!mGo && mJumpEdge >= 0 && !mJumped && mJumpEdge < static_cast<s32>(bot.Nav().Edges().size()))
+    {
+        const NavEdge& jump = bot.Nav().Edges()[mJumpEdge];
+        const s32 toTakeoff = jump.mLeft ? abe.mX - jump.mX : jump.mX - abe.mX;
+        // (over plain floor all the way to the take-off: no drill, nothing low to roll under, no hazard. Bonewerkz'
+        // ender path 14: the run from the Slogs to the jump at 1187 goes under a drill and a roll, which the way
+        // there takes care of, and the jump's own run went into the drill.)
+        bool plain = true;
+        {
+            const NavGraph& nav = bot.Nav();
+            const s32 cell = NavGraph::GridStep(abe.mHalfScale);
+            for (s32 x = abe.mX; plain && (jump.mLeft ? x >= jump.mX : x <= jump.mX); x += jump.mLeft ? -cell : cell)
+            {
+                const s32 n = nav.NodeAt(x, abe.mY, abe.mHalfScale, 12);
+                plain = n >= 0 && nav.Nodes()[n].mSweep < 0 && nav.Nodes()[n].mSweepHigh < 0 && !nav.Nodes()[n].mHazard && !nav.Nodes()[n].mLow;
+            }
+        }
+        if (plain && abe.mOnGround && abe.mMove == Move::eRun && abe.mFacingLeft == jump.mLeft && toTakeoff > abe.Grid2() / 2)
+        {
+            mJumped = true;
+            bot.Log("the running jump at the ledge from the run");
+            return TaskStep::Do(Prim::RunJump(jump.mX, jump.mLeft));
+        }
+    }
     // (a run looks at what is held every other cell, and with nothing held there slides two cells to a stop: so
     // let go once the look four cells short is past, for the one two cells short. Measured: let go a frame after
     // that one he ran on to the next and stood two cells too far.)
-    if (!mGo && (!abe.mOnGround || ahead > 88) && ++mHeld < 200)
+    if (!mGo && !mJumped && (!abe.mOnGround || ahead > 88) && ++mHeld < 200)
     {
         return TaskStep::Do(Prim::Wait(abe.mOnGround ? std::max(1, std::min(8, (ahead - 88) / 7)) : 1, (mLeft ? Btn::eLeft : Btn::eRight) | Btn::eRun));
     }
-    if (!mGo && abe.mMove == Move::eRun && ++mHeld < 260)
+    if (!mGo && !mJumped && abe.mMove == Move::eRun && ++mHeld < 260)
     {
         return TaskStep::Do(Prim::Wait(1));
     }

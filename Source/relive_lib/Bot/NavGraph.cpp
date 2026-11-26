@@ -377,6 +377,23 @@ s32 NavGraph::BarrierBetween(s32 xa, s32 xb, s32 y, bool half) const
     return -1;
 }
 
+s32 NavGraph::BeamOf(const NavEdge& edge) const
+{
+    s32 sw = 0;
+    if (!Condition(edge, &sw, nullptr))
+    {
+        return -1;
+    }
+    for (const s32 f : {edge.mFence, edge.mFeature, edge.mClear})
+    {
+        if (f >= 0 && mInput.mFeatures[f].mKind == FeatureKind::eBarrier && mInput.mFeatures[f].mBeam && mInput.mFeatures[f].mSwitch == sw)
+        {
+            return f;
+        }
+    }
+    return -1;
+}
+
 bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) const
 {
     if (edge.mWhen >= 0 && edge.mWell >= 0)
