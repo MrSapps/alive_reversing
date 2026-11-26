@@ -2883,6 +2883,16 @@ struct Domain::Builder final
     std::set<s32> mLetOut;
     std::set<u32> mHuntable;
     std::set<s32> mHuntGates;
+    // A Slog dropped by a ring once a barrier is open (Key::Released): its entity, that barrier's switch fact, and
+    // its floor (the ring's cell)
+    struct Release final
+    {
+        u32 mSlog = 0;
+        Goap::Fact mOpen;
+        s32 mFloorY = 0;
+        s32 mHalf = 0;
+    };
+    std::vector<Release> mReleases;
     std::vector<char> mPackAt;
     std::vector<GrenadeTarget> mGrenadeTargets;
     std::vector<Goap::Fact> mEatenAll;
@@ -3059,6 +3069,39 @@ Domain Domain::Builder::Run()
     // a short while, which does for Abe on his own but not for leading a group by. (Zulag 5: the big Slog by the
     // bone sack, fed, was taken as out of the way of the wheels' Mudokons.) Only once no Slogs by a ring are left:
     // before that it reordered what comes first, and the Sloggies' drop failed.
+    // A Slog let out to be dropped by a ring (TrapDoorSligs): the drop straight after the barrier that kept it is
+    // opened, with only ways and levers between. Anything longer and it wanders off out of reach (Zulag 5's big
+    // Slog: the plan went for bones in between). "pull the lever to open the right gate. Quickly climb back up
+    // again. Go right across the top. The Slog will chase you."
+    // (and over the top, off its floor: "Quickly climb back up again. Go right across the top." Walked along its
+    // floor, it caught him.)
+    for (const Release& release : mReleases)
+    {
+        const Goap::Fact released{Key::Released(release.mSlog), 1};
+        if (mD.mStart.Has(release.mOpen))
+        {
+            mD.mStart.Set(released.mKey, 1);
+        }
+        for (Goap::Action& a : mD.mActions)
+        {
+            if (std::find(a.mEffects.begin(), a.mEffects.end(), release.mOpen) != a.mEffects.end())
+            {
+                a.mEffects.push_back(released);
+                continue;
+            }
+            const DomainStep* step = a.mTag >= 0 && a.mTag < static_cast<s32>(mD.mSteps.size()) ? &mD.mSteps[a.mTag] : nullptr;
+            bool keeps = step && step->mKind == StepKind::eUse;
+            if (step && step->mKind == StepKind::eCross && step->mEdge >= 0 && step->mEdge < static_cast<s32>(mEdges.size()))
+            {
+                const NavNode& to = mNav.Nodes()[mEdges[step->mEdge].mTo];
+                keeps = to.mHalf != release.mHalf || std::abs(to.mY - release.mFloorY) > 30;
+            }
+            if (!keeps && std::find(a.mPre.begin(), a.mPre.end(), released) == a.mPre.end())
+            {
+                a.mEffects.push_back({released.mKey, 0});
+            }
+        }
+    }
     bool ringSlogsLeft = false;
     for (const Goap::Action& a : mD.mActions)
     {
@@ -5539,6 +5582,7 @@ void Domain::Builder::TrapDoorSligs()
                 continue;
             }
             std::vector<Goap::Fact> opens;
+            s32 nearestOpen = -1;
             if (std::abs(slog.CentreX() - under.mX) > 200)
             {
                 // (the nearest of the ring's trap doors on its side)
@@ -5556,6 +5600,12 @@ void Domain::Builder::TrapDoorSligs()
                     if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == under.mHalf && f.mY1 <= under.mY + 4 && f.mY2 >= under.mY - 40 && fx > std::min(slog.CentreX(), doorEdge) && fx < std::max(slog.CentreX(), doorEdge))
                     {
                         opens.push_back({Key::Switch(f.mSwitch), f.mStartClosed ? 1 : 0});
+                        if (nearestOpen < 0 || std::abs(fx - slog.CentreX()) < std::abs(nearestOpen - slog.CentreX()))
+                        {
+                            nearestOpen = fx;
+                            mReleases.erase(std::remove_if(mReleases.begin(), mReleases.end(), [&](const Release& r) { return r.mSlog == slog.mId; }), mReleases.end());
+                            mReleases.push_back({slog.mId, opens.back(), under.mY, under.mHalf});
+                        }
                     }
                 }
             }
@@ -5600,6 +5650,8 @@ void Domain::Builder::TrapDoorSligs()
             {
                 std::vector<Goap::Fact> pre{regionFact(over)};
                 pre.insert(pre.end(), one.second.begin(), one.second.end());
+                // (straight after it is let out: Run() ties Key::Released to that)
+                pre.push_back({Key::Released(one.first.mKey - Key::Switch(World::HazardSwitch(0))), 1});
                 // (with a bone to toss it over the far trap door with, where there are any: SlogRingTask)
                 const bool bones = !world.CarriesMeat();
                 // (mOther 1: by the bone over the far trap door, SlogRingTask)
@@ -6541,7 +6593,7 @@ void Domain::Builder::SlogPens()
                 s32 frames = 0;
                 // (not from a region that comes onto the stretch along the floor only: see above)
                 const bool round = roundRegions.count(d.mRegions[n]) != 0;
-                if (level ? BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames, nullptr, nullptr, true) : !round && BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames))
+                if (level ? BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames, nullptr, nullptr, true, &world) : !round && BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames, nullptr, nullptr, false, &world))
                 {
                     DomainStep feed;
                     feed.mKind = StepKind::eFeedSlogs;
@@ -8258,7 +8310,7 @@ bool Domain::SightBlocked(const NavInput& in, bool half, s32 x1, s32 y1, s32 x2,
     return false;
 }
 
-bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX, const std::function<bool(s32 downX)>& wanted, bool otherScreen)
+bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX, const std::function<bool(s32 downX)>& wanted, bool otherScreen, const World* world)
 {
     static const ThrowSpot::Kind kKinds[] = {ThrowSpot::eDown, ThrowSpot::eForward, ThrowSpot::eUp, ThrowSpot::eLob};
     const NavNode& from = nav.Nodes()[node];
@@ -8313,11 +8365,27 @@ bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY
             // down at 315 and at rest at 407, a screen's edge at 375, and the Slogs had him at the lever.)
             // (from over the floor it has a few cells of roll in it; thrown along the floor he stands on it rolls
             // half a screen. Into a wall is no matter: it comes back off it.)
-            const s32 roll = std::abs(from.mY - floorY) <= 10 ? 220 : 100;
+            // (one thrown down skips on a long way past where it first comes down: Zulag 5, from 1037,360 down
+            // at 876, then 768, and it lay at 738)
+            const s32 roll = std::abs(from.mY - floorY) <= 10 ? 220 : kind == ThrowSpot::eDown ? 140 : 100;
             const s32 rest = end.mX + (goesLeft ? -roll : roll);
             const s32 camW = std::max(1, nav.Input().mCamW);
             // (past the stretch's end that way: a wall there stops it, a screen's edge does not)
-            const bool off = goesLeft ? rest < x1 && x1 % camW == 0 : rest > x2 && x2 % camW == camW - 1;
+            bool off = goesLeft ? rest < x1 && x1 % camW == 0 : rest > x2 && x2 % camW == camW - 1;
+            // (nor a slam door at that end that is open: it rolls on out through it. Zulag 5's Slog pen, the gate at
+            // 762: thrown down from 1037 it came down at 768 and lay at 738, and the Slog was shut out by lever 140.)
+            if (world && !off && (goesLeft ? rest < x1 : rest > x2))
+            {
+                const s32 edge = goesLeft ? x1 : x2;
+                for (const NavFeature& f : nav.Input().mFeatures)
+                {
+                    if (f.mKind == FeatureKind::eBarrier && f.mSwitch > 1 && f.mHalf == from.mHalf && std::abs((f.mX1 + f.mX2) / 2 - edge) <= 30 && f.mY1 <= floorY + 4 && f.mY2 >= floorY - 40 &&
+                        FloorOpen(nav.Input(), *world, std::min(rest, edge) , std::max(rest, edge), floorY + 4, from.mHalf))
+                    {
+                        off = true;
+                    }
+                }
+            }
             if (end.mX < x1 + 15 || end.mX > x2 - 15 || (!otherScreen && nav.CameraOf(end.mX, floorY - 5) != cam) || off || (wanted && !wanted(end.mX)))
             {
                 continue;

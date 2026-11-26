@@ -4264,8 +4264,16 @@ std::unique_ptr<Task> Bot::MakeSlogFlee()
     for (const SlogAt& slog : mWorld.mSlogs)
     {
         s32 node = -1;
-        // (one with a bone to go for is not after him)
-        if (mWorld.SlogFed(slog))
+        // (one with a bone to go for is not after him, nor one eating one: Zulag 5's pen, he went down to lever 140
+        // as the Slog ate the bone at 895, took it for one after him and was back up at once. 20: AE's
+        // Motion_20_Eating)
+        // (or one a bone lies by on its floor, that it is on its way to: it stops at it)
+        bool byBone = false;
+        for (const RockAt& bone : mWorld.mBones)
+        {
+            byBone = byBone || (std::abs(bone.mY - slog.mY) <= 20 && std::abs(bone.mX - slog.mX) <= 80 && (bone.mX - slog.mX) * (mAbe.mX - slog.mX) <= 0);
+        }
+        if (mWorld.SlogFed(slog) || (mIsAe && slog.mMotion == 20) || byBone)
         {
             continue;
         }

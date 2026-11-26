@@ -7307,7 +7307,7 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
         {
             mInHand = true;
             mHad = -world.mRocks - 1;
-            bot.Log("a bone for the Slogs at " + std::to_string(px1) + ".." + std::to_string(px2) + " from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + ", " + std::to_string(world.mRocks) + " in hand");
+            bot.Log("a bone for the Slogs at " + std::to_string(px1) + ".." + std::to_string(px2) + " from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + ", " + std::to_string(world.mRocks) + " in hand (aim " + std::to_string(static_cast<s32>(mKind)) + (mLeft ? " left)" : " right)"));
             return TaskStep::Do(Prim::Wait(8, Btn::eThrow));
         }
         mInHand = false;
@@ -13535,6 +13535,23 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
             slogs.push_back(&s);
         }
     }
+    // (when the nearest began eating, as it is: a Slog eats a while, then turns and runs at him)
+    {
+        const SlogAt* eater = nullptr;
+        for (const SlogAt* s : slogs)
+        {
+            eater = !eater || std::abs(s->mX - under.mX) < std::abs(eater->mX - under.mX) ? s : eater;
+        }
+        const bool eating = eater && bot.IsAe() && eater->mMotion == 20;
+        if (eating && mEatFrom == 0)
+        {
+            mEatFrom = static_cast<s32>(bot.Abe().mFrame);
+        }
+        if (!eating && mEatFrom != 0)
+        {
+            mEatFrom = 0;
+        }
+    }
     // (the ones seen near the ring while at this: what is gone at the end is those. The big Slog in its pen, on the
     // screen next door, was taken for one of the Sloggies.)
     for (const Entity& e : world.mEntities)
@@ -13651,21 +13668,68 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
     // (one in hand is no longer counted among them)
     if (mPhase == 0 && mByBone && (world.mRocks > 0 || mBoneInHand) && !world.CarriesMeat() && mBoneTries < 3)
     {
+        const SlogAt* nearest = nullptr;
+        for (const SlogAt* sl : slogs)
+        {
+            nearest = !nearest || std::abs(sl->mX - under.mX) < std::abs(nearest->mX - under.mX) ? sl : nearest;
+        }
+        // (beyond the trap door on the side away from where it is, or the right one)
+        const NavFeature* far = nullptr;
+        for (const NavFeature& door : nav.Input().mFeatures)
+        {
+            if (nearest && door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring->mSwitch && door.mHalf == under.mHalf && std::abs(door.mY1 - under.mY) < 40 &&
+                (!far || ((door.mX1 + door.mX2) / 2 - under.mX) * (nearest->mX - under.mX) < 0))
+            {
+                far = &door;
+            }
+        }
+        const bool right = far && (far->mX1 + far->mX2) / 2 > under.mX;
+        // (onto the door or past it: one that eats it on the door is dropped as it eats, or as it comes back over it)
+        s32 x1 = far ? (right ? far->mX1 + 5 : far->mX1 - 100) : 0;
+        s32 x2 = far ? (right ? far->mX2 + 100 : far->mX2 - 5) : 0;
+        // (short of a slam door past it: beyond one that is shut, or shuts, the Slog does not get to it. Zulag 5:
+        // to 1448, past the door at 1425 that the ledge Mudokon keeps turning over, and the Slog sat at 1209)
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            if (far && f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == under.mHalf && f.mY1 <= under.mY + 4 && f.mY2 >= under.mY - 40)
+            {
+                x2 = right && f.mX1 > far->mX2 ? std::min(x2, f.mX1 - 10) : x2;
+                x1 = !right && f.mX2 < far->mX1 ? std::max(x1, f.mX2 + 10) : x1;
+            }
+        }
+        // (from the floor over the ring: the cell nearest it that has a throw there, else the nearest. Zulag 5: from
+        // 1312,360 down, onto the door at 1339; nothing from 1287 came down short of the slam door)
         s32 over = -1;
+        bool overThrows = false;
+        u32 aim = 0;
+        s32 frames = 0;
+        s32 downX = 0;
         for (std::size_t n = 0; n < nav.Nodes().size(); n++)
         {
             const NavNode& node = nav.Nodes()[n];
-            if (node.mHalf == under.mHalf && !node.mHazard && node.mY <= under.mY - 60 && node.mY >= under.mY - 160 && nav.CameraOf(node.mX, node.mY - 5) == cam &&
-                (over < 0 || std::abs(node.mX - under.mX) < std::abs(nav.Nodes()[over].mX - under.mX)))
+            if (node.mHalf != under.mHalf || node.mHazard || node.mY > under.mY - 60 || node.mY < under.mY - 160 || nav.CameraOf(node.mX, node.mY - 5) != cam || std::abs(node.mX - under.mX) > 60)
+            {
+                continue;
+            }
+            u32 a = 0;
+            s32 f = 0;
+            s32 dx = 0;
+            const bool throws = far && Domain::BoneThrow(nav, static_cast<s32>(n), x1, x2, under.mY, a, f, &dx);
+            if (over < 0 || (throws && !overThrows) || (throws == overThrows && std::abs(node.mX - under.mX) < std::abs(nav.Nodes()[over].mX - under.mX)))
             {
                 over = static_cast<s32>(n);
+                overThrows = throws;
+                aim = a;
+                frames = f;
+                downX = dx;
             }
         }
-        if (over >= 0 && bot.AbeNode() != over)
+        if (over >= 0 && bot.AbeNode() != over && !mBoneInHand)
         {
-            if (!mGo)
+            if (!mGo || mGoTo != over)
             {
                 mGo = GoToNode(over);
+                mGoTo = over;
             }
             TaskStep go;
             if (!RunGo(mGo, bot, lastFailed, go))
@@ -13679,30 +13743,10 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
             }
             return TaskStep::Do(Prim::Wait(1));
         }
-        const SlogAt* nearest = nullptr;
-        for (const SlogAt* sl : slogs)
-        {
-            nearest = !nearest || std::abs(sl->mX - under.mX) < std::abs(nearest->mX - under.mX) ? sl : nearest;
-        }
         if (over >= 0 && nearest && (std::abs(nearest->mX - under.mX) <= 160 || mBoneInHand))
         {
-            // (beyond the trap door on the side away from where it is, or the right one)
-            const NavFeature* far = nullptr;
-            for (const NavFeature& door : nav.Input().mFeatures)
-            {
-                if (door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring->mSwitch && door.mHalf == under.mHalf && std::abs(door.mY1 - under.mY) < 40 &&
-                    (!far || ((door.mX1 + door.mX2) / 2 - under.mX) * (nearest->mX - under.mX) < 0))
-                {
-                    far = &door;
-                }
-            }
-            u32 aim = 0;
-            s32 frames = 0;
-            s32 downX = 0;
-            const bool right = far && (far->mX1 + far->mX2) / 2 > under.mX;
-            const s32 x1 = far ? (right ? far->mX2 + 10 : far->mX1 - 100) : 0;
-            const s32 x2 = far ? (right ? far->mX2 + 100 : far->mX1 - 10) : 0;
-            if (far && Domain::BoneThrow(nav, over, x1, x2, under.mY, aim, frames, &downX))
+            (void) frames;
+            if (overThrows)
             {
                 const bool left = aim % 2 == 1;
                 if (bot.Abe().mFacingLeft != left)
@@ -13717,7 +13761,11 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 mBoneInHand = false;
                 mBoneTries++;
-                mPhase = 3;
+                // (and down to the ring once it is past it, at the bone: going down as it ran under him to it, he
+                // came down in its way. Zulag 5, the Slog at 1203 and the bone to 1381.)
+                mPhase = 4;
+                mTossRight = right;
+                mTossFrame = static_cast<s32>(bot.Abe().mFrame);
                 bot.NoteRingBone(mRing);
                 mGo.reset();
                 return TaskStep::Do(Prim::Wait(6, Btn::eThrow | BlowMineTask::AimBits(static_cast<ThrowSpot::Kind>((aim & 255) / 2), left)));
@@ -13727,6 +13775,20 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return TaskStep::Do(Prim::Wait(2));
         }
+    }
+    if (mPhase == 4)
+    {
+        bool past = !slogs.empty();
+        for (const SlogAt* sl : slogs)
+        {
+            past = past && (mTossRight ? sl->mX > under.mX + 40 : sl->mX < under.mX - 40);
+        }
+        if (past || static_cast<s32>(bot.Abe().mFrame) - mTossFrame > 240)
+        {
+            bot.Log(past ? "the Slog is past the ring, at the bone: down to it" : "no Slog went past the ring for the bone: down to it");
+            mPhase = 3;
+        }
+        return TaskStep::Do(Prim::Wait(1));
     }
     if (mPhase == 0)
     {
@@ -13953,7 +14015,28 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
         const s32 then = s->mX + pace10 * mDelay / 10;
         for (const NavFeature& door : nav.Input().mFeatures)
         {
-            on = on || (pace10 != 0 && door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring->mSwitch && std::abs(door.mY1 - under.mY) < 40 && then >= door.mX1 + 2 && then <= door.mX2 - 2);
+            // (a door on its side of him: one on the far side it gets to through him. Zulag 5, the big Slog at 1230
+            // on the left door coming at him, timed for the right one: dead)
+            const bool itsSide = ((door.mX1 + door.mX2) / 2 - under.mX) * (s->mX - under.mX) > 0;
+            // (or one stood on it: at the bone tossed there)
+            const bool stood = pace10 == 0 && last != 0 && s->mX >= door.mX1 + 2 && s->mX <= door.mX2 - 2;
+            on = on || ((pace10 != 0 || stood) && (itsSide || stood) && door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring->mSwitch && std::abs(door.mY1 - under.mY) < 40 && ((then >= door.mX1 + 2 && then <= door.mX2 - 2) || stood));
+        }
+    }
+    // (one eating beyond a trap door, by when it began: it eats some 56 frames, turns, and runs at him 68 frames
+    // after it began, over the door some 73 to 77. Open for 20 frames, the door has it when it opens 57 to 76 frames
+    // after, which is a pull 33 to 52 frames after at the 24 it takes: 42. Zulag 5's big Slog at the bone tossed
+    // over the far door: pulled as it set off, it was through before the door opened.)
+    for (const SlogAt* s : slogs)
+    {
+        bool doorBetween = false;
+        for (const NavFeature& door : nav.Input().mFeatures)
+        {
+            doorBetween = doorBetween || (door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring->mSwitch && std::abs(door.mY1 - under.mY) < 40 && door.mX1 > std::min(s->mX, under.mX) && door.mX2 < std::max(s->mX, under.mX));
+        }
+        if (doorBetween && mEatFrom != 0 && s->mMotion == 20 && static_cast<s32>(bot.Abe().mFrame) - mEatFrom >= 66 - mDelay)
+        {
+            on = true;
         }
     }
     mLastX = xs;

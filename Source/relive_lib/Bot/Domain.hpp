@@ -69,6 +69,12 @@ inline u32 OffDrill(u32 entityId)
 {
     return 7000000 + entityId;
 }
+// A Slog kept from a ring's trap doors by a barrier has just been let out (the barrier opened, with only ways and
+// levers since): what dropping it needs (Zulag 5's big Slog)
+inline u32 Released(u32 entityId)
+{
+    return 8000000 + entityId;
+}
 } // namespace Key
 
 enum class StepKind : u8
@@ -570,7 +576,7 @@ struct Domain final
     // it comes down. The soonest of the throws there are; false if none.
     // otherScreen: down on a screen that is not the one he throws from is as good (for Slogs that wait behind
     // something and find the bone when he comes onto their screen)
-    static bool BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX = nullptr, const std::function<bool(s32 downX)>& wanted = nullptr, bool otherScreen = false);
+    static bool BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX = nullptr, const std::function<bool(s32 downX)>& wanted = nullptr, bool otherScreen = false, const World* world = nullptr);
     static std::vector<ThrowSpot> ThrowSpots(const NavGraph& nav, s32 x, s32 y, bool half, const World* world = nullptr);
     // A Mudokon that pulls the lever by it in anger, and has not been told sorry
     static bool AngryWorker(const Entity& mud);

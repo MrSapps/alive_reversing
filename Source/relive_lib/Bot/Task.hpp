@@ -1842,6 +1842,13 @@ private:
     // The side of the slam door that shuts them away that faces the ring
     s32 mDoorX = 0;
     std::unique_ptr<GoToTask> mGo;
+    // The cell mGo goes to, where that changes (the cell a bone is tossed from)
+    s32 mGoTo = -1;
+    // Tossed (mPhase 4): which way, and when
+    bool mTossRight = false;
+    s32 mTossFrame = 0;
+    // The frame the nearest Slog was first seen eating, as it is now (0: it is not)
+    s32 mEatFrom = 0;
     std::unique_ptr<Task> mUse;
 };
 
