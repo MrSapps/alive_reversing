@@ -799,6 +799,18 @@ s32 NavGraph::WellOut(s32 featureIdx, s32 when, s32 depth, s32 knownSwitch, s32 
             const s32 line = FloorBelow(from, other.mY1 - 60, other.mHalf, &fy);
             return line >= 0 ? NodeOnLine(line, from) : -1;
         }
+        // (thrown at a point below its own floor: he comes down on the first floor under him on the way, its own
+        // or one between. Hub 2's background well at 499,368, aimed at 525,565: he lands by it on the floor at 379.)
+        if (other.mD > other.mY2)
+        {
+            s32 fy = 0;
+            const s32 line = FloorBelow(other.mC, other.mY1 - 20, other.mHalf, &fy);
+            // (its own floor, not one over it: the Mudomo vault's path 11, the well at 1636,400)
+            if (line >= 0 && fy <= other.mD && fy >= other.mY1)
+            {
+                return NodeOnLine(line, other.mC);
+            }
+        }
         return Thrown(other.mC, other.mD, from, other.mHalf, depth, knownSwitch, knownValue);
     }
     return -1;
