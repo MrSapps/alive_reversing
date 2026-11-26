@@ -1004,7 +1004,9 @@ struct World final
                 // (the Slogs of a stretch of floor: on while a bone is on it, or in the air over it)
                 if (e.mKind == EntityKind::eSlog && HazardSwitch(e.mId) == id)
                 {
-                    if (e.mGone)
+                    // (or dropped by a ring, which the map does not mark: Zulag 5's big Slog, whose pen was kept off
+                    // after it went down, and the Mudokon over it was not got to)
+                    if (e.mGone || mFleechKilled.count(e.mId) != 0)
                     {
                         return 1;
                     }
@@ -1056,6 +1058,18 @@ struct World final
                     return 1;
                 }
                 // (a Slig that a flying Slig is to get rid of: Domain::FlierTargets)
+                // (the Sligs over a pull ring's trap doors, GameView's MarkRingSligs: once they are all down)
+                if (e.mKind == EntityKind::ePullRing && HazardSwitch(e.mId) == id)
+                {
+                    for (const Entity& o : mEntities)
+                    {
+                        if (o.mKind == EntityKind::eSlig && o.mInputs[4] == static_cast<s32>(e.mId) + 1 && !o.mGone && mFleechKilled.count(o.mId) == 0)
+                        {
+                            return 0;
+                        }
+                    }
+                    return 1;
+                }
                 if (e.mKind == EntityKind::eSlig && HazardSwitch(e.mId) == id)
                 {
                     // (or the grenades did not get it: its floor is then gone onto as any Slig's is)

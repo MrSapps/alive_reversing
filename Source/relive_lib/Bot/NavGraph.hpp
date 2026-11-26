@@ -52,6 +52,7 @@ enum class FeatureKind : u8
     ePortalExit,
     eDanger,      // the stretch a flying Slig that can be got rid of goes along: nothing is crossed into it until
                   // the Slig is gone, which the world gives as switch mSwitch
+                  // (mA 1: to be got rid of first; 2: along the floor only; 3: down onto it from another floor only)
     eZCover,      // AE: wholly inside it Abe isn't seen by the Sligs that shoot from the background
     eFlyingMine,  // AE: a mine that goes round a track (BombCycle): mX1, mY1 is where it is put
     ePlate,       // a foot switch: stepping on it does mA to switch mSwitch (0 on, 1 off, 2 the other way)

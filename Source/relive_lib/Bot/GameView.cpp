@@ -1405,6 +1405,147 @@ static void MarkFlierTargets(NavInput& in, const World& world)
     }
 }
 
+// The Sligs that walk over the trap doors of a pull ring on their own floor (Domain::TrapDoorSligs drops them): the
+// stretches of their screen's floor out in the open, with no shadow to wait in on one side or the other, are not
+// gone onto until they are all down (FeatureKind::eDanger, mA 1, the switch World::HazardSwitch of the ring, which
+// World::Switch has on once they all are). A stretch between two shadows is sneaked over as they walk away. The
+// Sligs are marked with the ring's id + 1 (mInputs[4]). (Zulag 5: "Sneak on the next screen behind
+// the Sligs to the middle. Pull the ring when they're over the trapdoors". Coming back from the left, out in the
+// open from the slam door at 1537 on, he was shot.)
+static void MarkRingSligs(NavInput& in, World& world)
+{
+    const s32 camW = std::max(1, in.mCamW);
+    for (const Entity& ring : world.mEntities)
+    {
+        if (ring.mKind != EntityKind::ePullRing || ring.mGone || ring.mSwitch <= 1)
+        {
+            continue;
+        }
+        // (its floor: the one its trap doors are in, under it)
+        s32 floorY = 0;
+        for (const NavFeature& door : in.mFeatures)
+        {
+            if (door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring.mSwitch && door.mHalf == ring.mHalf && door.mY1 > ring.mY2 && door.mY1 - ring.mY2 <= 160 && std::abs((door.mX1 + door.mX2) / 2 - ring.CentreX()) <= 250)
+            {
+                floorY = door.mY1;
+            }
+        }
+        if (floorY == 0)
+        {
+            continue;
+        }
+        std::vector<Entity*> sligs;
+        s32 x0 = 0;
+        s32 x1 = 0;
+        for (Entity& slig : world.mEntities)
+        {
+            if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mState == 1 || slig.mHalf != ring.mHalf || std::abs(slig.mY2 - floorY) > 40 || slig.mBeatMax <= slig.mBeatMin ||
+                ring.CentreX() < slig.mBeatMin || ring.CentreX() > slig.mBeatMax)
+            {
+                continue;
+            }
+            bool over = false;
+            for (const NavFeature& door : in.mFeatures)
+            {
+                over = over || (door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring.mSwitch && std::abs(door.mY1 - floorY) <= 10 && door.mX2 >= slig.mBeatMin && door.mX1 <= slig.mBeatMax);
+            }
+            if (!over)
+            {
+                continue;
+            }
+            x0 = sligs.empty() ? slig.mBeatMin / camW * camW : std::min(x0, slig.mBeatMin / camW * camW);
+            x1 = sligs.empty() ? (slig.mBeatMax / camW + 1) * camW - 1 : std::max(x1, (slig.mBeatMax / camW + 1) * camW - 1);
+            sligs.push_back(&slig);
+        }
+        if (sligs.empty())
+        {
+            continue;
+        }
+        // (the cells of that floor a shadow hides him in, stood still: NavGraph's mHiddenStill)
+        const s32 step = ring.mHalf ? 13 : 25;
+        const s32 width = ring.mHalf ? 7 : 13;
+        const auto covered = [&in, &ring, floorY, width](s32 x)
+        {
+            for (const NavFeature& f : in.mFeatures)
+            {
+                if (f.mKind == FeatureKind::eInvisibleZone && f.mHalf == ring.mHalf && x - width >= f.mX1 && x + width <= f.mX2 && floorY >= f.mY1 + 40 && floorY <= f.mY2 + 4)
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+        // (only where he waits at the ring unseen, in a shadow: that is what the drop is done from as they walk by.
+        // FeeCo's path 5, the ring at 1637 out in the open by the Slig of 1700: the drop was never got, and the way
+        // on that was got past it before was shut)
+        const s32 cell = ring.mHalf ? 12 : 25;
+        const s32 ringX = (ring.CentreX() - cell / 2) / cell * cell + cell / 2;
+        if (!covered(ringX) && !covered(ringX + cell) && !covered(ringX - cell))
+        {
+            continue;
+        }
+        // (and beside its trap doors, not over one: pulled from its own floor between them, as Domain's
+        // TrapDoorSligs has it. FeeCo's path 2: the ring at 1587 over the door at 1577..1628)
+        bool overDoor = false;
+        for (const NavFeature& door : in.mFeatures)
+        {
+            overDoor = overDoor || (door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring.mSwitch && std::abs(door.mY1 - floorY) <= 10 && ringX >= door.mX1 - 12 && ringX <= door.mX2 + 12);
+        }
+        if (overDoor)
+        {
+            continue;
+        }
+        for (s32 x = x0 + step / 2; x <= x1;)
+        {
+            if (covered(x))
+            {
+                x += step;
+                continue;
+            }
+            const s32 from = x;
+            while (x <= x1 && !covered(x))
+            {
+                x += step;
+            }
+            // (between two shadows: sneaked over)
+            if (from - step >= x0 && x <= x1)
+            {
+                continue;
+            }
+            NavFeature f;
+            f.mKind = FeatureKind::eDanger;
+            f.mX1 = from - step / 2;
+            f.mX2 = x - step / 2;
+            f.mY1 = floorY - 60;
+            f.mY2 = floorY + 10;
+            f.mHalf = ring.mHalf;
+            f.mA = 1;
+            f.mId = sligs[0]->mId;
+            f.mSwitch = World::HazardSwitch(ring.mId);
+            in.mFeatures.push_back(f);
+        }
+        // (and down onto any of that floor from over it, shadow or not: they see him land. Zulag 5: off the end of the
+        // floor over it at a run into the shadow at 1637, he was shot)
+        {
+            NavFeature f;
+            f.mKind = FeatureKind::eDanger;
+            f.mX1 = x0;
+            f.mX2 = x1;
+            f.mY1 = floorY - 60;
+            f.mY2 = floorY + 10;
+            f.mHalf = ring.mHalf;
+            f.mA = 3;
+            f.mId = sligs[0]->mId;
+            f.mSwitch = World::HazardSwitch(ring.mId);
+            in.mFeatures.push_back(f);
+        }
+        for (Entity* slig : sligs)
+        {
+            slig->mInputs[4] = static_cast<s32>(ring.mId) + 1;
+        }
+    }
+}
+
 // The floor by a locker for guns that naked Sligs crawl to: nothing is crossed onto it while one that is awake
 // can get there, or an armed one is about by it (World::Switch of the locker's switch). Which locker each naked
 // Slig goes to, and what is shut between them, is put on the Slig. (The Barracks' Slig bunks: the four he wakes
@@ -1778,6 +1919,7 @@ bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
         world.mEntities[i].mGone = world.mEntities[i].mGone || (world.mEntities[i].mKind == EntityKind::eUxb && UxbOff(*pTlv));
     }
     MarkFlierTargets(input, world);
+    MarkRingSligs(input, world);
     MarkGrenadeTargets(input, world);
     MarkDrilledSlogs(input, world);
     MarkLockers(input, world);
@@ -1807,6 +1949,19 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         {
             lockers = lockers || e.mKind == EntityKind::ePantsLocker;
             slogs = slogs || e.mKind == EntityKind::eSlog;
+        }
+        // (the Sligs over a pull ring's trap doors, marked as the nav graph's input has them)
+        bool sligs = false;
+        bool rings = false;
+        for (const Entity& e : world.mEntities)
+        {
+            sligs = sligs || e.mKind == EntityKind::eSlig;
+            rings = rings || e.mKind == EntityKind::ePullRing;
+        }
+        if (sligs && rings)
+        {
+            NavInput scratch = BuildNavInput(map);
+            MarkRingSligs(scratch, world);
         }
         if (slogs && !fliers && !lockers)
         {
@@ -2704,6 +2859,7 @@ NavInput GameView::BuildNavInput(BaseMap& map)
         things.mEntities[i].mGone = things.mEntities[i].mGone || (things.mEntities[i].mKind == EntityKind::eUxb && UxbOff(*pTlv));
     }
     MarkFlierTargets(in, things);
+    MarkRingSligs(in, things);
     MarkGrenadeTargets(in, things);
     MarkDrilledSlogs(in, things);
     MarkLockers(in, things);

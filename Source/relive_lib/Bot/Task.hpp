@@ -836,6 +836,12 @@ public:
     {
         mZHold = frames;
     }
+    // A gate on the way shut by a lever he can get to: the lever is pulled (Work together's ways, which go through a
+    // pen whose lever opens one gate as it shuts the other)
+    void SetPullGates(bool pull)
+    {
+        mPullGates = pull;
+    }
     void SetHurry(bool hurry)
     {
         mHurry = hurry;
@@ -1090,8 +1096,11 @@ private:
     bool mSlogUp = false;
     // Frames waited for a lift that is on its way to the stop he would walk onto, and where it was last
     // Pulling the lever that sends a lift to the stop the way goes onto
+    // (also a lever pulled for a gate on the way, leading: mGateCalls)
     std::unique_ptr<Task> mLiftCall;
     s32 mLiftCalls = 0;
+    s32 mGateCalls = 0;
+    bool mPullGates = false;
     s32 mLiftComeWaits = 0;
     s32 mLiftComeY = -100000;
     s32 mUnseenWaits = 0;
@@ -1209,6 +1218,11 @@ public:
     {
         return "Recruit Mudokon#" + std::to_string(mMud);
     }
+    // (its way to the Mudokon pulls the levers of gates on it: GoToTask::SetPullGates)
+    void SetPullGates(bool pull)
+    {
+        mPullGates = pull;
+    }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
     // The side of it to talk from (-1 left, 1 right, 0 either): a blind one walks that way
     void SetSide(s32 side)
@@ -1254,6 +1268,7 @@ private:
     s32 mHeld = 0;
     s32 mCloseIns = 0;
     s32 mWaits = 0;
+    bool mPullGates = false;
 };
 
 // Talk a Mudokon into following, lead it to a bird portal and chant it through
@@ -1849,6 +1864,8 @@ private:
     s32 mTossFrame = 0;
     // The frame the nearest Slog was first seen eating, as it is now (0: it is not)
     s32 mEatFrom = 0;
+    // The quickest pace a Slog has been seen to run at in this, tenths of a pixel a frame
+    s32 mTopPace10 = 0;
     std::unique_ptr<Task> mUse;
 };
 

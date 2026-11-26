@@ -381,6 +381,18 @@ public:
     {
         mWorld.mNoBomb.insert(id);
     }
+    // A switch something else turns over (below 256): its last turn and the frames between its last two
+    bool SwitchRhythm(s32 sw, s32* last, s32* period) const
+    {
+        if (sw < 0 || sw >= 256 || mSwitchFlips[sw].size() < 2)
+        {
+            return false;
+        }
+        const std::vector<u32>& f = mSwitchFlips[sw];
+        *last = static_cast<s32>(f.back());
+        *period = static_cast<s32>(f.back() - f[f.size() - 2]);
+        return *period > 0 && *period < 600 && static_cast<s32>(mAbe.mFrame) - *last < 600;
+    }
     // A switch (below 256) that something other than him keeps turning over: three changes or more in the last 600
     // frames. sinceChange: frames since its last. (Zulag 1: the angry Mudokon at its lever opens the trap doors
     // of switch 158 again and again.)

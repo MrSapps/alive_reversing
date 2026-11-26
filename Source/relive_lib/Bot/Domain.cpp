@@ -2770,6 +2770,21 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
             }
         }
     }
+    // (a switch the way wants one way and then the other: a pen's lever that opens the one gate as it shuts the
+    // other, pulled on the way with them in it (GoToTask, leading). Neither is wanted of it beforehand.)
+    for (std::size_t i = 0; i < pre.size(); i++)
+    {
+        for (std::size_t j = i + 1; j < pre.size(); j++)
+        {
+            if (pre[i].mKey == pre[j].mKey && pre[i].mKey != Key::kRegion && pre[i].mValue != pre[j].mValue)
+            {
+                const u32 key = pre[i].mKey;
+                pre.erase(std::remove_if(pre.begin(), pre.end(), [key](const Goap::Fact& f) { return f.mKey == key; }), pre.end());
+                i = static_cast<std::size_t>(-1);
+                break;
+            }
+        }
+    }
     return true;
 }
 
@@ -4923,6 +4938,18 @@ void Domain::Builder::SwitchLogicThing(const Entity& entity, const std::string& 
     {
         const Entity* wheel = world.Find(team.mAbeWheel);
         teamPre.insert(teamPre.begin(), regionFact(UseNode(nav, *wheel, nullptr)));
+        // (one of the team that works a lever in anger is sorried first: it follows no one as it is, and the
+        // switch of its lever, which the wheels may want one way, is turned over and over until then. Zulag 5's
+        // Mudokon at lever 139 on the ledge over the Sloggies' pit: "Bring the Mudokon here to the wheels".)
+        for (u32 id : team.mMuds)
+        {
+            const Entity* mud = world.Find(id);
+            const Goap::Fact calm{Key::Calm(id), 1};
+            if (mud && AngryWorker(*mud) && std::find(teamPre.begin(), teamPre.end(), calm) == teamPre.end())
+            {
+                teamPre.push_back(calm);
+            }
+        }
         // Drills along the floor the Mudokons are brought by, that a lever stops or slows: that first. A
         // Mudokon is not timed under a drill as he is. (The brewery's third Zulag: "pulling the levers
         // to stop most of the drills ... The drills move slow enough now that you can lead the whole
@@ -5766,6 +5793,32 @@ void Domain::Builder::TrapDoorSligs()
                 }
             }
         }
+    }
+    // The Sligs over a pull ring's trap doors whose open floor is kept off until they are all down (GameView's
+    // MarkRingSligs): that is so once each has gone down
+    for (const Entity& ring : world.mEntities)
+    {
+        std::vector<Goap::Fact> each;
+        for (const Entity& slig : world.mEntities)
+        {
+            if (ring.mKind == EntityKind::ePullRing && slig.mKind == EntityKind::eSlig && slig.mInputs[4] == static_cast<s32>(ring.mId) + 1 && !slig.mGone && world.mFleechKilled.count(slig.mId) == 0)
+            {
+                each.push_back({Key::Mud(slig.mId), 2});
+            }
+        }
+        const Goap::Fact down{Key::Switch(World::HazardSwitch(ring.mId)), 1};
+        if (ring.mKind != EntityKind::ePullRing)
+        {
+            continue;
+        }
+        if (world.Switch(World::HazardSwitch(ring.mId)))
+        {
+            d.mStart.Set(down.mKey, 1);
+            continue;
+        }
+        DomainStep logic;
+        logic.mKind = StepKind::eLogic;
+        add("The Sligs over the trap doors of PullRing#" + std::to_string(ring.mId) + " are down", each, {down}, 1, logic);
     }
 }
 

@@ -2157,6 +2157,41 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 break;
             }
         }
+        // Leading Mudokons (or on the way to them for it, mPullGates), a gate shut by a lever he can get to, which opens it (and may shut another behind):
+        // the lever is pulled, and on from there. Zulag 5's Slog pen, whose lever 140 opens the gate at 762 and
+        // shuts the one at 1062: in with the gate behind open, the lever, and out by the other. ("Go left and have
+        // the last Mudokon 'Follow me' to the right to join the others".)
+        if ((mLeading || mPullGates) && mGateCalls < 4)
+        {
+            std::vector<char> got(nav.Nodes().size(), 0);
+            std::vector<s32> none;
+            nav.FindPath(cur, [&got](s32 n)
+                         {
+                             got[n] = 1;
+                             return false;
+                         }, all, none);
+            got[cur] = 1;
+            for (const NavEdge& e : nav.Edges())
+            {
+                s32 sw = 0;
+                s32 value = 0;
+                if (!got[e.mFrom] || got[e.mTo] || !nav.Condition(e, &sw, &value) || sw <= 1 || sw >= 256 || w.Switch(sw) == value)
+                {
+                    continue;
+                }
+                for (const Entity& lever : w.mEntities)
+                {
+                    const s32 at = lever.mKind == EntityKind::eLever && lever.mSwitch == sw && !lever.mGone ? Domain::UseNode(nav, lever, nullptr) : -1;
+                    if (at >= 0 && got[at])
+                    {
+                        mGateCalls++;
+                        bot.Log("leading, the gate at " + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY) + " is shut: Lever#" + std::to_string(lever.mId) + " for it");
+                        mLiftCall = std::make_unique<UseTask>(lever.mId, value);
+                        return Next(bot, "");
+                    }
+                }
+            }
+        }
         // (what stops it, for the log: the edges out of what can be got to that the cost function refuses)
         std::string why;
         {
@@ -10016,8 +10051,26 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
     // Sorry is said with a pat on the back, from the cell next to it. Anything else from a cell or two away.
     // (and so is a slap)
     const bool close = mud->mLive && ((mud->mMood == MudMood::eUpset && mSaidHello) || (mud->mMood == MudMood::eWired && mCalm));
-    const s32 minHalf = close ? 1 : 3;
+    s32 minHalf = close ? 1 : 3;
     const s32 maxHalf = close ? 3 : 5;
+    // (from the next cell where no cell a cell or two away on its floor can be got to: Zulag 5's Mudokon at
+    // 812,360, whose floor's other cells are past the gate at 762 that the way in shuts)
+    if (!close && abeNode >= 0)
+    {
+        const s32 line = nav.Nodes()[mudNode].mLine;
+        const s32 mudX = nav.Nodes()[mudNode].mX;
+        const s32 halfCell = cell / 2;
+        std::vector<s32> way;
+        if (!nav.FindPath(abeNode, [&nav, line, mudX, halfCell](s32 n)
+                          {
+                              const NavNode& node = nav.Nodes()[n];
+                              const s32 off = std::abs(node.mX - mudX);
+                              return node.mLine == line && off >= 3 * halfCell && off <= 5 * halfCell;
+                          }, bot.EdgeCostFn(), way))
+        {
+            minHalf = 2;
+        }
+    }
     const bool wrongSide = (abe.mX - (mud->mLive ? mud->mLiveX : mud->CentreX())) * mSide < 0;
     // (on its screen: it doesn't hear him from the next, however near. With Mudokons to save: the Mines' path 5, a
     // hello said fifty times from 3387 to the one at 3337, the screens parting at 3375.)
@@ -10042,6 +10095,8 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
             }
         }
         mGo = GoNearMud(nav, bot.GetWorld(), mudNode, minHalf, maxHalf, mSide, bot.SavesMudokons());
+        mGo->SetPullGates(mPullGates);
+
         return Next(bot, "");
     }
     if (!mud->mLive)
@@ -12456,6 +12511,7 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
                     return TaskStep::Failed("the Mudokons won't all come along");
                 }
                 mRecruit = std::make_unique<RecruitTask>(mudId);
+                mRecruit->SetPullGates(true);
                 // (all o' ya: the others on the screen listen too, and one "follow me" brings them all)
                 mRecruit->SetAll(true);
                 mRecruiting = mudId;
@@ -12527,6 +12583,7 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
             }
             mStage = 2;
             mGo = GoToNode(beyond(Domain::UseNode(nav, *nearWheel, nullptr), -away, 2));
+            mGo->SetPullGates(true);
             mGo->SetLeading(true);
             return Next(bot, "");
         }
@@ -12537,6 +12594,7 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
             mWaits = 0;
             mStill = 0;
             mGo = GoToNode(beyond(farNode, away, 3));
+            mGo->SetPullGates(true);
             // (at a walk: a Mudokon that runs after him doesn't stop at a wheel)
             mGo->SetTopGait(Gait::eWalk);
             return Next(bot, "");
@@ -12607,6 +12665,7 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
             if (mine)
             {
                 mGo = GoToNode(Domain::UseNode(nav, *mine, nullptr));
+                mGo->SetPullGates(true);
             }
             return Next(bot, "");
         }
@@ -12733,9 +12792,11 @@ TaskStep WorkTogetherTask::Levers(Bot& bot, const std::string& lastFailed)
                 if (under >= 0 && bot.AbeNode() != under && nav.CameraOf(abe.mX, abe.mY - 5) != nav.CameraOf(mud->mLive ? mud->mLiveX : mud->CentreX(), (mud->mLive ? mud->mLiveY : mud->mY2) - 5))
                 {
                     mGo = GoToNode(under);
+                    mGo->SetPullGates(true);
                     return Levers(bot, "");
                 }
                 mRecruit = std::make_unique<RecruitTask>(mud->mId);
+                mRecruit->SetPullGates(true);
                 mRecruit->SetRemote(true);
                 mRecruiting = mud->mId;
             }
@@ -12799,6 +12860,7 @@ TaskStep WorkTogetherTask::Levers(Bot& bot, const std::string& lastFailed)
                     bot.Log("Mudokon#" + std::to_string(mud->mId) + " is on the floor at " + std::to_string(mudY) + ": past where it comes down, to " + std::to_string(nav.Nodes()[past].mX) + "," + std::to_string(nav.Nodes()[past].mY));
                 }
                 mGo = GoToNode(past);
+                mGo->SetPullGates(true);
                 mGo->SetLeading(true);
                 mGo->SetTopGait(Gait::eWalk);
                 return Levers(bot, "");
@@ -12823,6 +12885,7 @@ TaskStep WorkTogetherTask::Levers(Bot& bot, const std::string& lastFailed)
             mPlaceWaits = 0;
             bot.Log("leading Mudokon#" + std::to_string(mud->mId) + " to " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY) + " by Lever#" + std::to_string(theirs[i]->mId));
             mGo = GoToNode(lead);
+            mGo->SetPullGates(true);
             mGo->SetLeading(true);
             mGo->SetTopGait(Gait::eWalk);
             return Levers(bot, "");
@@ -12866,6 +12929,7 @@ TaskStep WorkTogetherTask::Levers(Bot& bot, const std::string& lastFailed)
     {
         mLeverStage = 3;
         mGo = GoToNode(own);
+        mGo->SetPullGates(true);
         return Levers(bot, "");
     }
     if (mLeverStage == 5)
@@ -13876,16 +13940,19 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
     // stays shut)
     if (mPhase == 1)
     {
-        // (over the floor on the Slogs' side, short of the slam door that shuts them away and as near it as can be:
-        // over the ring itself they come back in under him as it opens. Zulag 5: 1412,360, a hop, a hoist and a
-        // step from the ring.)
+        // (over the floor on the Slogs' side, beyond the slam door that shuts them away and as near it as can be:
+        // they follow him along under him, and over the ring itself they come back in under him as it opens. Short
+        // of the door, at 1412,360 by the door at 1425, they were in its doorway as it shut, on his side of it. From
+        // 1462 it is a run off the end of that floor to the ring.)
         s32 doorX = 0;
+        s32 doorFar = 0;
         for (const NavFeature& f : nav.Input().mFeatures)
         {
             if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == under.mHalf && f.mY1 <= under.mY + 4 && f.mY2 >= under.mY - 40 && !slogs.empty() &&
                 (f.mX1 + f.mX2) / 2 > std::min(slogs[0]->mX, under.mX) && (f.mX1 + f.mX2) / 2 < std::max(slogs[0]->mX, under.mX))
             {
                 doorX = slogs[0]->mX > under.mX ? f.mX1 : f.mX2;
+                doorFar = slogs[0]->mX > under.mX ? f.mX2 : f.mX1;
             }
         }
         // (chosen once: following him along their side they come into the doorway, and it is between no more)
@@ -13893,9 +13960,9 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
         for (std::size_t n = 0; mOver < 0 && n < nav.Nodes().size(); n++)
         {
             const NavNode& node = nav.Nodes()[n];
-            const bool between = doorX != 0 && (node.mX - under.mX) * (doorX - under.mX) > 0 && std::abs(node.mX - under.mX) < std::abs(doorX - under.mX) - 6;
-            if (node.mHalf == under.mHalf && !node.mHazard && node.mY <= under.mY - 60 && node.mY >= under.mY - 160 && nav.CameraOf(node.mX, node.mY - 5) == cam && (doorX == 0 || between) &&
-                (over < 0 || (doorX != 0 ? std::abs(node.mX - under.mX) > std::abs(nav.Nodes()[over].mX - under.mX) : std::abs(node.mX - under.mX) < std::abs(nav.Nodes()[over].mX - under.mX))))
+            const bool beyond = doorX != 0 && (node.mX - under.mX) * (doorX - under.mX) > 0 && std::abs(node.mX - under.mX) > std::abs(doorFar - under.mX) + 6;
+            if (node.mHalf == under.mHalf && !node.mHazard && node.mY <= under.mY - 60 && node.mY >= under.mY - 160 && nav.CameraOf(node.mX, node.mY - 5) == cam && (doorX == 0 || beyond) &&
+                (over < 0 || std::abs(node.mX - under.mX) < std::abs(nav.Nodes()[over].mX - under.mX)))
             {
                 over = static_cast<s32>(n);
             }
@@ -13930,13 +13997,17 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     const bool cycles = bot.SwitchCycles(f.mSwitch, &since);
                     const bool shut = !Domain::FloorOpen(nav.Input(), world, f.mX1 - 2, f.mX2 + 2, under.mY + 4, under.mHalf);
-                    fresh = fresh && shut && (!cycles || since <= 8);
+                    // (one that has turned over at all lately is gone down on as it has just shut: two turns are
+                    // not "cycling" yet, and gone down on 32 frames into its 53 shut, he was too late)
+                    fresh = fresh && shut && ((!cycles && since >= 600) || since <= 8);
                 }
             }
             bool still = true;
+            // (and beyond the door that shuts them away: at 1420 by the door at 1425..1449 as it shut, they were
+            // on his side of it)
             for (const SlogAt* sl : slogs)
             {
-                still = still && std::abs(sl->mX - under.mX) >= 120;
+                still = still && std::abs(sl->mX - under.mX) >= 120 && (mDoorX == 0 || (sl->mX - mDoorX) * (mDoorX - under.mX) > 0);
             }
             if (!still)
             {
@@ -13962,7 +14033,10 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
     {
         // (along the ring's floor at a run: walked across the trap door from where he came down, he was at the ring
         // as the big Slog was already on its way)
-        if (bot.AbeNode() != mAt && bot.AbeNode() >= 0 && nav.Nodes()[bot.AbeNode()].mLine == under.mLine && std::abs(bot.Abe().mX - under.mX) > 6)
+        // (or a cell of the floor beyond its trap doors with nothing shut between: the door is run over, shut)
+        const NavNode* on = bot.AbeNode() >= 0 ? &nav.Nodes()[bot.AbeNode()] : nullptr;
+        const bool onFloor = on && on->mHalf == under.mHalf && (on->mLine == under.mLine || (std::abs(on->mY - under.mY) <= 5 && Domain::FloorOpen(nav.Input(), world, on->mX, under.mX, under.mY + 4, under.mHalf)));
+        if (bot.AbeNode() != mAt && onFloor && std::abs(bot.Abe().mX - under.mX) > 6)
         {
             // (a stretch of four cells or six from a stand is run and slid to a stop: shorter, the pilot walks it)
             Prim run = Prim::MoveTo(under.mX, Gait::eRun);
@@ -13973,6 +14047,27 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
         if (bot.AbeNode() != mAt)
         {
             // (down onto the ring's floor first, the nearest cell of it, and the rest of the way at a run)
+            // (straight down onto that floor where a fall from here comes down on it: quicker than the hop and the
+            // hoist. Zulag 5: from 1412,360 that was 73 frames, and the slam door the Mudokon turns over is shut
+            // for 53; off the end to 1387 and a run is some 45.)
+            if (!mGo && bot.AbeNode() >= 0)
+            {
+                for (const NavEdge& e : nav.Edges())
+                {
+                    const NavNode& to = nav.Nodes()[e.mTo];
+                    // (at a run, off the end and on along the floor as he lands)
+                    const NavNode& here = nav.Nodes()[bot.AbeNode()];
+                    const NavNode& edgeFrom = nav.Nodes()[e.mFrom];
+                    const bool ahead = edgeFrom.mLine == here.mLine && (edgeFrom.mX - here.mX) * (under.mX - here.mX) >= 0 && std::abs(edgeFrom.mX - here.mX) <= 100;
+                    if (ahead && e.mKind == EdgeKind::eFall && !e.mHung && e.mWell < 0 && to.mHalf == under.mHalf && std::abs(to.mY - under.mY) <= 5 && std::abs(to.mX - under.mX) <= 150 &&
+                        (to.mX - under.mX) * (to.mX - nav.Nodes()[e.mFrom].mX) < 0 && Domain::FloorOpen(nav.Input(), world, to.mX, under.mX, under.mY + 4, under.mHalf))
+                    {
+                        Prim off = Prim::WalkOff(to.mX < nav.Nodes()[e.mFrom].mX);
+                        off.mRunOff = 1;
+                        return TaskStep::Do(off);
+                    }
+                }
+            }
             if (!mGo)
             {
                 // (its own stretch of floor, between the trap doors: not beyond a slam door)
@@ -14011,7 +14106,12 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
         {
             last = last == 0 || std::abs(x - s->mX) < std::abs(last - s->mX) ? x : last;
         }
-        const s32 pace10 = last != 0 && std::abs(s->mX - last) < 14 * frames ? (s->mX - last) * 10 / frames : 0;
+        const s32 seen10 = last != 0 && std::abs(s->mX - last) < 14 * frames ? (s->mX - last) * 10 / frames : 0;
+        // (at the quickest it has been seen to go: its run goes 3 to 9 a frame from one frame of it to the next, and
+        // from a stand it speeds up. Timed by the pace of the frame just gone, the Sloggie was through before the
+        // door opened. Too soon is no matter: the door is open 20 frames.)
+        mTopPace10 = std::max(mTopPace10, std::abs(seen10));
+        const s32 pace10 = seen10 > 0 ? mTopPace10 : seen10 < 0 ? -mTopPace10 : 0;
         const s32 then = s->mX + pace10 * mDelay / 10;
         for (const NavFeature& door : nav.Input().mFeatures)
         {
@@ -14021,6 +14121,43 @@ TaskStep SlogRingTask::Next(Bot& bot, const std::string& lastFailed)
             // (or one stood on it: at the bone tossed there)
             const bool stood = pace10 == 0 && last != 0 && s->mX >= door.mX1 + 2 && s->mX <= door.mX2 - 2;
             on = on || ((pace10 != 0 || stood) && (itsSide || stood) && door.mKind == FeatureKind::eTrapDoor && door.mSwitch == ring->mSwitch && std::abs(door.mY1 - under.mY) < 40 && ((then >= door.mX1 + 2 && then <= door.mX2 - 2) || stood));
+        }
+    }
+    // (ones shut behind a slam door that keeps turning over, between them and him: by when it opens next, at the
+    // turns seen, and their run from there at the quickest pace seen. The door at 1437 that Zulag 5's ledge
+    // Mudokon turns over is shut 53 frames at a time: on the ring as it opened and pulled as they came, they
+    // were through before the trap door opened.)
+    for (const NavFeature& f : nav.Input().mFeatures)
+    {
+        s32 last = 0;
+        s32 period = 0;
+        if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mSwitch <= 1 || f.mHalf != under.mHalf || f.mY1 > under.mY + 4 || f.mY2 < under.mY - 40 || mTopPace10 <= 0 ||
+            Domain::FloorOpen(nav.Input(), world, f.mX1 - 2, f.mX2 + 2, under.mY + 4, under.mHalf) || !bot.SwitchRhythm(f.mSwitch, &last, &period))
+        {
+            continue;
+        }
+        const s32 fx = (f.mX1 + f.mX2) / 2;
+        for (const SlogAt* s : slogs)
+        {
+            if ((fx - under.mX) * (s->mX - fx) <= 0)
+            {
+                continue;
+            }
+            for (const NavFeature& door : nav.Input().mFeatures)
+            {
+                if (door.mKind != FeatureKind::eTrapDoor || door.mSwitch != ring->mSwitch || std::abs(door.mY1 - under.mY) >= 40 || (door.mX1 - under.mX) * (fx - under.mX) <= 0)
+                {
+                    continue;
+                }
+                const s32 nearEdge = fx > under.mX ? door.mX2 : door.mX1;
+                const s32 opensIn = last + period - static_cast<s32>(bot.Abe().mFrame);
+                const s32 travel = std::abs(s->mX - nearEdge) * 10 / mTopPace10;
+                // (the trap door open from mDelay frames on, for 20: they are on it from travel on, for a few)
+                if (opensIn >= 0 && opensIn + travel - mDelay <= 6)
+                {
+                    on = true;
+                }
+            }
         }
     }
     // (one eating beyond a trap door, by when it began: it eats some 56 frames, turns, and runs at him 68 frames

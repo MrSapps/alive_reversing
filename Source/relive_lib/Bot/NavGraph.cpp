@@ -2282,7 +2282,9 @@ void NavGraph::Build(const NavInput& input)
             {
                 return n.mHalf == f.mHalf && n.mX >= f.mX1 && n.mX <= f.mX2 && n.mY >= f.mY1 && n.mY <= f.mY2;
             };
-            if (f.mKind == FeatureKind::eDanger && in(mNodes[e.mTo]) && !in(mNodes[e.mFrom]) && (f.mA != 2 || std::abs(mNodes[e.mFrom].mY - mNodes[e.mTo].mY) <= 10))
+            // (mA 2: along the floor only; 3: down onto it from another floor only)
+            const bool level = std::abs(mNodes[e.mFrom].mY - mNodes[e.mTo].mY) <= 10;
+            if (f.mKind == FeatureKind::eDanger && in(mNodes[e.mTo]) && !in(mNodes[e.mFrom]) && (f.mA != 2 || level) && (f.mA != 3 || !level))
             {
                 // (one that is got by as it is, mA 0: its switch is on all along, and the way in is a dear one.
                 // Where the way goes into both kinds at once it is the one to get rid of that the edge waits for.)
