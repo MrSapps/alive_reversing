@@ -1,4 +1,5 @@
 #include "Domain.hpp"
+#include "FollowBelow.hpp"
 #include "FartFlight.hpp"
 #include "ThrowArc.hpp"
 #include <algorithm>
@@ -2904,6 +2905,7 @@ struct Domain::Builder final
     void ParamiteFleeches();
     void Scrabs();
     void DrillsOverMudokons();
+    void FollowersBelow();
 
     // An action for the planner, and the step it is
     void add(std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step);
@@ -3138,6 +3140,7 @@ Domain Domain::Builder::Run()
     SligBursts();
     GuardedLevers();
     PenGates();
+    FollowersBelow();
     // Mudokons led to work wheels together past a Slog that a ring can drop: with it dead, not fed. A bone keeps it
     // a short while, which does for Abe on his own but not for leading a group by. (Zulag 5: the big Slog by the
     // bone sack, fed, was taken as out of the way of the wheels' Mudokons.) Only once no Slogs by a ring are left:
@@ -8609,6 +8612,39 @@ void Domain::Builder::Zones()
     }
 }
 
+// Mudokons that follow under him, a floor down, press the plates of their floor for him (FollowBelow): a plate of
+// theirs is worked from over it, by watching. (Zulag 13: the slam door at 1600,1120 is opened by them going over the
+// plate at 1550 under it.)
+void Domain::Builder::FollowersBelow()
+{
+    const FollowBelow::Result below = FollowBelow::Find(mNav, mWorld, mAbeNode);
+    for (const FollowBelow::Plate& plate : below.mPlates)
+    {
+        s32 from = plate.mFrom.front();
+        for (const s32 cell : plate.mFrom)
+        {
+            from = std::abs(mNav.Nodes()[cell].mX - plate.mX) < std::abs(mNav.Nodes()[from].mX - plate.mX) ? cell : from;
+        }
+        for (s32 value = 0; value <= 1; value++)
+        {
+            if ((plate.mOp == 0 && value == 0) || (plate.mOp == 1 && value == 1))
+            {
+                continue;
+            }
+            std::vector<Goap::Fact> pre{regionFact(from), {Key::Switch(plate.mSwitch), 1 - value}};
+            for (const auto& open : plate.mOpen)
+            {
+                pre.push_back({Key::Switch(open.first), open.second});
+            }
+            DomainStep step;
+            step.mKind = StepKind::eLeadBelow;
+            step.mEntity = plate.mId;
+            step.mOther = static_cast<u32>(value);
+            add("Get the Mudokons under him over FootSwitch#" + std::to_string(plate.mId) + " sw" + std::to_string(plate.mSwitch) + (value ? " on" : " off"), pre, {{Key::Switch(plate.mSwitch), value}}, 300, step);
+        }
+    }
+}
+
 // Foot switches that turn a gate over
 void Domain::Builder::FootSwitchGates()
 {
@@ -8656,11 +8692,18 @@ void Domain::Builder::FootSwitchGates()
         {
             continue;
         }
+        // (of those on the side he comes from: one behind the gate can't be stepped on before it. Zulag 13's slam door
+        // at 1600,1120 is opened by the plate at 1650 behind it, or by those of the floor under it at 1550 and 1750.)
+        const s32 gx = (f.mX1 + f.mX2) / 2;
+        const s32 fromX = nav.Nodes()[nav.Edges()[s.mEdge].mFrom].mX;
         const Entity* nearest = nullptr;
         for (const Entity& plate : world.mEntities)
         {
+            // (and near it: a vault's lock is between two of them, a cell or two off its gates. Not from in the
+            // gate's own cell, which has no side.)
             if (plate.mKind == EntityKind::eFootSwitch && !plate.mGone && plate.mOp == 2 && plate.mSwitch == f.mSwitch && plate.mHalf == f.mHalf && std::abs(plate.mY2 - f.mY2) <= 30 &&
-                (!nearest || std::abs(plate.CentreX() - (f.mX1 + f.mX2) / 2) < std::abs(nearest->CentreX() - (f.mX1 + f.mX2) / 2)))
+                (plate.CentreX() < gx) == (fromX < gx) && std::abs(fromX - gx) > 6 && std::abs(plate.CentreX() - gx) <= 4 * NavGraph::GridStep(f.mHalf) &&
+                (!nearest || std::abs(plate.CentreX() - gx) < std::abs(nearest->CentreX() - gx)))
             {
                 nearest = &plate;
             }

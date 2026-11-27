@@ -463,6 +463,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<FleechPenTask>(step.mEntity);
         case StepKind::eFleechLead:
             return std::make_unique<FleechLeadTask>(step.mEntity);
+        case StepKind::eLeadBelow:
+            return std::make_unique<LeadBelowTask>(step.mEntity, static_cast<s32>(step.mOther));
         case StepKind::eScrabPen:
             return std::make_unique<ScrabPenTask>(step.mEntity, static_cast<s32>(step.mOther), step.mEdge != 0);
         case StepKind::eLogic:
@@ -2666,9 +2668,16 @@ void Bot::MaybeCheckpoint(BaseMap& map)
             return;
         }
     }
+    // (only where there are Sligs for the laughing to wake: Zulag 13's corridor has none, and with wired Mudokons
+    // in tow the whole of it, no saves in it made every death all of it over again)
+    bool sligs = false;
+    for (const SligAt& slig : mWorld.mSligs)
+    {
+        sligs = sligs || !slig.mPossessed;
+    }
     for (const Entity& e : mWorld.mEntities)
     {
-        if (e.mKind == EntityKind::eMudokon && e.mLive && e.mFollowing && e.mMood == MudMood::eWired)
+        if (sligs && e.mKind == EntityKind::eMudokon && e.mLive && e.mFollowing && e.mMood == MudMood::eWired)
         {
             return;
         }

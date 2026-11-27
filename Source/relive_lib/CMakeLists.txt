@@ -650,6 +650,8 @@ SET(relive_lib_src
     Bot/NavGraph.cpp
     Bot/FartFlight.hpp
     Bot/FartFlight.cpp
+    Bot/FollowBelow.hpp
+    Bot/FollowBelow.cpp
     Bot/Pilot.hpp
     Bot/SligCycle.hpp
     Bot/BombCycle.hpp

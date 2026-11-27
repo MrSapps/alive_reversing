@@ -21740,6 +21740,178 @@ void FleechLeadTask::Keep(Bot& bot, const std::set<s32>& edges)
     mKept = edges.empty() ? nullptr : &bot;
 }
 
+TaskStep LeadBelowTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const AbeState& abe = bot.Abe();
+    if (mGo)
+    {
+        const TaskStep step = mGo->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mGo.reset();
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            // (one cell out of reach now, say behind a wall the Mudokons turned on: the others)
+            bot.Log("no way to " + std::to_string(mGoX) + " over the plate: " + step.mWhy);
+            mNoWay.insert(mGoX);
+            mThere = false;
+        }
+    }
+    else if (!lastFailed.empty())
+    {
+        return TaskStep::Failed(lastFailed);
+    }
+    const FollowBelow::Result below = FollowBelow::Find(nav, world, bot.AbeNode());
+    const FollowBelow::Plate* plate = nullptr;
+    for (const FollowBelow::Plate& p : below.mPlates)
+    {
+        plate = p.mId == mPlate ? &p : plate;
+    }
+    if (!plate)
+    {
+        return TaskStep::Failed("no Mudokons under him that can get to the plate");
+    }
+    if (mThere)
+    {
+        // until they have stopped
+        std::vector<s32> xs;
+        for (const u32 id : below.mMuds)
+        {
+            const Entity* mud = world.Find(id);
+            xs.push_back(mud ? mud->mLiveX : 0);
+        }
+        mStill = xs == mLastX ? mStill + 1 : 0;
+        mLastX = xs;
+        if (mStill < 30 && ++mWaited < 400)
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mThere = false;
+        std::sort(xs.begin(), xs.end());
+        std::string at;
+        for (const s32 x : xs)
+        {
+            at += " " + std::to_string(x);
+        }
+        bot.Log("at " + std::to_string(abe.mX) + ": Mudokons at" + at + ", switch " + std::to_string(plate->mSwitch) + " is " + std::to_string(world.Switch(plate->mSwitch)));
+    }
+    // Done once its switch is right with each of them that can get to it on his side of it: one left the other side
+    // goes over as he goes on, and turns it again. (Zulag 13: the one at 2037 by the plate at 2049, which works the
+    // wall at 2125 that he was going through.) Those far off are shut away behind a gate.
+    bool across = false;
+    for (const u32 id : below.mMuds)
+    {
+        const Entity* mud = world.Find(id);
+        across = across || (mud && mud->mLive && std::abs(mud->mLiveX - abe.mX) < 150 && (mud->mLiveX < plate->mX) != (abe.mX < plate->mX));
+    }
+    if (world.Switch(plate->mSwitch) == mValue && (!across || mTries >= 2 * static_cast<s32>(plate->mFrom.size()) + 8))
+    {
+        return TaskStep::Done();
+    }
+    // The cells over it (he gets there the way GoTo finds: over his own plates by a hop where they would shut his way)
+    std::vector<s32> cells;
+    for (const s32 cell : plate->mFrom)
+    {
+        // (not one with a plate of his own: stood on, it is set too. Zulag 13: the one at 1550,1120 shut the
+        // door at 1700 ahead of him and the one at 1600 under him, which the Mudokons go through.)
+        const NavNode& node = nav.Nodes()[cell];
+        bool own = false;
+        for (const Entity& e : world.mEntities)
+        {
+            own = own || (e.mKind == EntityKind::eFootSwitch && !e.mGone && e.mHalf == node.mHalf && std::abs(e.mY2 - node.mY) <= 30 && std::abs(e.CentreX() - node.mX) <= 12);
+        }
+        // (nor one in a barrier, nor one there was no way to)
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            own = own || (f.mKind == FeatureKind::eBarrier && f.mHalf == node.mHalf && std::abs(f.mY2 - node.mY) <= 40 && node.mX >= f.mX1 - 12 && node.mX <= f.mX2 + 12);
+        }
+        if (!own && mNoWay.count(node.mX) == 0)
+        {
+            cells.push_back(node.mX);
+        }
+    }
+    const s32 n = static_cast<s32>(cells.size());
+    if (cells.empty() || mTries >= 2 * n + 16)
+    {
+        return TaskStep::Failed("the Mudokons under him didn't leave switch " + std::to_string(plate->mSwitch) + " at " + std::to_string(mValue));
+    }
+    // To and fro over the cells there are, a cell at a time. Then, where they stand bunched up short of it (they stop
+    // where the first does), off the way they are and back to the far side of it, for them to come at a run and
+    // slide on over. (Zulag 13: all five at 1537 with him at 1587, two cells off the plate at 1550 and the door at
+    // 1600 in his way.)
+    s32 x = 0;
+    if (mTries < 2 * n)
+    {
+        const s32 k = mTries % (2 * n);
+        x = cells[k < n ? k : 2 * n - 1 - k];
+    }
+    else
+    {
+        std::vector<s32> xs;
+        for (const u32 id : below.mMuds)
+        {
+            const Entity* mud = world.Find(id);
+            if (mud && mud->mLive)
+            {
+                xs.push_back(mud->mLiveX);
+            }
+        }
+        std::sort(xs.begin(), xs.end());
+        const s32 side = xs.empty() || xs[xs.size() / 2] < plate->mX ? 1 : -1;
+        if ((mTries - 2 * n) % 2 == 0)
+        {
+            // (as far as 250 that way with nothing between that he would set or that would stop him: what the
+            // Mudokons go over on the way sets things too. Zulag 13: back over his plate at 1425 it turned on
+            // the wall at 1375.)
+            const s32 from = side > 0 ? cells.front() : cells.back();
+            x = from;
+            for (s32 step = 1; step <= 10; step++)
+            {
+                const s32 nx = from - side * step * NavGraph::GridStep(abe.mHalfScale);
+                const s32 node = nav.NodeAt(nx, abe.mY, abe.mHalfScale, 10);
+                if (node < 0 || std::abs(nav.Nodes()[node].mX - nx) > 5 || std::abs(nx - plate->mX) > 250 || mNoWay.count(nx) != 0)
+                {
+                    break;
+                }
+                bool stop = false;
+                for (const Entity& e : world.mEntities)
+                {
+                    stop = stop || (e.mKind == EntityKind::eFootSwitch && !e.mGone && e.mHalf == abe.mHalfScale && std::abs(e.mY2 - abe.mY) <= 30 && std::abs(e.CentreX() - nx) <= 12);
+                }
+                for (const NavFeature& f : nav.Input().mFeatures)
+                {
+                    stop = stop || (f.mKind == FeatureKind::eBarrier && f.mHalf == abe.mHalfScale && std::abs(f.mY2 - abe.mY) <= 40 && nx >= f.mX1 - 12 && nx <= f.mX2 + 12);
+                }
+                if (stop)
+                {
+                    break;
+                }
+                x = nx;
+            }
+        }
+        else
+        {
+            x = side > 0 ? cells.back() : cells.front();
+        }
+    }
+    mTries++;
+    mThere = true;
+    mWaited = 0;
+    mStill = 0;
+    mLastX.clear();
+    if (std::abs(x - abe.mX) <= 5)
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    mGo = GoToTask::To(bot, x, abe.mY, abe.mHalfScale);
+    mGoX = x;
+    return Next(bot, "");
+}
+
 TaskStep FleechLeadTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const NavGraph& nav = bot.Nav();

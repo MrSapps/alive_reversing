@@ -2,6 +2,7 @@
 
 #include "Pilot.hpp"
 #include "Domain.hpp"
+#include "FollowBelow.hpp"
 #include "World.hpp"
 #include <array>
 #include <functional>
@@ -2488,6 +2489,37 @@ private:
 // They make for where he is, not along the way he went, and go up a hoist only if they come by it with him
 // above: so he is on its top, got to by another way if there is one, until the first of them starts up it, and
 // then keeps a few cells ahead of them to where they drop.
+// A foot switch of the floor under him, worked by the Mudokons that follow him there (FollowBelow): from the cells
+// over it, a cell at a time, each time until they stop, until its switch is as it has to be
+class LeadBelowTask final : public Task
+{
+public:
+    LeadBelowTask(u32 plate, s32 value)
+        : mPlate(plate)
+        , mValue(value)
+    {
+    }
+    std::string Name() const override
+    {
+        return "The Mudokons under him over FootSwitch#" + std::to_string(mPlate) + " until its switch is " + std::to_string(mValue);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mPlate;
+    s32 mValue;
+    // The cells stood at so far, and whether he is waiting at the last
+    s32 mTries = 0;
+    bool mThere = false;
+    s32 mWaited = 0;
+    s32 mStill = 0;
+    std::vector<s32> mLastX;
+    std::unique_ptr<GoToTask> mGo;
+    s32 mGoX = 0;
+    // Cells there was no way to
+    std::set<s32> mNoWay;
+};
+
 class FleechLeadTask final : public Task
 {
 public:
