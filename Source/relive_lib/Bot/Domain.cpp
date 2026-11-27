@@ -6530,7 +6530,10 @@ void Domain::Builder::addForGlukkon(const GlukkonSource& glukkon, const std::str
     for (const s32 n : order)
     {
         const NavNode& node = nav.Nodes()[n];
-        if (node.mHalf != glukkon.mHalf || node.mHazard || nav.CameraOf(node.mX, node.mY - 5) != cam)
+        // (not from a lift's platform: his body rides it when the Glukkon has it worked, and the screen shown is
+        // still the one he was taken from when he is himself again, as the game has it. Zulag 14: from 412,980 on
+        // the lift of 46, he came to at 1400 with 780's screen up, where no chant took a Slig and no Mudokon heard.)
+        if (node.mHalf != glukkon.mHalf || node.mHazard || node.mLiftStop >= 0 || nav.CameraOf(node.mX, node.mY - 5) != cam)
         {
             continue;
         }
