@@ -2233,9 +2233,37 @@ void NavGraph::Build(const NavInput& input)
             {
                 deadly = deadly || (f.mKind == FeatureKind::eDeathDrop && over.mX >= f.mX1 - step && over.mX <= f.mX2 + step && f.mY1 <= fy && f.mY2 >= over.mY);
             }
+            // AE: walked on into it open he drifts on as he falls, some 22 across for each 100 down, and comes down
+            // on the first floor under him then. Measured in Zulag 12: onto the trap door at 575..600,480 from the
+            // left, at 617 by 750 and down on the ledge at 662,880 ("drop through the gap with the down arrow. When
+            // you land, sneak right"), not on the floor at 980 by the Slogs.
+            s32 to = NodeOnLine(below, over.mX);
+            if (mInput.mIsAe && from >= 0 && mNodes[from].mX != over.mX && (fy - over.mY) * (over.mHalf ? 2 : 1) >= 300)
+            {
+                const s32 dir = over.mX > mNodes[from].mX ? 1 : -1;
+                for (s32 dx = step / 2; dx <= (fy - over.mY) * 22 / 100 + step; dx += 5)
+                {
+                    s32 ly = 0;
+                    const s32 xs = over.mX + dir * dx;
+                    const s32 line = FloorBelow(xs, over.mY + 20, over.mHalf, &ly);
+                    if (line < 0 || line == below || ly >= fy)
+                    {
+                        continue;
+                    }
+                    if (std::abs((ly - over.mY) * 22 / 100 - dx) <= step / 2 && !WallBetween(over.mX, xs, ly, over.mHalf, over.mHalf ? 10 : 20))
+                    {
+                        const s32 on = NodeOnLine(line, xs);
+                        if (on >= 0)
+                        {
+                            to = on;
+                        }
+                        break;
+                    }
+                }
+            }
             if (!deadly)
             {
-                AddEdge(edges, from, NodeOnLine(below, over.mX), EdgeKind::eFall, kWalkCost + (fy - over.mY) / 6, trap, left);
+                AddEdge(edges, from, to, EdgeKind::eFall, kWalkCost + (fy - over.mY) / 6, trap, left);
             }
         }
     };
