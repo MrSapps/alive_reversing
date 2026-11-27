@@ -14931,6 +14931,12 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
             }
             return TaskStep::Done();
         }
+        // (one that ran out of time short of it: the way there is not one a fart gets along, and the machine has only
+        // so many. Zulag 9's orb at 629,553: four farts stuck at its room's corner, and none left for the Sligs.)
+        if (mShort)
+        {
+            return TaskStep::Failed("the fart ran out of time short of it");
+        }
         if (mFarts >= 4)
         {
             return TaskStep::Failed("four farts and it is still there");
@@ -15132,7 +15138,9 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
     const bool still = fart.mVelX100 == 0 && fart.mVelY100 == 0;
     const bool last = mCorner + 1 >= mWay.size();
     const s32 tx = last ? aim.mX : mWay[mCorner].first;
-    const s32 ty = last ? aim.mY : mWay[mCorner].second;
+    // (moved up or down a little more each time it stalls on the way to it: a leg along a floor's line catches on
+    // the floor's or a wall's end. Zulag 9, into the room of the orb at 629,553 along 550, stuck on the end of its floor at 526,599.)
+    const s32 ty = (last ? aim.mY : mWay[mCorner].second) - mLift;
     const s32 dx = std::abs(tx - body.mX);
     const s32 dy = std::abs(ty - body.mY);
     // (a flying Slig: where it will be when the blast goes off)
@@ -15162,14 +15170,27 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
     const s32 near = dx + dy;
     mCornerStall = near < mCornerBest ? 0 : mCornerStall + 1;
     mCornerBest = std::min(mCornerBest, near);
+    // (down first, further each time, then up: a ceiling's end over the way, or a floor's under it)
+    if (mCornerStall >= 40 && (dx > 20 || dy > 20) && mLift < 40)
+    {
+        mLift = mLift <= 0 && mLift > -40 ? mLift - 10 : (mLift <= -40 ? 10 : mLift + 10);
+        mCornerStall = 0;
+        mCornerBest = 100000;
+    }
     if (!last && ((dx <= 10 && dy <= 10) || (mCornerStall >= 20 && dx <= 20 && dy <= 20)))
     {
         mCorner++;
         mCornerBest = 100000;
         mCornerStall = 0;
+        mLift = 0;
         return TaskStep::Do(Prim::Wait(1));
     }
     // There, or as good as (a Slig walks on), or out of time: let go and set it off once it stands
+    // (out of time short of the way's end, or of the last leg: noted, see above)
+    if (fart.mFramesLeft < 60 && (!last || dx > 45 || dy > 45))
+    {
+        mShort = true;
+    }
     if (last && ((dx <= (isFlier ? 10 : (isSlig ? 30 : 8)) && dy <= (isFlier ? 5 : 12)) || fart.mFramesLeft < 60))
     {
         // (for both while there is time, then for the one)

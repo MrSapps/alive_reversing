@@ -1883,6 +1883,8 @@ private:
     s32 mFlownLog = 0;
     s32 mCornerBest = 100000;
     s32 mCornerStall = 0;
+    s32 mLift = 0;
+    bool mShort = false;
     std::unique_ptr<GoToTask> mGo;
 };
 

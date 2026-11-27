@@ -6994,8 +6994,13 @@ void Domain::Builder::GuardedLevers()
         for (const Entity& slig : world.mEntities)
         {
             // (the lever on its beat itself: one beside the beat is pulled as it walks off, ClearSligTask's sortie)
-            if (slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch <= 1 && slig.mState != 1 && slig.mHalf == lever.mHalf && std::abs(slig.mY2 - lever.mY2) <= 40 && slig.mBeatMax > slig.mBeatMin &&
-                nav.CameraOf(slig.mBeatMin, slig.mY2 - 5) == cam && nav.CameraOf(slig.mBeatMax, slig.mY2 - 5) == cam && lever.mX2 >= slig.mBeatMin && lever.mX1 <= slig.mBeatMax)
+            // (or, with no beat known for it, one that stands right by the lever: Zulag 9's sixth level, the Slig
+            // kept between two enemy stoppers at 587 beside the lever of 178)
+            const s32 sx = slig.CentreX();
+            const bool byIt = slig.mBeatMax <= slig.mBeatMin && std::abs(sx - lever.CentreX()) <= 75 && nav.CameraOf(sx, slig.mY2 - 5) == cam;
+            // (asleep or not, the one right by it: the pull wakes it)
+            if (slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch <= 1 && (slig.mState != 1 || byIt) && slig.mHalf == lever.mHalf && std::abs(slig.mY2 - lever.mY2) <= 40 &&
+                (byIt || (slig.mBeatMax > slig.mBeatMin && nav.CameraOf(slig.mBeatMin, slig.mY2 - 5) == cam && nav.CameraOf(slig.mBeatMax, slig.mY2 - 5) == cam && lever.mX2 >= slig.mBeatMin && lever.mX1 <= slig.mBeatMax)))
             {
                 guarded[lever.mId].push_back(slig.mId);
             }

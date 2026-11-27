@@ -46,6 +46,34 @@ static bool Meet(s32 ax, s32 ay, s32 bx, s32 by, s32 cx, s32 cy, s32 dx, s32 dy)
     return ((d1 <= 0 && d2 >= 0) || (d1 >= 0 && d2 <= 0)) && ((d3 <= 0 && d4 >= 0) || (d3 >= 0 && d4 <= 0));
 }
 
+// The lines of the path that are a trap door's floor: those are its own, a gate (Gates) when it is shut and
+// nothing when it is open. (Zulag 9's top floor: the floor of 400..450 at 460 is the trap door the Mudokon's
+// lever opens, and with it open the way up the shaft is through it.) Worked out once per path.
+static const std::vector<char>& TrapDoorLines(const NavInput& in)
+{
+    static const NavInput* sFor = nullptr;
+    static std::size_t sLines = 0;
+    static std::vector<char> sMask;
+    if (sFor != &in || sLines != in.mLines.size() || sMask.size() != in.mLines.size())
+    {
+        sFor = &in;
+        sLines = in.mLines.size();
+        sMask.assign(in.mLines.size(), 0);
+        for (std::size_t i = 0; i < in.mLines.size(); i++)
+        {
+            const NavLine& line = in.mLines[i];
+            for (const NavFeature& f : in.mFeatures)
+            {
+                if (f.mKind == FeatureKind::eTrapDoor && line.mY1 == line.mY2 && std::abs(line.mY1 - f.mY1) <= 4 && std::min(line.mX1, line.mX2) >= f.mX1 - 2 && std::max(line.mX1, line.mX2) <= f.mX2 + 2)
+                {
+                    sMask[i] = 1;
+                }
+            }
+        }
+    }
+    return sMask;
+}
+
 // Nothing of the path is between two points, for a move that goes sideways, up or down, or both
 static bool Clear(const NavInput& in, bool half, const std::vector<NavLine>* more, s32 ax, s32 ay, s32 bx, s32 by)
 {
@@ -57,8 +85,14 @@ static bool Clear(const NavInput& in, bool half, const std::vector<NavLine>* mor
             return false;
         }
     }
-    for (const NavLine& line : in.mLines)
+    const std::vector<char>& doors = TrapDoorLines(in);
+    for (std::size_t i = 0; i < in.mLines.size(); i++)
     {
+        const NavLine& line = in.mLines[i];
+        if (doors[i])
+        {
+            continue;
+        }
         const bool stops = (ax != bx && StopsSideways(line.mType, half)) || (ay != by && StopsUpDown(line.mType, half));
         if (stops && Meet(ax, ay, bx, by, line.mX1, line.mY1, line.mX2, line.mY2))
         {
@@ -114,6 +148,11 @@ bool FartFlight::Route(const NavInput& in, bool half, Point from, Point to, s32 
     {
         const bool extra = li >= in.mLines.size();
         const NavLine& line = extra ? (*more)[li - in.mLines.size()] : in.mLines[li];
+        // (a trap door's own floor: its gate stands for it, see TrapDoorLines)
+        if (!extra && TrapDoorLines(in)[li])
+        {
+            continue;
+        }
         const bool sideways = extra ? line.mType == 1 : StopsSideways(line.mType, half);
         const bool upDown = extra ? line.mType == 0 : StopsUpDown(line.mType, half);
         if (!sideways && !upDown)

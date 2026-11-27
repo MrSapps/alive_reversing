@@ -3616,6 +3616,38 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
             worth.push_back({Key::Switch(spawn.mSwitch), 1});
         }
     }
+    // (and a Slig got rid of that something else waits on: a lever it guards, a floor not to be come onto while it
+    // is about. Zulag 9: "fly your farts up the shaft to destroy all of the Sligs".)
+    std::vector<Goap::Fact> deaths;
+    // (where there are Brews to spend on them: elsewhere a Slig is got by on the way, and the level's other paths are
+    // looked to first. FeeCo's lobby, its way out shut: it went for a Slig of its own instead, and stayed.)
+    bool brews = false;
+    for (const Entity& e : mWorld.mEntities)
+    {
+        brews = brews || (e.mKind == EntityKind::eBrew && !e.mGone);
+    }
+    for (const Goap::Action& a : brews ? actions : std::vector<Goap::Action>{})
+    {
+        for (const Goap::Fact& f : a.mPre)
+        {
+            const Entity* slig = f.mKey >= Key::Mud(0) && f.mKey < Key::Mud(0) + 1000000 && f.mValue == 2 ? mWorld.Find(static_cast<u32>(f.mKey - Key::Mud(0))) : nullptr;
+            if (slig && slig->mKind == EntityKind::eSlig && !domain.mStart.Has(f) && std::find(deaths.begin(), deaths.end(), f) == deaths.end() &&
+                mExplored.count({mAbe.mLevel * 1000 + mAbe.mPath, f.mKey}) == 0)
+            {
+                deaths.push_back(f);
+            }
+        }
+    }
+    for (const Goap::Fact& f : deaths)
+    {
+        const s32 est = Goap::Planner::Short(domain.mStart, {f}, actions);
+        if (est >= 0)
+        {
+            // (before the switches of the same cost: a Slig gone is what a Brew's farts are for first, the orbs
+            // after. Zulag 9: two farts on an orb out of reach, and the Slig of the floor below the top left.)
+            tries.push_back({est / 2, f});
+        }
+    }
     for (const Goap::Fact& fact : worth)
     {
         if (fact.mKey < 1000 || fact.mKey >= 1000000 || mExplored.count({mAbe.mLevel * 1000 + mAbe.mPath, fact.mKey}))
@@ -3654,9 +3686,15 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
             continue;
         }
         const s32 est = Goap::Planner::Short(domain.mStart, {fact}, actions);
+        // (an orb blown up is for chanting under it only: after the Sligs got rid of, which come first)
+        bool orbFact = false;
+        for (const Entity& e : mWorld.mEntities)
+        {
+            orbFact = orbFact || (e.mKind == EntityKind::eSecurityOrb && Key::Switch(World::HazardSwitch(e.mId)) == fact.mKey);
+        }
         if (est >= 0)
         {
-            tries.push_back({est, fact});
+            tries.push_back({est + (orbFact ? 1000 : 0), fact});
         }
     }
     std::stable_sort(tries.begin(), tries.end(), [](const std::pair<s32, Goap::Fact>& a, const std::pair<s32, Goap::Fact>& b)
@@ -3698,7 +3736,7 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
         if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || sub.mCost < best.mCost))
         {
             best = sub;
-            bestGoal = "Try switch " + std::to_string(fact.mKey - 1000) + "=" + std::to_string(fact.mValue);
+            bestGoal = fact.mKey >= Key::Mud(0) ? "Get rid of Slig#" + std::to_string(fact.mKey - Key::Mud(0)) : "Try switch " + std::to_string(fact.mKey - 1000) + "=" + std::to_string(fact.mValue);
             bestFacts = {fact};
             mExploring = fact.mKey;
             plansFound++;
@@ -5237,7 +5275,7 @@ void Bot::Think(BaseMap& map)
                     // Another way, or the same again if it was a fluke: twice and the action is given up
                     Log("action_failed: " + mTask->Name() + ": " + step.mWhy);
                     // (a switch tried for the sake of it under the eye of a Slig that never goes: tried, no more)
-                    if (mExploring >= 1000 && mExploring < 1256 && step.mWhy.find("never leaves its screen") != std::string::npos)
+                    if (mExploring >= 1000 && (step.mWhy.find("never leaves its screen") != std::string::npos || step.mWhy.find("ran out of time short of it") != std::string::npos))
                     {
                         mExplored.insert({mAbe.mLevel * 1000 + mAbe.mPath, mExploring});
                     }
