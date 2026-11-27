@@ -516,8 +516,11 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                 }
                 case ReliveTypes::eDrill:
                 {
+                    const auto& t = static_cast<const relive::Path_Drill&>(tlv);
                     NavFeature f = MakeFeature(FeatureKind::eSweep, tlv, camera, id);
-                    f.mHalf = static_cast<const relive::Path_Drill&>(tlv).mScale == relive::reliveScale::eHalf;
+                    f.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    // (one that is still until its switch is on: Domain::SligWay goes under it while it is off)
+                    f.mSwitch = t.mDrillBehavior == relive::Path_Drill::DrillBehavior::eToggle && !t.mStartStateOn ? t.mSwitchId : 0;
                     in.mFeatures.push_back(f);
                     break;
                 }

@@ -1260,6 +1260,43 @@ void NavGraph::AddLedgeCatches(std::vector<NavEdge>& edges, s32 from, s32 dir) c
     }
 }
 
+// A teleporter's cell: the way to the one it sends to
+void NavGraph::AddTeleportEdges(std::vector<NavEdge>& edges, s32 from) const
+{
+    const NavNode& n = mNodes[from];
+    s32 featureIdx = -1;
+    const NavFeature* tele = FeatureAt(FeatureKind::eTeleporter, n.mX, n.mY, n.mHalf, &featureIdx);
+    // (one that a plate in it sets off: from the cells of the plate)
+    for (const NavFeature& plate : mInput.mFeatures)
+    {
+        if (tele && plate.mKind == FeatureKind::ePlate && plate.mSwitch == tele->mSwitch && plate.mHalf == tele->mHalf && (plate.mX1 + plate.mX2) / 2 >= tele->mX1 && (plate.mX1 + plate.mX2) / 2 <= tele->mX2 &&
+            std::abs(plate.mY2 - n.mY) <= 30 && (n.mX < plate.mX1 - 2 || n.mX > plate.mX2 + 2))
+        {
+            tele = nullptr;
+        }
+    }
+    if (tele)
+    {
+        for (const NavFeature& other : mInput.mFeatures)
+        {
+            if (other.mKind == FeatureKind::eTeleporter && &other != tele && other.mA == tele->mB && other.mCamera == tele->mDestCamera)
+            {
+                s32 fy = 0;
+                const s32 cx = (other.mX1 + other.mX2) / 2;
+                // (the floor in its box, not one that its top touches: the Mudanchee trial has one right
+                // under the floor of another)
+                s32 line = FloorBelow(cx, other.mY1 + 5, other.mHalf, &fy);
+                if (line < 0 || fy > other.mY2 + 12)
+                {
+                    line = FloorBelow(cx, other.mY1 - 20, other.mHalf, &fy);
+                }
+                AddEdge(edges, from, NodeOnLine(line, cx), EdgeKind::eTeleport, kWellCost, featureIdx, false);
+                break;
+            }
+        }
+    }
+}
+
 void NavGraph::Build(const NavInput& input)
 {
     mInput = input;
@@ -1949,6 +1986,9 @@ void NavGraph::Build(const NavInput& input)
         }
         if (sweptLow)
         {
+            // (a teleporter there all the same: a drill that goes by over it is waited for as for a walk. Zulag
+            // 10's at 2787,720, the way down for the Slig that turns off the last electric wall.)
+            AddTeleportEdges(edges, from);
             continue;
         }
         // Down: looked for a little under it
@@ -2058,36 +2098,7 @@ void NavGraph::Build(const NavInput& input)
             }
         }
 
-        const NavFeature* tele = FeatureAt(FeatureKind::eTeleporter, n.mX, n.mY, n.mHalf, &featureIdx);
-        // (one that a plate in it sets off: from the cells of the plate)
-        for (const NavFeature& plate : mInput.mFeatures)
-        {
-            if (tele && plate.mKind == FeatureKind::ePlate && plate.mSwitch == tele->mSwitch && plate.mHalf == tele->mHalf && (plate.mX1 + plate.mX2) / 2 >= tele->mX1 && (plate.mX1 + plate.mX2) / 2 <= tele->mX2 &&
-                std::abs(plate.mY2 - n.mY) <= 30 && (n.mX < plate.mX1 - 2 || n.mX > plate.mX2 + 2))
-            {
-                tele = nullptr;
-            }
-        }
-        if (tele)
-        {
-            for (const NavFeature& other : mInput.mFeatures)
-            {
-                if (other.mKind == FeatureKind::eTeleporter && &other != tele && other.mA == tele->mB && other.mCamera == tele->mDestCamera)
-                {
-                    s32 fy = 0;
-                    const s32 cx = (other.mX1 + other.mX2) / 2;
-                    // (the floor in its box, not one that its top touches: the Mudanchee trial has one right
-                    // under the floor of another)
-                    s32 line = FloorBelow(cx, other.mY1 + 5, other.mHalf, &fy);
-                    if (line < 0 || fy > other.mY2 + 12)
-                    {
-                        line = FloorBelow(cx, other.mY1 - 20, other.mHalf, &fy);
-                    }
-                    AddEdge(edges, from, NodeOnLine(line, cx), EdgeKind::eTeleport, kWellCost, featureIdx, false);
-                    break;
-                }
-            }
-        }
+        AddTeleportEdges(edges, from);
 
         // A bird portal of Abe's own: hopped into from two cells before it on the side it is entered from (the
         // game takes a hop within two cells of it, facing it, on its floor), out at its exit

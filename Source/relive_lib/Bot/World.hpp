@@ -827,14 +827,25 @@ struct World final
     // 3900..3976 and the one at 3850..3926 under it)
     bool LiftAtStop(s32 x1, s32 x2, s32 y, bool startsHere) const
     {
+        // (any lift of that column at the stop: one shaft may be over another's in it. Zulag 7, 1412: the lift
+        // of 460..620 was taken for that of 980..1140, which stood at 980 the while he waited for it.)
         for (const std::vector<LiftAt>* lifts : {&mLifts, &mLiftsSeen})
         {
+            bool column = false;
             for (const LiftAt& lift : *lifts)
             {
                 if (std::abs(lift.mX1 + lift.mX2 - x1 - x2) <= 24)
                 {
-                    return std::abs(lift.mY - y) <= 4;
+                    if (std::abs(lift.mY - y) <= 4)
+                    {
+                        return true;
+                    }
+                    column = true;
                 }
+            }
+            if (column)
+            {
+                return false;
             }
         }
         return startsHere;

@@ -327,6 +327,7 @@ private:
     s32 BarrierBetween(s32 xa, s32 xb, s32 y, bool half) const;
     const NavFeature* FeatureAt(FeatureKind kind, s32 x, s32 y, bool half, s32* index = nullptr) const;
     void AddEdge(std::vector<NavEdge>& edges, s32 from, s32 to, EdgeKind kind, s32 cost, s32 feature, bool left) const;
+    void AddTeleportEdges(std::vector<NavEdge>& edges, s32 from) const;
     s32 NodeOnLine(s32 line, s32 x) const;
     // The cell a local well throws Abe to: under where it aims, or the ledge just beyond that he catches
     s32 WellLanding(const NavFeature& well) const;

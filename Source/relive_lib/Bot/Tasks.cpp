@@ -2129,7 +2129,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             for (s32 idx : soon)
             {
                 const NavEdge& e = nav.Edges()[idx];
-                if (all(e) >= 0 || !away(e) || mLiftCalls >= 2)
+                if (all(e) >= 0 || !away(e) || mLiftCalls >= 3)
                 {
                     continue;
                 }
@@ -2137,7 +2137,10 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 const s32 moverSwitch = nav.Input().mFeatures[stop.mLiftStop].mSwitch;
                 for (const Entity& lever : w.mEntities)
                 {
-                    if (moverSwitch <= 1 || lever.mKind != EntityKind::eLever || lever.mSwitch != moverSwitch || w.Switch(moverSwitch) != 0)
+                    // (its switch on already, and the lift ridden off since: off, and on again if that is not it.
+                    // A lift mover sends the lift its way as its switch goes on and back as it goes off. Zulag 10,
+                    // the lift at 1962 that the Slig rode up after the lever had sent it down.)
+                    if (moverSwitch <= 1 || lever.mKind != EntityKind::eLever || lever.mSwitch != moverSwitch)
                     {
                         continue;
                     }
@@ -2150,7 +2153,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                         mLiftComeWaits = 0;
                         mLiftComeY = -100000;
                         bot.Log("the lift is away from " + std::to_string(stop.mX) + "," + std::to_string(stop.mY) + ": calling it with Lever#" + std::to_string(lever.mId));
-                        mLiftCall = std::make_unique<UseTask>(lever.mId, 1);
+                        mLiftCall = std::make_unique<UseTask>(lever.mId, w.Switch(moverSwitch) != 0 ? 0 : 1);
                         return Next(bot, "");
                     }
                 }
@@ -2406,7 +2409,15 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             if (!world.SweepOf(drill->mId))
             {
-                // Not about until its screen is: a cell at a time till it shows
+                // Not about until its screen is: a cell at a time till it shows. Not by a way he can't stop on
+                // (a hoist, a drop, a jump, a teleporter): that is taken into its stroke wherever that is when it
+                // shows. Kept off once, for any other way there is. (Zulag 10: up from 2437,1400 to the floor of
+                // 2276..2476, where the drill along the floor showed as he came up, at the cell beside him.)
+                const EdgeKind kind = nav.Edges()[path[0]].mKind;
+                if (!inside && kind != EdgeKind::eWalk && kind != EdgeKind::eRoll && bot.BanBlindDrill(path[0]))
+                {
+                    return TaskStep::Failed("a drill not about yet reaches where the way lands");
+                }
                 sweepStop = 1;
             }
             else if (!SweepsClear(nav, world, path, count, bot.SweepLate()))
@@ -3556,6 +3567,23 @@ TaskStep GoToTask::RollStep(Bot& bot, const std::string& lastFailed, const Way& 
     std::vector<s32>& path = way.mPath;
     const std::size_t sweepStop = way.mSweepStop;
     const NavEdge& first = way.mFirst;
+    // Not from the middle of a lift: down there takes hold of it, and he never goes down to roll. A cell on first,
+    // walked as a drill there leaves it alone long enough. (Zulag 10, off the lift at 2912,720 under the drills.)
+    {
+        const NavNode& here = nav.Nodes()[cur];
+        if (here.mLiftStop >= 0 && abe.mMove != Move::eCrouch)
+        {
+            const NavFeature& stop = nav.Input().mFeatures[here.mLiftStop];
+            if (std::abs(abe.mX - (stop.mX1 + stop.mX2) / 2) * 2 < NavGraph::GridStep(here.mHalf))
+            {
+                if (abe.mMove == Move::eLiftIdle || !abe.Settled())
+                {
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+                return SweepsClear(nav, bot.GetWorld(), path, 1, bot.SweepLate()) ? TaskStep::Do(Prim::MoveTo(nav.Nodes()[first.mTo].mX, Gait::eWalk)) : TaskStep::Do(Prim::Wait(1));
+            }
+        }
+    }
     std::size_t last = 0;
     while (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eRoll && nav.Edges()[path[last + 1]].mLeft == first.mLeft)
     {
@@ -5328,6 +5356,24 @@ TaskStep GoToTask::TeleportStep(Bot& bot, const std::string& lastFailed, const W
     {
         if (e.mKind == EntityKind::eLever && e.mSwitch == tele.mSwitch && std::abs(e.CentreX() - abe.mX) <= 2 * cell)
         {
+            // (stood up for it, under drills that go to and fro over his head as he is crouched there: as none
+            // comes by in the time to stand, pull and go. Zulag 10's teleporter at 2787,720.)
+            if (abe.mMove == Move::eCrouch)
+            {
+                const NavNode& here = nav.Nodes()[cur];
+                const s32 tall = here.mHalf ? 30 : 60;
+                bool comes = false;
+                for (const SweepAt& sweep : bot.GetWorld().mSweeps)
+                {
+                    comes = comes || sweep.Hits(0, 50, here.mX - 6, here.mY - tall, here.mX + 6, here.mY);
+                }
+                if (comes && mTeleWaits++ < 900)
+                {
+                    mSteps--;
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+                return TaskStep::Do(Prim::Press(Btn::eUp));
+            }
             const bool left = e.CentreX() < abe.mX;
             if (abe.mFacingLeft != left)
             {
@@ -7473,7 +7519,7 @@ TaskStep FeedAwayTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Do(Prim::Wait(1));
     }
     bot.Log("they are on the last bone: on, at a run");
-    bot.RunFor(150);
+    bot.RunFor(150, true);
     return TaskStep::Done();
 }
 
@@ -7613,7 +7659,7 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
             if (slog || mRun > 0)
             {
                 // (with them after him, for as long as the bones he has for it last: he is down among them)
-                bot.RunFor(slog ? (world.SlogsOut(*slog) ? 200 : std::max<s32>(slog->mInputs[0], 30)) : mRun);
+                bot.RunFor(slog ? (world.SlogsOut(*slog) ? 200 : std::max<s32>(slog->mInputs[0], 30)) : mRun, true);
             }
         }
         return TaskStep::Done();
@@ -12307,6 +12353,68 @@ TaskStep SendToWheelTask::Next(Bot& bot, const std::string& lastFailed)
     }
 }
 
+TaskStep MudLeverTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* mud = world.Find(mMud);
+    const Entity* lever = world.Find(mLever);
+    if (!mud || !lever || mud->mGone)
+    {
+        return TaskStep::Failed("no such Mudokon or lever");
+    }
+    if (mStart < 0)
+    {
+        mStart = world.Switch(lever->mSwitch);
+    }
+    if (world.Switch(lever->mSwitch) != mStart)
+    {
+        bot.Log("Mudokon#" + std::to_string(mMud) + " has pulled Lever#" + std::to_string(mLever));
+        return TaskStep::Done();
+    }
+    // (from its screen: it hears him anywhere on it)
+    const s32 cam = nav.CameraOf(mud->CentreX(), mud->mY2 - 5);
+    const AbeState& abe = bot.Abe();
+    if (nav.CameraOf(abe.mX, abe.mY - 5) != cam)
+    {
+        if (!mGo)
+        {
+            const NavGraph* g = &nav;
+            mGo = std::make_unique<GoToTask>("to the screen of the Mudokon at the lever", [g, cam](s32 n)
+                                             { return g->CameraOf(g->Nodes()[n].mX, g->Nodes()[n].mY - 5) == cam; });
+        }
+        const TaskStep step = mGo->Next(bot, lastFailed);
+        if (step.mKind != TaskStep::Kind::eDone)
+        {
+            return step;
+        }
+        mGo.reset();
+    }
+    if (++mFrames > 1200)
+    {
+        return TaskStep::Failed("the Mudokon would not work the lever");
+    }
+    if (!abe.Settled() || abe.mMove != Move::eIdle)
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    // (listening: work; else hello, now and then)
+    if (mud->mState / 100 == 4)
+    {
+        if (mWorkSaid++ % 90 == 0)
+        {
+            bot.Log("work, said to Mudokon#" + std::to_string(mMud) + " by Lever#" + std::to_string(mLever));
+            return TaskStep::Do(Prim::Wait(2, bot.SpeakWork()));
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (mFrames % 60 == 1)
+    {
+        return TaskStep::Do(Prim::Wait(2, bot.SpeakHello()));
+    }
+    return TaskStep::Do(Prim::Wait(1));
+}
+
 bool RescueTask::LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, const std::string& lastFailed, TaskStep& step)
 {
     const NavGraph& nav = bot.Nav();
@@ -16106,10 +16214,14 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
     const Entity* slig = world.Find(mSlig);
     const Entity* lever = world.Find(mLever);
     const auto code = world.mLockCodes.find(mLock);
-    if (!lock || !slig || !lever || code == world.mLockCodes.end())
+    // (or a lever it pulls: Domain::SligLocks)
+    const bool pulls = lock && lock->mKind == EntityKind::eLever;
+    if (!lock || !slig || !lever || (code == world.mLockCodes.end() && !pulls))
     {
         return TaskStep::Failed("no such entity");
     }
+    bool pullLeft = false;
+    const s32 pullAt = pulls ? Domain::UseNode(nav, *lock, &pullLeft) : -1;
     const SligAt* me = nullptr;
     for (const SligAt& s : world.mSligs)
     {
@@ -16311,11 +16423,11 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Failed("the Slig got no further than " + std::to_string(me->mX) + "," + std::to_string(me->mY));
     }
-    const auto goalOf = [&nav](const Entity& which)
+    const auto goalOf = [&nav, pulls, pullAt](const Entity& which)
     {
-        return [&nav, &which](s32 n)
+        return [&nav, &which, pulls, pullAt](s32 n)
         {
-            return Domain::AtSligLock(nav, which, n);
+            return pulls ? n == pullAt : Domain::AtSligLock(nav, which, n);
         };
     };
     if (open)
@@ -16329,6 +16441,13 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
                 bot.Log("the Slig is kept for SligLock#" + std::to_string(other.mId));
                 return TaskStep::Done();
             }
+        }
+        // (and so is one that a later step of the plan has go on to a lever or a lock: called anew, the next one
+        // would find the lift it rode down left there. Zulag 10: levers 72, 74 and 62 one after another.)
+        if (bot.PlanLater("with Slig#" + std::to_string(mSlig)) && mBurst == 0)
+        {
+            bot.Log("the Slig is kept for what the plan has it do next");
+            return TaskStep::Done();
         }
         mBurst += 20;
         if (mBurst > 600)
@@ -16413,7 +16532,26 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
         }
     }
 
-    if (Domain::AtSligLock(nav, *lock, node))
+    // At the lever: faced, and pulled (Slig::PullLever: the lever a grid ahead of it)
+    if (pulls && node == pullAt)
+    {
+        if (me->mMotion != 0)
+        {
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        if (me->mFacingLeft != pullLeft)
+        {
+            return TaskStep::Do(Prim::Wait(2, pullLeft ? Btn::eLeft : Btn::eRight));
+        }
+        if (++mPullTries > 4)
+        {
+            return TaskStep::Failed("the Slig's pull of Lever#" + std::to_string(mLock) + " did nothing");
+        }
+        mPullWait = 40;
+        bot.Log("the Slig pulls Lever#" + std::to_string(mLock));
+        return TaskStep::Do(Prim::Wait(3, Btn::eAction));
+    }
+    if (!pulls && Domain::AtSligLock(nav, *lock, node))
     {
         if (lock->mState == 5 && mLastState != 5 && ++mTries > 4)
         {
@@ -16428,10 +16566,175 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Do(Prim::Wait(2, say));
     }
 
-    const std::vector<s32> way = Domain::SligWay(nav, node, goalOf(*lock), nullptr, &world);
+    std::vector<s32> way = Domain::SligWay(nav, node, goalOf(*lock), nullptr, &world);
     if (way.empty())
     {
-        return TaskStep::Failed("the Slig has no way to the lock from " + std::to_string(me->mX) + "," + std::to_string(me->mY));
+        return TaskStep::Failed(std::string(pulls ? "the Slig has no way to the lever from " : "the Slig has no way to the lock from ") + std::to_string(me->mX) + "," + std::to_string(me->mY));
+    }
+    // Sligs on a floor of a screen ahead that it would walk in among: shot from the background over them, where it
+    // gets to a cell there. A Slig it is in shoots into the foreground straight down the screen at what is within
+    // 25 of it (Bullet.cpp, ePossessedSligZBullet_1; throw with down held, Slig::ShootOrShootZ), and one in the foreground that can't shoot back there is no
+    // match for it. Not with a Mudokon in that line. (Zulag 10: "hop down and use the lower teleporter there.
+    // Shoot the Sligs in the foreground, watching out for the Mudokon, teleport back and go left." Walked in among
+    // the four of them, it was shot.)
+    {
+        // (the ones of the screen: in the foreground, not his)
+        const auto below = [&](s32 cam, s32 floorY, std::vector<s32>* xs)
+        {
+            bool any = false;
+            bool loaded = false;
+            for (const SligAt& s : world.mSligs)
+            {
+                loaded = loaded || nav.CameraOf(s.mX, s.mY - 5) == cam;
+                if (!s.mPossessed && !s.mHalf && nav.CameraOf(s.mX, s.mY - 5) == cam && (floorY < 0 || std::abs(s.mY - floorY) <= 45))
+                {
+                    any = true;
+                    if (xs)
+                    {
+                        xs->push_back(s.mX);
+                    }
+                }
+            }
+            // (and on a screen not come to yet, the ones the path has there that are not dead)
+            for (const Entity& e : world.mEntities)
+            {
+                if (!loaded && e.mKind == EntityKind::eSlig && e.mSwitch <= 1 && !e.mGone && !e.mHalf && nav.CameraOf(e.CentreX(), e.mY2 - 5) == cam && (floorY < 0 || std::abs(e.mY2 - floorY) <= 45))
+                {
+                    any = true;
+                    if (xs)
+                    {
+                        xs->push_back(e.CentreX());
+                    }
+                }
+            }
+            return any;
+        };
+        const auto mudIn = [&](s32 x, s32 cam)
+        {
+            for (const Entity& m : world.mEntities)
+            {
+                if (m.mKind == EntityKind::eMudokon && !m.mGone && !m.mHalf && std::abs(m.CentreX() - x) <= 32 && nav.CameraOf(m.CentreX(), m.mY2 - 5) == cam)
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+        // (the switches of what is shut on the way on: a teleporter's lever that is one of them is not pulled for
+        // this, it would shut that again. Zulag 10's 72 works the teleporter at 2487 and the walls of 2262..2337.)
+        std::set<s32> wayGates;
+        for (s32 idx : way)
+        {
+            s32 sw = 0;
+            if (nav.Condition(edges[idx], &sw, nullptr))
+            {
+                wayGates.insert(sw);
+            }
+        }
+        const auto keepsGates = [&](const std::vector<s32>& route)
+        {
+            for (s32 idx : route)
+            {
+                if (edges[idx].mKind == EdgeKind::eTeleport && edges[idx].mFeature >= 0 && wayGates.count(nav.Input().mFeatures[edges[idx].mFeature].mSwitch) != 0)
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+        if (mZCam < 0)
+        {
+            for (std::size_t i = 0; i < way.size() && mZCam < 0; i++)
+            {
+                const NavNode& n = nodes[edges[way[i]].mTo];
+                const s32 cam = nav.CameraOf(n.mX, n.mY - 5);
+                // (from the background already, over them: the screen it is on is one too)
+                if (n.mHalf || (cam == nav.CameraOf(me->mX, me->mY - 5) && !me->mHalf) || !below(cam, n.mY, nullptr))
+                {
+                    continue;
+                }
+                std::vector<s32> xs;
+                below(cam, n.mY, &xs);
+                const std::vector<s32> over = Domain::SligWay(nav, node, [&](s32 k)
+                                                              {
+                                                                  const NavNode& b = nodes[k];
+                                                                  if (!b.mHalf || nav.CameraOf(b.mX, b.mY - 5) != cam || mudIn(b.mX, cam))
+                                                                  {
+                                                                      return false;
+                                                                  }
+                                                                  for (s32 x : xs)
+                                                                  {
+                                                                      if (std::abs(b.mX - x) <= 20)
+                                                                      {
+                                                                          return true;
+                                                                      }
+                                                                  }
+                                                                  return false;
+                                                              }, nullptr, &world);
+                if ((!over.empty() || (me->mHalf && nav.CameraOf(me->mX, me->mY - 5) == cam)) && over.size() <= i + 40 && keepsGates(over))
+                {
+                    mZCam = cam;
+                    mZFrames = 0;
+                    bot.Log("Sligs on the floor ahead at " + std::to_string(n.mX) + "," + std::to_string(n.mY) + ": shot from the background over them first");
+                }
+                break;
+            }
+        }
+        if (mZCam >= 0)
+        {
+            std::vector<s32> xs;
+            mZFrames += 2;
+            if (!below(mZCam, -1, &xs) || mZFrames > 3000)
+            {
+                bot.Log(mZFrames > 3000 ? "the Sligs below are not all shot: on" : "the Sligs below are shot: on");
+                mZCam = -1;
+            }
+            else if (me->mHalf && nav.CameraOf(me->mX, me->mY - 5) == mZCam)
+            {
+                // (over the nearest of them that has no Mudokon by it, and down the screen at it)
+                s32 best = -1;
+                for (s32 x : xs)
+                {
+                    if (!mudIn(x, mZCam) && (best < 0 || std::abs(x - me->mX) < std::abs(best - me->mX)))
+                    {
+                        best = x;
+                    }
+                }
+                // (each of them by the Mudokon: waited for, up here out of their reach, until one walks off from it)
+                if (best < 0)
+                {
+                    mStuck = 0;
+                    return TaskStep::Do(Prim::Wait(2));
+                }
+                else if (std::abs(best - me->mX) > 12)
+                {
+                    mStuck = 0;
+                    return StepTo(*me, best);
+                }
+                else
+                {
+                    mStuck = 0;
+                    return TaskStep::Do(Prim::Wait(2, me->mMotion == 0 || me->mMotion == 42 ? static_cast<u32>(Btn::eThrow | Btn::eDown) : 0u));
+                }
+            }
+            if (mZCam >= 0)
+            {
+                const s32 cam = mZCam;
+                std::vector<s32> over = Domain::SligWay(nav, node, [&](s32 k)
+                                                        {
+                                                            const NavNode& b = nodes[k];
+                                                            return b.mHalf && nav.CameraOf(b.mX, b.mY - 5) == cam;
+                                                        }, nullptr, &world);
+                if (over.empty() || !keepsGates(over))
+                {
+                    mZCam = -1;
+                }
+                else
+                {
+                    way = over;
+                }
+            }
+        }
     }
     const NavEdge& e = edges[way[0]];
     const NavNode& from = nodes[node];
@@ -16513,8 +16816,10 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
     // teleporter), the last of it is single steps.
     const bool left = to.mX < from.mX;
     s32 stopX = to.mX;
+    // (and at the end of the way: the cell a lever is pulled from is the one cell)
     bool mustStop = false;
-    for (std::size_t i = 1; i < way.size(); i++)
+    std::size_t i = 1;
+    for (; i < way.size(); i++)
     {
         const NavEdge& next = edges[way[i]];
         // (and before it walks off a floor's end: it may have to wait there)
@@ -16523,13 +16828,13 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
             mustStop = true;
             break;
         }
-        if (next.mKind != EdgeKind::eWalk || (nodes[next.mTo].mX < nodes[next.mFrom].mX) != left)
+        if ((next.mKind != EdgeKind::eWalk && next.mKind != EdgeKind::eRoll) || (nodes[next.mTo].mX < nodes[next.mFrom].mX) != left)
         {
             break;
         }
         stopX = nodes[next.mTo].mX;
     }
-    if (mustStop)
+    if (mustStop || (pulls && i == way.size()))
     {
         return StepTo(*me, stopX);
     }

@@ -188,6 +188,12 @@ std::vector<s32> LevelGraph::Wanted(s32 path) const
         }
         for (const PathSummary::Want& want : p.mWants)
         {
+            // (nor one its own path sets: a switch's number is used again from path to path. Brewery path 4's door
+            // wants its own 49..51, and in path 6 those are Slog gates, opened again for it once he had them shut.)
+            if (std::find(p.mSets.begin(), p.mSets.end(), want.mSwitch) != p.mSets.end())
+            {
+                continue;
+            }
             if (Wanters(want.mSwitch).count(p.mPath) != 0)
             {
                 all.insert(want.mSwitch);

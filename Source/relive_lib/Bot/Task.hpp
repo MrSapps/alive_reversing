@@ -1392,6 +1392,31 @@ private:
 };
 
 // A blind Mudokon is called from the wheel's side of it, walks until the wheel stops it, and is told to work
+// A Mudokon that stands a cell from a lever: hello and work, said from its screen, and it pulls it
+// (Mudokon.cpp, Brain_4_ListeningToAbe: on work it pulls a lever a grid to either side of it)
+class MudLeverTask final : public Task
+{
+public:
+    MudLeverTask(u32 mudId, u32 leverId)
+        : mMud(mudId)
+        , mLever(leverId)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Have Mudokon#" + std::to_string(mMud) + " work Lever#" + std::to_string(mLever);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mMud;
+    u32 mLever;
+    std::unique_ptr<GoToTask> mGo;
+    s32 mStart = -1;
+    s32 mFrames = 0;
+    s32 mWorkSaid = 0;
+};
+
 class SendToWheelTask final : public Task
 {
 public:
@@ -2101,6 +2126,9 @@ private:
     s32 mShots = 0;
     s32 mLastNode = -1;
     s32 mStuck = 0;
+    // The screen whose Sligs it is shooting from the background over them (-1: none), and frames spent at it
+    s32 mZCam = -1;
+    s32 mZFrames = 0;
     TaskStep StepTo(const SligAt& me, s32 x);
 };
 

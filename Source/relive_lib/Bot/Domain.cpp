@@ -1152,6 +1152,16 @@ std::vector<s32> Domain::SligWay(const NavGraph& nav, s32 from, const std::funct
         return {};
     }
     static const s32 kShut = 100000;
+    const auto stillDrill = [&](s32 n)
+    {
+        const NavNode& nd = nodes[n];
+        if (!nd.mLow || nd.mSweepHigh < 0)
+        {
+            return false;
+        }
+        const s32 sw = nav.Input().mFeatures[nd.mSweepHigh].mSwitch;
+        return sw > 1 && (!world || gates || world->Switch(sw) == 0);
+    };
     std::vector<s32> cost(nodes.size(), -1);
     std::vector<s32> via(nodes.size(), -1);
     std::set<std::pair<s32, s32>> open;
@@ -1172,8 +1182,11 @@ std::vector<s32> Domain::SligWay(const NavGraph& nav, s32 from, const std::funct
         {
             const s32 idx = nodes[at].mFirstEdge + k;
             const NavEdge& e = edges[idx];
-            const bool takes = e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eLift || e.mKind == EdgeKind::eTeleport;
-            if (!takes || nodes[e.mTo].mLow || nodes[e.mTo].mHazard || e.mCrouched)
+            // (under a drill that is still till its switch is on, as it is: walked, where Abe rolls. Zulag 10, where
+            // every drill is still till the lever the Slig is sent to is pulled.)
+            const bool under = stillDrill(e.mTo);
+            const bool takes = e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eLift || e.mKind == EdgeKind::eTeleport || (e.mKind == EdgeKind::eRoll && (under || stillDrill(e.mFrom)));
+            if (!takes || (nodes[e.mTo].mLow && !under) || nodes[e.mTo].mHazard || e.mCrouched)
             {
                 continue;
             }
@@ -1245,6 +1258,14 @@ std::vector<s32> Domain::SligWay(const NavGraph& nav, s32 from, const std::funct
     {
         s32 switchId = 0;
         s32 openValue = 0;
+        if (gates && stillDrill(edges[idx].mTo))
+        {
+            const Goap::Fact still{Key::Switch(nav.Input().mFeatures[nodes[edges[idx].mTo].mSweepHigh].mSwitch), 0};
+            if (std::find(gates->begin(), gates->end(), still) == gates->end())
+            {
+                gates->push_back(still);
+            }
+        }
         if (gates && edges[idx].mKind != EdgeKind::eTeleport && nav.Condition(edges[idx], &switchId, &openValue))
         {
             const Goap::Fact need{Key::Switch(switchId), openValue};
@@ -2842,6 +2863,8 @@ struct Domain::Builder final
     void VoiceLocks();
     void TimedTrapDoors();
     void SlogPens();
+    void PenGates();
+    void MudLevers();
     void GlukkonCalls();
     void DrillSlogs();
     void Orbs();
@@ -3084,6 +3107,8 @@ Domain Domain::Builder::Run()
     ParamiteFleeches();
     Scrabs();
     DrillsOverMudokons();
+    MudLevers();
+    PenGates();
     // Mudokons led to work wheels together past a Slog that a ring can drop: with it dead, not fed. A bone keeps it
     // a short while, which does for Abe on his own but not for leading a group by. (Zulag 5: the big Slog by the
     // bone sack, fed, was taken as out of the way of the wheels' Mudokons.) Only once no Slogs by a ring are left:
@@ -6764,6 +6789,176 @@ void Domain::Builder::SlogPens()
     }
 }
 
+// A Slog on a stretch of floor that a gate (a slam door) opens onto, with a lever or ring of that gate's on the far
+// side: whatever he does out there past the gate's own ways and lever is done with the gate shut behind him. A bone
+// keeps a Slog a while only: then it comes after him, through the gate and on wherever he went. (Zulag 7: "pull the
+// ring as soon as the Slog goes for the second bone, trapping him behind the slamdoor". Fed and left, the first
+// came down the shaft of the lift at 1187 after him.)
+void Domain::Builder::PenGates()
+{
+    const NavGraph& nav = mNav;
+    Domain& d = mD;
+    std::set<std::tuple<s32, s32, s32>> seen;
+    for (const Entity& slog : mWorld.mEntities)
+    {
+        if (slog.mKind != EntityKind::eSlog || slog.mGone || slog.mInputs[3] <= slog.mInputs[2] || !seen.insert({slog.mInputs[2], slog.mInputs[3], slog.mInputs[4]}).second)
+        {
+            continue;
+        }
+        const s32 x1 = slog.mInputs[2];
+        const s32 x2 = slog.mInputs[3];
+        const s32 floorY = slog.mInputs[4];
+        std::set<s32> inside;
+        for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+        {
+            const NavNode& node = nav.Nodes()[n];
+            if (node.mHalf == slog.mHalf && node.mX >= x1 && node.mX <= x2 && std::abs(node.mY - floorY) <= 10)
+            {
+                inside.insert(d.mRegions[n]);
+            }
+        }
+        // The gates: barriers that are solid, of a switch, crossed from the stretch's regions
+        const auto gateOf = [&nav](const NavEdge& e, s32& sw, s32& open)
+        {
+            if (!nav.Condition(e, &sw, &open) || sw <= 1)
+            {
+                return false;
+            }
+            for (const s32 f : {e.mFeature, e.mFence})
+            {
+                if (f >= 0 && nav.Input().mFeatures[f].mKind == FeatureKind::eBarrier && nav.Input().mFeatures[f].mSolid && !nav.Input().mFeatures[f].mBeam && nav.Input().mFeatures[f].mSwitch == sw)
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+        std::map<s32, s32> gates;
+        for (const NavEdge& e : mEdges)
+        {
+            s32 sw = 0;
+            s32 open = 0;
+            if (gateOf(e, sw, open) && (inside.count(d.mRegions[e.mFrom]) != 0 || inside.count(d.mRegions[e.mTo]) != 0) && d.mRegions[e.mFrom] != d.mRegions[e.mTo])
+            {
+                gates[sw] = open;
+            }
+        }
+        for (const auto& gate : gates)
+        {
+            const s32 sw = gate.first;
+            const Goap::Fact shut{Key::Switch(sw), gate.second == 0 ? 1 : 0};
+            // (the regions out past it: by its own crossings only)
+            std::set<s32> out;
+            bool grew = true;
+            while (grew)
+            {
+                grew = false;
+                for (const NavEdge& e : mEdges)
+                {
+                    s32 esw = 0;
+                    s32 open = 0;
+                    const s32 from = d.mRegions[e.mFrom];
+                    const s32 to = d.mRegions[e.mTo];
+                    if (gateOf(e, esw, open) && esw == sw && (inside.count(from) != 0 || out.count(from) != 0) && inside.count(to) == 0 && out.insert(to).second)
+                    {
+                        grew = true;
+                    }
+                }
+            }
+            // (shut from out there)
+            bool lever = false;
+            for (const Goap::Action& a : d.mActions)
+            {
+                const DomainStep& step = d.mSteps[a.mTag];
+                lever = lever || (step.mKind == StepKind::eUse && std::find(a.mEffects.begin(), a.mEffects.end(), shut) != a.mEffects.end() &&
+                                  std::any_of(a.mPre.begin(), a.mPre.end(), [&out](const Goap::Fact& f) { return f.mKey == Key::kRegion && out.count(f.mValue - 1) != 0; }));
+            }
+            if (!lever)
+            {
+                continue;
+            }
+            for (Goap::Action& a : d.mActions)
+            {
+                const DomainStep& step = d.mSteps[a.mTag];
+                const bool there = std::any_of(a.mPre.begin(), a.mPre.end(), [&out](const Goap::Fact& f) { return f.mKey == Key::kRegion && out.count(f.mValue - 1) != 0; });
+                const bool ofGate = std::any_of(a.mPre.begin(), a.mPre.end(), [sw](const Goap::Fact& f) { return f.mKey == Key::Switch(sw); }) ||
+                                    std::any_of(a.mEffects.begin(), a.mEffects.end(), [sw](const Goap::Fact& f) { return f.mKey == Key::Switch(sw); });
+                if (!there || ofGate)
+                {
+                    continue;
+                }
+                if (step.mKind == StepKind::eCross && step.mEdge >= 0 && step.mEdge < static_cast<s32>(mEdges.size()))
+                {
+                    s32 esw = 0;
+                    s32 open = 0;
+                    const NavEdge& e = mEdges[step.mEdge];
+                    if (inside.count(d.mRegions[e.mTo]) != 0 || (gateOf(e, esw, open) && esw == sw))
+                    {
+                        continue;
+                    }
+                }
+                a.mPre.push_back(shut);
+            }
+        }
+    }
+}
+
+// A lever a Mudokon stands a cell from, under a security orb: hello and work, said from its screen, and it pulls
+// it. (Zulag 9's first screen: "Tell the Mudokon to 'Work' the lever, then hop off the edge of your platform".)
+void Domain::Builder::MudLevers()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    for (const Entity& mud : world.mEntities)
+    {
+        if (mud.mKind != EntityKind::eMudokon || mud.mGone || mud.mBlind || AngryWorker(mud) || mud.mFollowing)
+        {
+            continue;
+        }
+        const s32 mx = mud.CentreX();
+        const s32 cell = NavGraph::GridStep(mud.mHalf);
+        for (const Entity& lever : world.mEntities)
+        {
+            if (lever.mKind != EntityKind::eLever || lever.mGone || lever.mSwitch <= 1 || lever.mHalf != mud.mHalf || world.Switch(lever.mSwitch) != 0 || std::abs(lever.mY2 - mud.mY2) > 30)
+            {
+                continue;
+            }
+            const bool beside = (mx + cell >= lever.mX1 && mx + cell <= lever.mX2) || (mx - cell >= lever.mX1 && mx - cell <= lever.mX2);
+            if (!beside)
+            {
+                continue;
+            }
+            const s32 cam = nav.CameraOf(mx, mud.mY2 - 5);
+            // (where a security orb watches the lever: Abe at it is zapped, a Mudokon is not. Elsewhere he pulls it
+            // himself.)
+            bool orb = false;
+            for (const Entity& e : world.mEntities)
+            {
+                orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == nav.CameraOf(lever.CentreX(), lever.mY2 - 5));
+            }
+            if (!orb)
+            {
+                continue;
+            }
+            std::set<s32> regions;
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                const NavNode& node = nav.Nodes()[n];
+                if (nav.CameraOf(node.mX, node.mY - 5) == cam && node.mHalf == mud.mHalf && !node.mHazard && regions.insert(d.mRegions[n]).second)
+                {
+                    DomainStep step;
+                    step.mKind = StepKind::eMudLever;
+                    step.mEntity = mud.mId;
+                    step.mOther = lever.mId;
+                    add("Have Mudokon#" + std::to_string(mud.mId) + " work Lever#" + std::to_string(lever.mId) + " sw" + std::to_string(lever.mSwitch) + " from " + std::to_string(node.mX) + "," + std::to_string(node.mY),
+                        {regionFact(static_cast<s32>(n)), {Key::Mud(mud.mId), 0}, {Key::Switch(lever.mSwitch), 0}}, {{Key::Switch(lever.mSwitch), 1}}, 100, step);
+                }
+            }
+        }
+    }
+}
+
 // A lever a Slig comes down to when a Glukkon calls for help
 void Domain::Builder::GlukkonCalls()
 {
@@ -7471,6 +7666,78 @@ void Domain::Builder::SligLocks()
                 step.mOther = slig.mId;
                 step.mEdge = static_cast<s32>(lever.mId);
                 add("Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with Slig#" + std::to_string(slig.mId) + " called by Lever#" + std::to_string(lever.mId), pre, gives, 600 + 20 * static_cast<s32>(way.size()), step);
+            }
+        }
+    }
+
+    // A lever only a Slig gets to: the Slig of a spawner, called and taken over as for a lock, walked there and has
+    // it pull it. (Zulag 10: "pull the lever, then possess the Slig that appears. Go right and kill the other Sligs
+    // as you go ... Go left and teleport to the background near Abe, and pull the right lever to turn off the last
+    // electric fence.")
+    for (const Entity& target : world.mEntities)
+    {
+        if (target.mKind != EntityKind::eLever || target.mSwitch <= 1 || world.Switch(target.mSwitch) != 0)
+        {
+            continue;
+        }
+        bool faceLeft = false;
+        const s32 at = UseNode(nav, target, &faceLeft);
+        if (at < 0)
+        {
+            continue;
+        }
+        for (const Entity& slig : world.mEntities)
+        {
+            if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch <= 1 || slig.mSwitch == target.mSwitch)
+            {
+                continue;
+            }
+            const s32 start = SligNode(nav, slig);
+            if (start < 0)
+            {
+                continue;
+            }
+            for (const Entity& lever : world.mEntities)
+            {
+                if (lever.mKind != EntityKind::eLever || lever.mSwitch != slig.mSwitch || lever.mId == target.mId)
+                {
+                    continue;
+                }
+                const s32 stand = UseNode(nav, lever, nullptr);
+                if (stand < 0)
+                {
+                    continue;
+                }
+                const s32 cam = nav.CameraOf(nav.Nodes()[stand].mX, nav.Nodes()[stand].mY - 5);
+                bool orb = false;
+                for (const Entity& e : world.mEntities)
+                {
+                    orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
+                }
+                if (orb || nav.CameraOf(nav.Nodes()[start].mX, nav.Nodes()[start].mY - 5) != cam)
+                {
+                    continue;
+                }
+                std::vector<Goap::Fact> pre{regionFact(stand), {Key::Switch(target.mSwitch), 0}};
+                const std::vector<s32> way = SligWay(nav, start, [at](s32 n)
+                                                     { return n == at; }, &pre, nullptr);
+                if (way.empty() && start != at)
+                {
+                    continue;
+                }
+                pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(target.mSwitch), 1}), pre.end());
+                pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(lever.mSwitch), 1}), pre.end());
+                std::vector<Goap::Fact> gives{{Key::Switch(target.mSwitch), 1}};
+                for (u32 met : SligsMet(nav, world, start, way, slig.mId))
+                {
+                    gives.push_back({Key::Mud(met), 2});
+                }
+                DomainStep step;
+                step.mKind = StepKind::eSligLock;
+                step.mEntity = target.mId;
+                step.mOther = slig.mId;
+                step.mEdge = static_cast<s32>(lever.mId);
+                add("Pull Lever#" + std::to_string(target.mId) + " sw" + std::to_string(target.mSwitch) + " with Slig#" + std::to_string(slig.mId) + " called by Lever#" + std::to_string(lever.mId), pre, gives, 900 + 20 * static_cast<s32>(way.size()), step);
             }
         }
     }
@@ -8483,6 +8750,28 @@ bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY
                     {
                         off = true;
                     }
+                }
+            }
+            // (nor one that comes down or rolls to the far side of an open gate across the stretch, away from most of
+            // it: the Slogs go out through it after the bone. Zulag 7's third pen, the gate at 1300 of 1225..1449:
+            // thrown from over 1412 it came down at 1255 and lay at 1173, and the Slog had him at the ring.)
+            for (const NavFeature& f : nav.Input().mFeatures)
+            {
+                if (!world || off)
+                {
+                    break;
+                }
+                const s32 gx = (f.mX1 + f.mX2) / 2;
+                if (f.mKind != FeatureKind::eBarrier || f.mBeam || !f.mSolid || f.mSwitch <= 1 || f.mHalf != from.mHalf || gx < x1 - 30 || gx > x2 + 30 || f.mY1 > floorY + 4 || f.mY2 < floorY - 40)
+                {
+                    continue;
+                }
+                const s32 inner = x2 - gx > gx - x1 ? 1 : -1;
+                const s32 lo = std::min({end.mX, rest, gx}) - 1;
+                const s32 hi = std::max({end.mX, rest, gx}) + 1;
+                if (((end.mX - gx) * inner < 25 || (rest - gx) * inner < 0) && FloorOpen(nav.Input(), *world, lo, hi, floorY + 4, from.mHalf))
+                {
+                    off = true;
                 }
             }
             if (end.mX < x1 + 15 || end.mX > x2 - 15 || (!otherScreen && nav.CameraOf(end.mX, floorY - 5) != cam) || off || (wanted && !wanted(end.mX)))

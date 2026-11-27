@@ -34,6 +34,8 @@ struct PathKnowledge final
     std::map<s32, s32> mExitUses;
     // Throws at a mine (its id, the cell thrown from, how) that missed or killed Abe: not tried again
     std::set<std::tuple<u32, s32, s32>> mBadThrows;
+    // Edges kept off once as they go into cells of a drill whose screen was not about yet (GoToTask)
+    std::set<s32> mBlindDrillEdges;
 };
 
 enum class BotState : u8
@@ -452,6 +454,16 @@ public:
     // The cell Abe stands in, or -1
     s32 AbeNode() const;
     void BanEdge(s32 edge);
+    // The first time only for that edge: banned as one that goes into cells of a drill not about yet
+    bool BanBlindDrill(s32 edge)
+    {
+        if (!mKnow || edge < 0 || !mKnow->mBlindDrillEdges.insert(edge).second)
+        {
+            return false;
+        }
+        BanEdge(edge);
+        return true;
+    }
     // The line of EdgeCostFn that ruled the last edge out (for the log)
     s32 RefusedAt() const
     {
@@ -615,10 +627,12 @@ public:
     }
     // In a hurry for the next frames: a bone thrown to Slogs is eaten in that time, and the way on is
     // through what it keeps them from
-    void RunFor(s32 frames)
+    // (slogs: it is a bone's time, see BoneRunOn)
+    void RunFor(s32 frames, bool slogs = false)
     {
         mRunUntil = GoToTask::HurryUntil(static_cast<s32>(mAbe.mFrame), frames);
         mRunPath = mAbe.mLevel * 1000 + mAbe.mPath;
+        mRunSlogs = slogs;
     }
     // A switch that keeps turning over, or whose lever an angry Mudokon works
     bool SwitchTurns(s32 sw) const;
@@ -627,6 +641,11 @@ public:
     // A cell that is no place to stop on: on a trap door of such a switch, or within reach of an electric wall of
     // one (Zulag 6)
     bool NoStopAt(s32 node) const;
+    // Only the time a bone thrown to Slogs is eaten in (RunFor)
+    bool BoneRunOn() const
+    {
+        return mRunSlogs && GoToTask::HurryOn(static_cast<s32>(mAbe.mFrame), mRunUntil, mRunPath, mAbe.mLevel * 1000 + mAbe.mPath);
+    }
     bool TimedRunOn() const
     {
         return mTimedRun || mFlierRun || GoToTask::HurryOn(static_cast<s32>(mAbe.mFrame), mRunUntil, mRunPath, mAbe.mLevel * 1000 + mAbe.mPath);
@@ -824,6 +843,7 @@ private:
     u32 mDangerLetUntil = 0;
     s32 mRunUntil = 0;
     s32 mRunPath = -1;
+    bool mRunSlogs = false;
     // Bones thrown to Slogs on their own floor, beyond the plan's
     s32 mRefeeds = 0;
     s32 mLooseFeeds = 0;

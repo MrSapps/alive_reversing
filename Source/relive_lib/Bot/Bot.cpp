@@ -204,7 +204,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             const bool noStop = NoStopAt(to);
             if ((TimedRunOn() || mWorld.mFleeing || noStop) && step.mOther == 0 && !mKeptPlan.empty() && mKeptPlan[0] == action.mName && (mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eWalk || mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eRoll))
             {
-                for (std::size_t i = 1; i < mKeptPlan.size() && mKeptPlan[i].rfind("Cross ", 0) == 0 && (TimedRunOn() || mWorld.mFleeing || NoStopAt(to)); i++)
+                std::size_t i = 1;
+                for (; i < mKeptPlan.size() && mKeptPlan[i].rfind("Cross ", 0) == 0 && (TimedRunOn() || mWorld.mFleeing || NoStopAt(to)); i++)
                 {
                     const DomainStep* next = nullptr;
                     for (const Goap::Action& other : domain.mActions)
@@ -220,6 +221,36 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
                         break;
                     }
                     to = mKnow->mNav.Edges()[next->mEdge].mTo;
+                }
+                // (and on to the cell a lever or ring is used from, where that is next and on along the same floor
+                // the same way: one run, not two short walks. Zulag 7's first pen: from where the second bone was
+                // thrown out through the gate to its ring, four cells and four, walked, and the Slog had eaten.)
+                const s32 dir = mKnow->mNav.Edges()[step.mEdge].mLeft ? -1 : 1;
+                if (BoneRunOn() && i < mKeptPlan.size() && mKeptPlan[i].rfind("Use ", 0) == 0)
+                {
+                    for (const Goap::Action& other : domain.mActions)
+                    {
+                        const DomainStep& use = domain.mSteps[other.mTag];
+                        const Entity* thing = other.mName == mKeptPlan[i] && use.mKind == StepKind::eUse ? mWorld.Find(use.mEntity) : nullptr;
+                        const s32 at = thing ? Domain::UseNode(mKnow->mNav, *thing, nullptr) : -1;
+                        if (at < 0)
+                        {
+                            continue;
+                        }
+                        const NavNode& end = mKnow->mNav.Nodes()[to];
+                        const NavNode& lever = mKnow->mNav.Nodes()[at];
+                        std::vector<s32> way;
+                        bool flat = lever.mHalf == end.mHalf && std::abs(lever.mY - end.mY) <= 10 && (lever.mX - end.mX) * dir > 0 && mKnow->mNav.FindPath(to, at, EdgeCostFn(), way);
+                        for (const s32 e : way)
+                        {
+                            flat = flat && mKnow->mNav.Edges()[e].mKind == EdgeKind::eWalk && mKnow->mNav.Edges()[e].mLeft == (dir < 0);
+                        }
+                        if (flat)
+                        {
+                            to = at;
+                        }
+                        break;
+                    }
                 }
             }
             std::string note;
@@ -279,6 +310,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
         }
         case StepKind::eSend:
             return std::make_unique<SendToWheelTask>(step.mEntity, step.mOther);
+        case StepKind::eMudLever:
+            return std::make_unique<MudLeverTask>(step.mEntity, step.mOther);
         case StepKind::eExit:
             return std::make_unique<ExitTask>(step.mEdge);
         case StepKind::eTogether:
@@ -3935,7 +3968,10 @@ Prim Bot::Keen(Prim prim) const
         hears = hears || (!s.mAsleep && !s.mPossessed && s.mHalf == mAbe.mHalfScale && std::abs(s.mY - mAbe.mY) <= 45 && std::abs(s.mX - mAbe.mX) <= 600 && mKnow &&
                           Domain::FloorOpen(mKnow->mNav.Input(), mWorld, s.mX, mAbe.mX, mAbe.mY, mAbe.mHalfScale));
     }
-    if (Hurry() && prim.mKind == Prim::Kind::eMoveTo && !prim.mSlide && prim.mRunUp == 0 && (prim.mGait == Gait::eWalk || prim.mGait == Gait::eRun || (prim.mGait == Gait::eSneak && !hears)) && !mWorld.mInvisible)
+    // (and with a bone's worth of time among Slogs: what would be walked is run. Zulag 7's first pen, the four
+    // cells out through the gate to its ring walked, and the Slog had eaten.)
+    const bool timed = BoneRunOn() && (prim.mGait == Gait::eWalk || prim.mGait == Gait::eRun);
+    if ((Hurry() || timed) && prim.mKind == Prim::Kind::eMoveTo && !prim.mSlide && prim.mRunUp == 0 && (prim.mGait == Gait::eWalk || prim.mGait == Gait::eRun || (prim.mGait == Gait::eSneak && !hears)) && !mWorld.mInvisible)
     {
         const s32 cells = std::abs(prim.mX - mAbe.mX) / NavGraph::GridStep(mAbe.mHalfScale);
         prim.mGait = Gait::eRun;
@@ -4635,7 +4671,7 @@ std::unique_ptr<Task> Bot::MakeReflex()
             {
                 shot = shot || (slig.mZShoot && !slig.mPossessed && !at.mZCover && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(at.mX, at.mY - 5));
             }
-            if (slogs && !shot && lying <= 1 && Domain::BoneThrow(mKnow->mNav, AbeNode(), e.mInputs[2], e.mInputs[3], e.mInputs[4], aim, frames))
+            if (slogs && !shot && lying <= 1 && Domain::BoneThrow(mKnow->mNav, AbeNode(), e.mInputs[2], e.mInputs[3], e.mInputs[4], aim, frames, nullptr, nullptr, false, &mWorld))
             {
                 mRefeeds++;
                 Log("on the Slogs' floor with " + std::to_string(lying) + " bone lying and " + std::to_string(mWorld.mRocks) + " in hand (" + std::to_string(later) + " for later): another");
