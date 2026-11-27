@@ -2812,6 +2812,8 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
         const Entity* mMud;
         s32 mCost;
         std::vector<s32> mPath;
+        // The gates shut now on its way
+        s32 mShut = 0;
     };
     std::vector<Candidate> candidates;
     const s32 firstWheel = UseNode(nav, free.empty() ? *wheels[0] : *free[0], nullptr);
@@ -2825,11 +2827,21 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
         Candidate c{&e, 0, {}};
         if (node >= 0 && nav.FindPath(node, firstWheel, mudCost, c.mPath, &c.mCost))
         {
+            for (s32 edge : c.mPath)
+            {
+                s32 sw = 0;
+                s32 value = 0;
+                // (a game's switch: not a UXB to be turned off on the way, which is a thing of its own)
+                c.mShut += nav.Condition(nav.Edges()[edge], &sw, &value) && sw < 256 && world.Switch(sw) != value ? 1 : 0;
+            }
             candidates.push_back(std::move(c));
         }
     }
+    // (the ones with the fewest gates shut on the way first, then the nearest: the final Zulag's wheels of 13 and
+    // 14 were planned with the angry worker of 1250,1380 behind the gate of 12, which only the far side of them
+    // opens, and not with the one of 1550,980 that the guide brings down the lifts)
     std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate& a, const Candidate& b)
-                     { return a.mCost < b.mCost; });
+                     { return a.mShut != b.mShut ? a.mShut < b.mShut : a.mCost < b.mCost; });
     if (candidates.size() + 1 < free.size())
     {
         return false;
