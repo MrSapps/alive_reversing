@@ -426,7 +426,7 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
         case StepKind::eFlierLock:
             return std::make_unique<FlierBombTask>(step.mEntity, step.mEdge, 0, step.mOther);
         case StepKind::eSligLock:
-            return std::make_unique<SligLockTask>(step.mEntity, step.mOther, static_cast<u32>(step.mEdge));
+            return step.mEdge < 0 ? std::make_unique<SligLockTask>(step.mEntity, step.mOther, 0u, -1 - step.mEdge) : std::make_unique<SligLockTask>(step.mEntity, step.mOther, static_cast<u32>(step.mEdge));
         case StepKind::eRide:
             return std::make_unique<RideCarTask>(step.mEntity, step.mEdge);
         case StepKind::eScrabRampage:

@@ -10798,6 +10798,16 @@ bool ClearSligTask::Target(const World& world, const SligAt& me, const Entity* m
         x = mud->mLiveX;
         return true;
     }
+    // (and the Slogs on its level near it: Zulag 12, "go left and kill the Slogs", which the Slig lock's doors let
+    // out onto its floor)
+    for (const SlogAt& slog : world.mSlogs)
+    {
+        if (!me.mHalf && std::abs(slog.mY - me.mY) <= 45 && std::abs(slog.mX - me.mX) < 600)
+        {
+            x = slog.mX;
+            return true;
+        }
+    }
     return false;
 }
 
@@ -11155,6 +11165,49 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return RaidStep(bot, *me);
         }
+        // (the Slig that woke: to a shut Slig lock near it first, and its code said)
+        if (mAmbush && !mMine && !mLockTried)
+        {
+            mLockTried = true;
+            const Entity* best = nullptr;
+            for (const Entity& lock : world.mEntities)
+            {
+                if (lock.mKind == EntityKind::eSligLock && lock.mSwitch > 1 && world.Switch(lock.mSwitch) == 0 && world.mLockCodes.count(lock.mId) != 0 && lock.mHalf == me->mHalf && std::abs(lock.CentreX() - me->mX) < 900 && std::abs(lock.mY2 - me->mY) < 200)
+                {
+                    best = &lock;
+                }
+            }
+            const Entity* mine = nullptr;
+            for (const Entity& e : world.mEntities)
+            {
+                if (e.mKind == EntityKind::eSlig && !e.mGone && e.mHalf == me->mHalf && (!mine || std::abs(e.CentreX() - me->mX) < std::abs(mine->CentreX() - me->mX)))
+                {
+                    mine = &e;
+                }
+            }
+            if (best && mine)
+            {
+                bot.Log("the Slig that woke is his: to SligLock#" + std::to_string(best->mId) + " for its code first");
+                mLockTask = std::make_unique<SligLockTask>(best->mId, mine->mId, 0u, bot.AbeNode() >= 0 ? bot.AbeNode() : 0);
+                mLockId = best->mId;
+            }
+        }
+        // (open: the Slig is kept for what it shoots after, not burst by the lock's task)
+        if (mLockTask && mLockId != 0 && world.Find(mLockId) && world.Switch(world.Find(mLockId)->mSwitch) != 0)
+        {
+            bot.Log("the Slig lock is open: on with the Slig");
+            mLockTask.reset();
+        }
+        if (mLockTask)
+        {
+            const TaskStep step = mLockTask->Next(bot, lastFailed);
+            if (step.mKind == TaskStep::Kind::ePrim)
+            {
+                return step;
+            }
+            bot.Log(step.mKind == TaskStep::Kind::eDone ? "the Slig lock is open" : "the Slig lock was not opened");
+            mLockTask.reset();
+        }
         // Into the flying mine, while that is there
         if (mMine != 0 && mMineFrames < 900)
         {
@@ -11179,6 +11232,23 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
             }
             const u32 hold = ShootLevel(world, *me, targetX, 6);
             return TaskStep::Do(Prim::Wait(6, hold));
+        }
+        // (Slogs up on their platforms over it, on its screen: "Here boy", and they come down to it, to be shot.
+        // Zulag 12: "kill the Slogs, calling 'Here boy' if they're still on the upper platforms".)
+        if (mHereBoys < 8 && mFrames == 0)
+        {
+            for (const SlogAt& slog : world.mSlogs)
+            {
+                if (!me->mHalf && std::abs(slog.mX - me->mX) < 600 && std::abs(slog.mY - me->mY) <= 200 && std::abs(slog.mY - me->mY) > 45 && nav.CameraOf(slog.mX, slog.mY - 5) == nav.CameraOf(me->mX, me->mY - 5))
+                {
+                    if (mHereBoys++ == 0)
+                    {
+                        bot.Log("Slogs up over the Slig: \"Here boy\"");
+                    }
+                    mShootFrames = 0;
+                    return TaskStep::Do(Prim::Wait(45, Btn::eSpeak2));
+                }
+            }
         }
         mFrames += 20;
         if (mFrames > 600)
@@ -17663,7 +17733,7 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
     const auto code = world.mLockCodes.find(mLock);
     // (or a lever it pulls: Domain::SligLocks)
     const bool pulls = lock && lock->mKind == EntityKind::eLever;
-    if (!lock || !slig || !lever || (code == world.mLockCodes.end() && !pulls))
+    if (!lock || !slig || (!lever && mStand < 0) || (code == world.mLockCodes.end() && !pulls))
     {
         return TaskStep::Failed("no such entity");
     }
@@ -17740,12 +17810,35 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
         {
             about = about || (!s.mPossessed && s.mHalf == slig->mHalf && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5));
         }
+        // (one the map puts there: to the place on its screen it is taken over from, first)
+        if (!lever && mPhase == 0)
+        {
+            if (!mToStand)
+            {
+                const s32 stand = mStand;
+                mToStand = std::make_unique<GoToTask>("to where the Slig is taken over from", [stand](s32 n)
+                                                      { return n == stand; });
+            }
+            const TaskStep step = mToStand->Next(bot, lastFailed);
+            if (step.mKind == TaskStep::Kind::ePrim || step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            mToStand.reset();
+            mPhase = 1;
+            bot.Log("at " + std::to_string(bot.Abe().mX) + "," + std::to_string(bot.Abe().mY) + ": the chant for Slig#" + std::to_string(mSlig));
+            return TaskStep::Do(Prim::Wait(2));
+        }
         if (!about)
         {
             // (it isn't listed for a moment as it is taken: not given up on at once)
             if (mPhase == 1 && mFrames > 0 && mGone++ < 45)
             {
                 return TaskStep::Do(Prim::Wait(2));
+            }
+            if (!lever)
+            {
+                return TaskStep::Failed("no Slig on this screen to take over");
             }
             // The lever makes a Slig while its switch is off (the spawner puts it back when its Slig dies)
             if (!world.Switch(slig->mSwitch))

@@ -8013,6 +8013,80 @@ void Domain::Builder::SligLocks()
         }
     }
 
+    // And a Slig the map puts there, taken over by his chant from a place on its screen (with no orb on it): Zulag
+    // 12, "possess the lower Slig and talk to the Slig Voice Lock", the one by the security door at 775..901,980
+    // that opens the tunnel's doors (switch 103).
+    for (const Entity& lock : world.mEntities)
+    {
+        if (lock.mKind != EntityKind::eSligLock || lock.mSwitch <= 1 || world.Switch(lock.mSwitch) != 0 || world.mLockCodes.count(lock.mId) == 0)
+        {
+            continue;
+        }
+        for (const Entity& slig : world.mEntities)
+        {
+            if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || slig.mHalf != lock.mHalf || std::abs(slig.CentreX() - lock.CentreX()) > 800)
+            {
+                continue;
+            }
+            const s32 start = SligNode(nav, slig);
+            if (start < 0)
+            {
+                continue;
+            }
+            const s32 cam = nav.CameraOf(nav.Nodes()[start].mX, nav.Nodes()[start].mY - 5);
+            bool orb = false;
+            for (const Entity& e : world.mEntities)
+            {
+                orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
+            }
+            if (orb || GlukkonOn(nav, world, cam, 0))
+            {
+                continue;
+            }
+            // (from the place on its screen furthest from it that is off its floor, or on it if there is none)
+            s32 stand = -1;
+            s32 standScore = -1;
+            for (s32 n = 0; n < static_cast<s32>(nav.Nodes().size()); n++)
+            {
+                const NavNode& node = nav.Nodes()[n];
+                if (node.mHalf != slig.mHalf || node.mHazard || nav.CameraOf(node.mX, node.mY - 5) != cam || mD.mRegions[n] < 0)
+                {
+                    continue;
+                }
+                const s32 score = std::abs(node.mX - slig.CentreX()) + (std::abs(node.mY - slig.mY2) > 30 ? 1000 : 0);
+                if (score > standScore)
+                {
+                    standScore = score;
+                    stand = n;
+                }
+            }
+            if (stand < 0)
+            {
+                continue;
+            }
+            std::vector<Goap::Fact> pre{regionFact(stand)};
+            const std::vector<s32> way = SligWay(nav, start, [&](s32 n)
+                                                 { return AtSligLock(nav, lock, n); }, &pre, nullptr);
+            if (way.empty() && !AtSligLock(nav, lock, start))
+            {
+                continue;
+            }
+            pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(lock.mSwitch), 1}), pre.end());
+            std::vector<Goap::Fact> gives{{Key::Switch(lock.mSwitch), 1}};
+            for (u32 met : SligsMet(nav, world, start, way, slig.mId))
+            {
+                gives.push_back({Key::Mud(met), 2});
+            }
+            DomainStep step;
+            step.mKind = StepKind::eSligLock;
+            step.mEntity = lock.mId;
+            step.mOther = slig.mId;
+            // (no lever: the place it is taken over from, as -1 - node)
+            step.mEdge = -1 - stand;
+            add("Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with Slig#" + std::to_string(slig.mId) + " taken over from " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY), pre, gives, 700 + 20 * static_cast<s32>(way.size()), step);
+        }
+    }
+
     // A lever only a Slig gets to: the Slig of a spawner, called and taken over as for a lock, walked there and has
     // it pull it. (Zulag 10: "pull the lever, then possess the Slig that appears. Go right and kill the other Sligs
     // as you go ... Go left and teleport to the background near Abe, and pull the right lever to turn off the last

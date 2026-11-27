@@ -1608,6 +1608,12 @@ public:
     static const Entity* NextTeleporter(const NavGraph& nav, const World& world, s32 x1, s32 x2, s32 y, bool half, const std::vector<s32>& seen, const Entity** dest);
 
 private:
+    // The Slig that woke, his: first to a shut Slig lock near, for its code (Zulag 12: "possess the lower Slig and
+    // talk to the Slig Voice Lock"), then burst
+    std::unique_ptr<Task> mLockTask;
+    bool mLockTried = false;
+    u32 mLockId = 0;
+    s32 mHereBoys = 0;
     u32 mEntity;
     bool mShootIt;
     s32 mShootFrames = 0;
@@ -2154,10 +2160,12 @@ private:
 class SligLockTask final : public Task
 {
 public:
-    SligLockTask(u32 lock, u32 slig, u32 lever)
+    // lever 0: a Slig the map puts there, taken over from the node stand on its screen
+    SligLockTask(u32 lock, u32 slig, u32 lever, s32 stand = -1)
         : mLock(lock)
         , mSlig(slig)
         , mLever(lever)
+        , mStand(stand)
     {
     }
     ~SligLockTask() override;
@@ -2187,6 +2195,8 @@ private:
     u32 mLock;
     u32 mSlig;
     u32 mLever;
+    s32 mStand = -1;
+    std::unique_ptr<GoToTask> mToStand;
     std::unique_ptr<UseTask> mPull;
     // The way to where it is taken over from, when that is not by the lever (Domain::SligLockPerch)
     std::unique_ptr<GoToTask> mLure;
