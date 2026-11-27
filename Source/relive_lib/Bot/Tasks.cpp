@@ -2515,6 +2515,40 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 mStop = std::make_unique<UseTask>(lever->mId, drill->mInputs[1] ? 1 : 0);
                 return Next(bot, "");
             }
+            // Leading through them on foot: run, with the ones following running after him, when that is clear for
+            // all (a walk is too slow for them and him both: the final Zulag, "Run under the drills").
+            if (followLag >= 0 && !inside && world.SweepOf(drill->mId))
+            {
+                std::size_t foot = 0;
+                while (foot < count && foot < path.size() && nav.Edges()[path[foot]].mKind == EdgeKind::eWalk && nav.Edges()[path[foot]].mLeft == nav.Edges()[path[0]].mLeft)
+                {
+                    foot++;
+                }
+                const s32 runLag = (followLag - 6) * 4 / 9;
+                // (timed from standing: up from a crouch first, which takes 9 frames the timing has no room for)
+                if (foot >= count && count >= 3 && abe.mMove == Move::eCrouch)
+                {
+                    mSteps--;
+                    return TaskStep::Do(Prim::Press(Btn::eUp));
+                }
+                // (they keep his pace a few frames behind: measured there, they set off 6 frames after him and run as
+                // long as he does. His run is aimed three cells past the drills: near where it is aimed it slows to a
+                // walk, and so do they, under the drills.)
+                if (foot >= count && count >= 3 && abe.mMove == Move::eIdle && SweepsClear(nav, world, path, count, bot.SweepLate(), false, true) && SweepsClear(nav, world, path, count, bot.SweepLate() + runLag + 6, false, true))
+                {
+                    std::size_t end = std::min(path.size() - 1, count);
+                    for (std::size_t more = 0; more < 3 && end + 1 < path.size() && nav.Edges()[path[end + 1]].mKind == EdgeKind::eWalk && nav.Edges()[path[end + 1]].mLeft == nav.Edges()[path[0]].mLeft; more++)
+                    {
+                        end++;
+                    }
+                    bot.Log("leading under the drills: across at a run to " + std::to_string(nav.Nodes()[nav.Edges()[path[end]].mTo].mX));
+                    bot.SweepBegun();
+                    mSweepWait = 0;
+                    Prim go = Prim::MoveTo(nav.Nodes()[nav.Edges()[path[end]].mTo].mX, Gait::eRun);
+                    go.mKeen = true;
+                    return TaskStep::Do(go);
+                }
+            }
             if (!world.SweepOf(drill->mId))
             {
                 // Not about until its screen is: a cell at a time till it shows. Not by a way he can't stop on
@@ -5914,7 +5948,7 @@ const Entity* GoToTask::SweepHigh(const NavGraph& nav, const World& world, s32 n
     return drill && drill->mKind == EntityKind::eDrill && world.SweepLive(*drill) ? drill : nullptr;
 }
 
-void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::size_t first, std::size_t count, bool rolled, bool rest, std::vector<Body>& out)
+void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::size_t first, std::size_t count, bool rolled, bool rest, std::vector<Body>& out, bool ran)
 {
     // Where Abe is frame by frame: along each edge at an even pace for the frames it takes (measured, see
     // BOT_DESIGN.md)
@@ -5937,7 +5971,8 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
             switch (kind)
             {
                 case EdgeKind::eWalk:
-                    frames = before == EdgeKind::eWalk ? 9 : 17;
+                    // (at a run 6.24 a frame, the first cell taken getting going)
+                    frames = ran ? (before == EdgeKind::eWalk ? 4 : 8) : (before == EdgeKind::eWalk ? 9 : 17);
                     break;
                 case EdgeKind::eRoll:
                     // (6.25 pixels a frame)
@@ -6184,12 +6219,12 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
     }
 }
 
-bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late, bool rolled)
+bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late, bool rolled, bool ran)
 {
     // (where he is, give or take kSlack pixels)
     const s32 kSlack = 9;
     std::vector<Body> bodies;
-    Bodies(nav, path, 0, count, rolled, true, bodies);
+    Bodies(nav, path, 0, count, rolled, true, bodies, ran);
     for (std::size_t k = 0; k < bodies.size(); k++)
     {
         const Body& body = bodies[k];
