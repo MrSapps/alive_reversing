@@ -45,6 +45,12 @@ inline u32 Mud(u32 entityId)
 }
 // He has drunk a Brew: his next fart is one that goes off
 static const u32 kBrew = 9;
+// How many Brews have been drunk from a machine in the plan (Entity::mState has how many it has left now): one
+// drink each, as many as it has. Zulag 12's has four, "drink one last brew, but save your fart for later".
+inline u32 BrewsUsed(u32 entityId)
+{
+    return 8000000 + entityId;
+}
 // A Slog that is after him is loose on a floor, with no bone to keep it (one that had no stretch of its own: it
 // slept, or came from elsewhere). Nothing comes down onto that floor while it is.
 static const u32 kSlogLoose = 10;

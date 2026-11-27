@@ -6015,7 +6015,10 @@ void Domain::Builder::Farts()
             DomainStep drink;
             drink.mKind = StepKind::eDrink;
             drink.mEntity = brew.mId;
-            add("Drink at Brew#" + std::to_string(brew.mId), {regionFact(at), {Key::kBrew, 0}}, {{Key::kBrew, 1}}, 150, drink);
+            for (s32 k = 0; k < std::min(brew.mState, 8); k++)
+            {
+                add("Drink at Brew#" + std::to_string(brew.mId), {regionFact(at), {Key::kBrew, 0}, {Key::BrewsUsed(brew.mId), k}}, {{Key::kBrew, 1}, {Key::BrewsUsed(brew.mId), k + 1}}, 150, drink);
+            }
         }
         const std::size_t crossings = d.mActions.size();
         for (const Entity& flier : world.mEntities)
@@ -8201,7 +8204,13 @@ void Domain::Builder::BrewMachines()
                     }
                 }
             }
-            add("Fly a fart from " + std::string(EntityKindName(brew.mKind)) + "#" + std::to_string(brew.mId) + " to " + EntityKindName(target.mKind) + "#" + std::to_string(target.mId), pre, {done}, 400 + length / 3, bomb);
+            // (it drinks there: one of the machine's Brews)
+            for (s32 k = 0; k < std::min(brew.mState, 8); k++)
+            {
+                std::vector<Goap::Fact> preK = pre;
+                preK.push_back({Key::BrewsUsed(brew.mId), k});
+                add("Fly a fart from " + std::string(EntityKindName(brew.mKind)) + "#" + std::to_string(brew.mId) + " to " + EntityKindName(target.mKind) + "#" + std::to_string(target.mId), preK, {done, {Key::BrewsUsed(brew.mId), k + 1}}, 400 + length / 3, bomb);
+            }
         }
     }
     // And at a security orb with the Brew in him, from wherever a fart gets to it: the machine may be where none
@@ -8216,13 +8225,18 @@ void Domain::Builder::BrewMachines()
             machines = machines || (brew.mKind == EntityKind::eBrew && !brew.mGone);
         }
         const std::size_t before = d.mActions.size();
+        std::set<u32> zoned;
+        // (and at a Slig the same way: Zulag 12, "drink one last brew, but save your fart for later ... Go right
+        // along the bottom and stop on the first empty screen. Now, fart and possess it, fly it right under the
+        // tunnel and blow up the Slig", the one by the wheel at 1750,860, out of a fart's reach from the machine)
         for (const Entity& orb : world.mEntities)
         {
-            if (!machines || orb.mKind != EntityKind::eSecurityOrb || orb.mGone)
+            const bool isSlig = orb.mKind == EntityKind::eSlig && orb.mSwitch <= 1 && orb.mState != 1;
+            if (!machines || (orb.mKind != EntityKind::eSecurityOrb && !isSlig) || orb.mGone)
             {
                 continue;
             }
-            const FartFlight::Point to{orb.CentreX(), orb.mY2 + 14};
+            const FartFlight::Point to{orb.CentreX(), isSlig ? orb.mY2 - 25 : orb.mY2 + 14};
             std::set<s32> regions;
             for (std::size_t ai = 0; ai < before; ai++)
             {
@@ -8290,11 +8304,58 @@ void Domain::Builder::BrewMachines()
                         continue;
                     }
                 }
-                regions.insert(d.mRegions[node]);
+                // (one place a region, but not one whose way needs a gate opened while another of that region may
+                // not: Zulag 12's first place of the region by the wheel, at 662,980, has its fart through the
+                // tunnel's door)
+                if (pre.size() <= 2)
+                {
+                    regions.insert(d.mRegions[node]);
+                }
                 DomainStep bomb;
                 bomb.mKind = StepKind::eFartBomb;
                 bomb.mEntity = orb.mId;
                 bomb.mEdge = node;
+                if (isSlig)
+                {
+                    if (n.mHalf != orb.mHalf)
+                    {
+                        continue;
+                    }
+                    add("Fly a fart from " + std::to_string(n.mX) + "," + std::to_string(n.mY) + " to Slig#" + std::to_string(orb.mId), pre, {{Key::Mud(orb.mId), 2}, {Key::kBrew, 0}}, 500 + length / 3, bomb);
+                    // (and, as for one a fart from the machine gets, the ways onto its floor by it need it dead: the
+                    // plan then drinks before it goes down, where the machine is out of reach)
+                    if (zoned.insert(orb.mId).second)
+                    {
+                        for (std::size_t ai = 0; ai < before; ai++)
+                        {
+                            Goap::Action& a = d.mActions[ai];
+                            const DomainStep& s3 = d.mSteps[a.mTag];
+                            s32 into = -1;
+                            if (s3.mKind == StepKind::eExit && s3.mEdge >= 0)
+                            {
+                                into = nav.Exits()[s3.mEdge].mNode;
+                            }
+                            else if (s3.mKind == StepKind::eCross && s3.mEdge >= 0)
+                            {
+                                into = nav.Edges()[s3.mEdge].mTo;
+                            }
+                            // (and what is used from there: Zulag 12's wheel at 1750,860 is turned from its floor,
+                            // the Slig's, which is walked onto inside a region)
+                            else if (s3.mKind == StepKind::eUse && s3.mEntity != 0)
+                            {
+                                const Entity* used = world.Find(s3.mEntity);
+                                into = used ? UseNode(nav, *used, nullptr) : -1;
+                            }
+                            // (a thing used may be up a hoist from its floor: Zulag 12's wheel at 1750,860)
+                            const s32 over = s3.mKind == StepKind::eUse ? 120 : 30;
+                            if (into >= 0 && nav.Nodes()[into].mHalf == orb.mHalf && nav.Nodes()[into].mY <= orb.mY2 + 30 && nav.Nodes()[into].mY >= orb.mY2 - over && std::abs(nav.Nodes()[into].mX - orb.CentreX()) <= kFartSligZone)
+                            {
+                                a.mPre.push_back({Key::Mud(orb.mId), 2});
+                            }
+                        }
+                    }
+                    continue;
+                }
                 add("Fly a fart from " + std::to_string(n.mX) + "," + std::to_string(n.mY) + " to SecurityOrb#" + std::to_string(orb.mId), pre, {{Key::Switch(World::HazardSwitch(orb.mId)), 1}, {Key::kBrew, 0}}, 500 + length / 3, bomb);
             }
         }

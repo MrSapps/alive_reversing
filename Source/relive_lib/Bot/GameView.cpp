@@ -958,6 +958,8 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mKind = EntityKind::eBrew;
                     keep = GetGameType() == GameType::eAe;
                     e.mInputs[0] = static_cast<const relive::Path_BrewMachine&>(tlv).mBrewCount;
+                    // (what it has left: its count until it is seen, then what it says)
+                    e.mState = e.mInputs[0];
                     break;
                 case ReliveTypes::eMovieHandStone:
                     // (a stone that shows a film: looked into it sets its switch like the other kind)
@@ -2211,15 +2213,17 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     for (s32 i = 0; isAe && i < gBaseGameObjects->Size(); i++)
     {
         BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
-        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eBrewMachine && static_cast<BrewMachine*>(pObj)->GetRemainingBrewCount() <= 0)
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eBrewMachine)
         {
+            const s32 left = static_cast<BrewMachine*>(pObj)->GetRemainingBrewCount();
             const s32 x = FP_GetExponent(static_cast<BrewMachine*>(pObj)->mXPos);
             const s32 y = FP_GetExponent(static_cast<BrewMachine*>(pObj)->mYPos);
             for (Entity& e : world.mEntities)
             {
                 if (e.mKind == EntityKind::eBrew && std::abs(e.CentreX() - x) <= 60 && std::abs(e.mY2 - y) <= 80)
                 {
-                    e.mGone = true;
+                    e.mState = left;
+                    e.mGone = e.mGone || left <= 0;
                 }
             }
         }
