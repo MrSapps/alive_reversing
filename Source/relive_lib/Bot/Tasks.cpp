@@ -8485,6 +8485,63 @@ static bool GlukkonGuard(Bot& bot, const GlukkonAt& me, GlukkonOrders& orders, T
     return true;
 }
 
+// The Slig the Glukkon has with it, left behind: called again. False when it isn't.
+static bool GlukkonRecall(Bot& bot, const GlukkonAt& me, GlukkonOrders& orders, TaskStep& step)
+{
+    const NavGraph& nav = bot.Nav();
+    // The Slig it has with it, left behind: one that follows stands a cell behind it, and one that crosses a lift
+    // as it follows stops there for good (Slig.cpp). It is called again from where the Glukkon has got to: off
+    // its screen it does not hear. ("And bring the Slig over the right edge." Measured: gone on alone, Director
+    // Phleg called for help at the next lever and none came.)
+    if (const SligAt* slig = GlukkonsSlig(nav, bot.GetWorld(), me))
+    {
+        const s32 away = std::abs(slig->mX - me.mX);
+        // (once it is being called, until it has been: it answers "Hey", and so does not stand still)
+        if (away <= 2 * NavGraph::GridStep(me.mHalf))
+        {
+            orders.mBehind = 0;
+        }
+        else if (orders.mBehind <= 6)
+        {
+            orders.mBehind = slig->mMotion == 0 ? orders.mBehind + 2 : 0;
+        }
+        if (orders.mBehind > 6)
+        {
+            if (me.mMotion != 0 || orders.mQuiet > 0)
+            {
+                orders.mQuiet = std::max(0, orders.mQuiet - 2);
+                step = TaskStep::Do(Prim::Wait(2));
+                return true;
+            }
+            if (me.mFacingLeft != (slig->mX < me.mX))
+            {
+                step = TaskStep::Do(Prim::Wait(2, slig->mX < me.mX ? Btn::eLeft : Btn::eRight));
+                return true;
+            }
+            if (!orders.mHey)
+            {
+                orders.mHey = true;
+                orders.mQuiet = 50;
+                step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+                return true;
+            }
+            bot.Log("the Glukkon at " + std::to_string(me.mX) + "," + std::to_string(me.mY) + ": \"Come here\" to the Slig left behind at " + std::to_string(slig->mX));
+            // ("Hey" again if this is not heeded)
+            orders.mHey = false;
+            orders.mBehind = 0;
+            orders.mQuiet = 60;
+            step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak2));
+            return true;
+        }
+    }
+    else
+    {
+        orders.mBehind = 0;
+    }
+    return false;
+}
+
+
 // A ride on the lift the Glukkon stands on, worked by a Slig: "Hey", "Come here" until the Slig stands in the
 // middle of the platform (it stops on a lift it comes to, Slig.cpp), then "Do it". Always sets a step.
 // A lift's stop with a voice lock over it: a Glukkon on the lift there works it by answering the lock, with no
@@ -8754,6 +8811,12 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 TaskStep guard;
                 if (GlukkonGuard(bot, *me, mOrdersGiven, guard))
+                {
+                    return guard;
+                }
+                // (and the Slig it has had along, left behind: Zulag 14's stood on the lift it had worked at 437,1400
+                // and the Glukkon went on without it, "Go down and bring the Slig to the right")
+                if (mOrdersGiven.mFollow && GlukkonRecall(bot, *me, mOrdersGiven, guard))
                 {
                     return guard;
                 }
@@ -9059,54 +9122,9 @@ static bool GlukkonStep(Bot& bot, const GlukkonAt& me, s32 x, s32 y, s32& lost, 
     {
         return true;
     }
-    // The Slig it has with it, left behind: one that follows stands a cell behind it, and one that crosses a lift
-    // as it follows stops there for good (Slig.cpp). It is called again from where the Glukkon has got to: off
-    // its screen it does not hear. ("And bring the Slig over the right edge." Measured: gone on alone, Director
-    // Phleg called for help at the next lever and none came.)
-    if (const SligAt* slig = GlukkonsSlig(nav, bot.GetWorld(), me))
+    if (GlukkonRecall(bot, me, orders, step))
     {
-        const s32 away = std::abs(slig->mX - me.mX);
-        // (once it is being called, until it has been: it answers "Hey", and so does not stand still)
-        if (away <= 2 * NavGraph::GridStep(me.mHalf))
-        {
-            orders.mBehind = 0;
-        }
-        else if (orders.mBehind <= 6)
-        {
-            orders.mBehind = slig->mMotion == 0 ? orders.mBehind + 2 : 0;
-        }
-        if (orders.mBehind > 6)
-        {
-            if (me.mMotion != 0 || orders.mQuiet > 0)
-            {
-                orders.mQuiet = std::max(0, orders.mQuiet - 2);
-                step = TaskStep::Do(Prim::Wait(2));
-                return true;
-            }
-            if (me.mFacingLeft != (slig->mX < me.mX))
-            {
-                step = TaskStep::Do(Prim::Wait(2, slig->mX < me.mX ? Btn::eLeft : Btn::eRight));
-                return true;
-            }
-            if (!orders.mHey)
-            {
-                orders.mHey = true;
-                orders.mQuiet = 50;
-                step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
-                return true;
-            }
-            bot.Log("the Glukkon at " + std::to_string(me.mX) + "," + std::to_string(me.mY) + ": \"Come here\" to the Slig left behind at " + std::to_string(slig->mX));
-            // ("Hey" again if this is not heeded)
-            orders.mHey = false;
-            orders.mBehind = 0;
-            orders.mQuiet = 60;
-            step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak2));
-            return true;
-        }
-    }
-    else
-    {
-        orders.mBehind = 0;
+        return true;
     }
     std::vector<s32> nodes;
     std::vector<bool> hops;
