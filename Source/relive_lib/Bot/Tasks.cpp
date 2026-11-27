@@ -21824,10 +21824,12 @@ TaskStep LeadBelowTask::Next(Bot& bot, const std::string& lastFailed)
         {
             own = own || (e.mKind == EntityKind::eFootSwitch && !e.mGone && e.mHalf == node.mHalf && std::abs(e.mY2 - node.mY) <= 30 && std::abs(e.CentreX() - node.mX) <= 12);
         }
-        // (nor one in a barrier, nor one there was no way to)
+        // (nor one in a barrier or, an electric wall, next to it: the cell by it is in its reach, and the Mudokons
+        // turn it on. Zulag 13: five deaths at 2112 by the wall at 2125. Nor one there was no way to.)
         for (const NavFeature& f : nav.Input().mFeatures)
         {
-            own = own || (f.mKind == FeatureKind::eBarrier && f.mHalf == node.mHalf && std::abs(f.mY2 - node.mY) <= 40 && node.mX >= f.mX1 - 12 && node.mX <= f.mX2 + 12);
+            const s32 reach = f.mBeam ? 12 + NavGraph::GridStep(node.mHalf) : 12;
+            own = own || (f.mKind == FeatureKind::eBarrier && f.mHalf == node.mHalf && std::abs(f.mY2 - node.mY) <= 40 && node.mX >= f.mX1 - reach && node.mX <= f.mX2 + reach);
         }
         if (!own && mNoWay.count(node.mX) == 0)
         {
@@ -21884,7 +21886,9 @@ TaskStep LeadBelowTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 for (const NavFeature& f : nav.Input().mFeatures)
                 {
-                    stop = stop || (f.mKind == FeatureKind::eBarrier && f.mHalf == abe.mHalfScale && std::abs(f.mY2 - abe.mY) <= 40 && nx >= f.mX1 - 12 && nx <= f.mX2 + 12);
+                    // (an electric wall's reach is a cell more, as above: Zulag 13, out to 2112 by the wall at 2125)
+                    const s32 reach = f.mBeam ? 12 + NavGraph::GridStep(abe.mHalfScale) : 12;
+                    stop = stop || (f.mKind == FeatureKind::eBarrier && f.mHalf == abe.mHalfScale && std::abs(f.mY2 - abe.mY) <= 40 && nx >= f.mX1 - reach && nx <= f.mX2 + reach);
                 }
                 if (stop)
                 {
