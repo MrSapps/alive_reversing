@@ -17815,7 +17815,11 @@ bool SligLockTask::DropClear(const NavGraph& nav, const World& world, s32 x, s32
         // Each has to be ahead of where it lands (it lands facing the way it walked off), a couple of cells off
         // at least, and walking away: one that stands is at the end of its beat and about to turn
         const bool ahead = left ? s.mX < x - 60 : s.mX > x + 60;
-        if (!ahead || s.mFacingLeft != left || s.mMotion != kSligWalking)
+        // (or behind it, walking off with its back to it: turned round, it is shot before it has turned. A Slig
+        // that sees it waits 30 frames before it shoots (Slig::RespondToEnemyOrPatrol). Zulag 14: the Slig at
+        // 1587..1637,980 under the ledge it walks off at 1612,880 is never two cells off.)
+        const bool behind = (left ? s.mX >= x : s.mX <= x) && s.mFacingLeft == (s.mX < x) && s.mMotion == kSligWalking;
+        if (!behind && (!ahead || s.mFacingLeft != left || s.mMotion != kSligWalking))
         {
             return false;
         }
