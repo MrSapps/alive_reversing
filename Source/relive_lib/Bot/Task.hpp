@@ -393,7 +393,11 @@ private:
     s32 mGapCalls = 0;
     // On its way to the screen of the spawner of the Slig its help calls
     bool mToHelp = false;
+    // Frames waited for a Mudokon to be out of the line of its Slig's shots
+    s32 mClearWaits = 0;
     s32 mWalked = 0;
+    // The fewest cells it has had left to the lock
+    s32 mNearest = -1;
     // Frames in the lock's box since it was come into (or since the last try), and the tries
     s32 mInBox = 0;
     s32 mTries = 0;

@@ -8328,6 +8328,21 @@ static const SligAt* GlukkonsSlig(const NavGraph& nav, const World& world, const
     return slig;
 }
 
+// A Mudokon in the line of the shots of a Slig at x1 at one at x2 on that floor: a shot takes the first thing it meets
+static bool MudInLine(const World& world, s32 x1, s32 x2, s32 y, bool half)
+{
+    for (const Entity& mud : world.mEntities)
+    {
+        const s32 mx = mud.mLive ? mud.mLiveX : mud.CentreX();
+        const s32 my = mud.mLive ? mud.mLiveY : mud.mY2;
+        if (mud.mKind == EntityKind::eMudokon && !mud.mGone && mud.mHalf == half && std::abs(my - y) <= 30 && mx >= std::min(x1, x2) - 40 && mx <= std::max(x1, x2) + 40)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 // A Slog awake on the Glukkon's floor near it: it has a Slig shoot it ("Kill 'em": Slig.cpp, 25 frames of
 // shooting the way the Slig faces, which is at the Glukkon it follows and so at what comes at it from beyond).
 // Nothing else is done while one is about. False when there is none. (Bonewerkz' Executive Office: "and 'Kill
@@ -8843,19 +8858,46 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
                 const SligAt* with = GlukkonsSlig(bot.Nav(), world, *me);
                 if (with && std::abs(with->mX - me->mX) <= 60)
                 {
+                    bool blocked = false;
                     for (const SligAt& s : world.mSligs)
                     {
+                        // (one it would shoot but for a Mudokon in the line: waited for, it walks its beat and comes
+                        // in between, and the shot stops at it)
+                        // (or off its screen for now, on its floor not far off: it walks back onto it)
+                        blocked = blocked || (&s != with && !s.mPossessed && !s.mAsleep && s.mHalf == me->mHalf && std::abs(s.mY - me->mY) <= 20 && std::abs(s.mX - me->mX) <= 600 &&
+                                              Domain::FloorOpen(bot.Nav().Input(), world, s.mX, me->mX, me->mY + 4, me->mHalf) && std::abs(s.mX - with->mX) > 30 &&
+                                              (MudInLine(world, with->mX, s.mX, me->mY, me->mHalf) || bot.Nav().CameraOf(s.mX, s.mY - 5) != bot.Nav().CameraOf(me->mX, me->mY - 5)));
+                    }
+                    if (blocked && mClearWaits < 1500)
+                    {
+                        if (mClearWaits == 0)
+                        {
+                            bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": a Slig of its floor with a Mudokon in the line of the shots, or off its screen: waits for a clear shot");
+                        }
+                        mClearWaits += 2;
+                        mWalked = std::max(0, mWalked - 2);
+                    }
+                    for (const SligAt& s : world.mSligs)
+                    {
+                        // (not with a Mudokon in the line of its shots: Zulag 14, three shot at 912, 987 and 1312 of
+                        // floor 1400, "Walk past the Mudokons, then kill the Sligs that walk in here")
                         if (&s != with && !s.mPossessed && !s.mAsleep && s.mHalf == me->mHalf && std::abs(s.mY - me->mY) <= 20 && bot.Nav().CameraOf(s.mX, s.mY - 5) == bot.Nav().CameraOf(me->mX, me->mY - 5) &&
-                            Domain::FloorOpen(bot.Nav().Input(), world, s.mX, me->mX, me->mY + 4, me->mHalf) && std::abs(s.mX - with->mX) > 30)
+                            Domain::FloorOpen(bot.Nav().Input(), world, s.mX, me->mX, me->mY + 4, me->mHalf) && std::abs(s.mX - with->mX) > 30 && !MudInLine(world, with->mX, s.mX, me->mY, me->mHalf))
                         {
                             TaskStep guard;
                             mOrdersGiven.mHey = true;
                             if (GlukkonGuard(bot, *me, mOrdersGiven, guard, s.mX))
                             {
                                 mKills += 2;
+                                // (nor is the time it stands while they are shot)
+                                mWalked = std::max(0, mWalked - 2);
                                 return guard;
                             }
                         }
+                    }
+                    if (blocked && mClearWaits > 0 && mClearWaits < 1500)
+                    {
+                        return TaskStep::Do(Prim::Wait(2));
                     }
                 }
             }
@@ -8872,6 +8914,14 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
                 return TaskStep::Do(Prim::Wait(2));
             }
             mLost = 0;
+            // (the time it is given is for a walk that gets no nearer: each cell nearer the lock than it has been yet
+            // starts it again. Zulag 14's goes to the far end of the floor for the Slig its help calls, back, down a
+            // lift, and waits for a clear shot at the two Sligs of floor 1400 on the way.)
+            if (mNearest < 0 || static_cast<s32>(nodes.size()) < mNearest)
+            {
+                mNearest = static_cast<s32>(nodes.size());
+                mWalked = 0;
+            }
             // A lift on the way, which a Slig has to work: one is told to come along before it sets off ("then make
             // him follow you to the right"). A Slig a screen back does not hear it from the lift.
             // (or with a Slig by it that listens, which it has along for what Sligs lie ahead: see below)
@@ -8935,6 +8985,9 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
                             bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": to the screen of the spawner of " + std::to_string(spawner.mSwitch) + " at " + std::to_string(at.mX) + "," + std::to_string(at.mY) + ", whose Slig its help calls");
                         }
                         toHelp = true;
+                        // (the walk there and back is no walk to the lock that gets nowhere: the time for that
+                        // starts again from here)
+                        mWalked = 0;
                         nodes = helpNodes;
                         hops = helpHops;
                         lifts = helpLifts;
