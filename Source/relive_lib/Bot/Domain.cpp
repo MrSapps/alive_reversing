@@ -2861,12 +2861,30 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
             team.mFromX = e.mKind == EdgeKind::eWalk ? team.mFromX : nav.Nodes()[e.mTo].mX;
         }
     }
-    // Abe's wheel: the one furthest from there, so they pass the others first
+    // Abe's wheel: the one furthest along their way, so they pass the others first: by the length of their way to it,
+    // where they have one (as far as the floor goes that is the furthest in x; where one wheel is up a hoist from the
+    // others it is the one they come round to the long way, if at all. The final Zulag: wheel 18 at 1437,1400, up
+    // from the floor of wheel 17, "lead the Mudokon to the bottom wheel. Run and jump to the upper wheel".)
+    const s32 mudFrom = candidates.empty() ? -1 : UseNode(nav, *candidates[0].mMud, nullptr);
+    const auto mudWay = [&](const Entity* w)
+    {
+        std::vector<s32> way;
+        s32 cost = 0;
+        const s32 at = UseNode(nav, *w, nullptr);
+        if (mudFrom < 0 || at < 0)
+        {
+            return std::abs(w->CentreX() - team.mFromX);
+        }
+        return nav.FindPath(mudFrom, at, mudCost, way, &cost) ? cost : 1000000;
+    };
+    s32 abeWay = -1;
     for (const Entity* w : free)
     {
-        if (std::abs(w->CentreX() - team.mFromX) > std::abs(abeWheel->CentreX() - team.mFromX))
+        const s32 way = mudWay(w);
+        if (way > abeWay)
         {
             abeWheel = w;
+            abeWay = way;
         }
         team.mFree.push_back(w->mId);
     }
