@@ -1354,6 +1354,10 @@ static void BuildEntities(BinaryPath& path, World& world)
                     }
                     break;
                 }
+                case ReliveTypes::eGreeter:
+                    e.mKind = EntityKind::eGreeter;
+                    e.mHalf = static_cast<const relive::Path_Greeter&>(tlv).mScale == relive::reliveScale::eHalf;
+                    break;
                 case ReliveTypes::eSecurityOrb:
                 // (AO's claw does what AE's orb does: whoever chants on its screen is zapped)
                 case ReliveTypes::eSecurityClaw:

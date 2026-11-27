@@ -47,6 +47,7 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eRockSack: return "RockSack";
         case EntityKind::eBrew: return "Brew";
         case EntityKind::eFlier: return "FlyingSlig";
+        case EntityKind::eGreeter: return "Greeter";
         case EntityKind::eFlierSpawner: return "FlierSpawner";
         case EntityKind::eDrill: return "Drill";
         case EntityKind::eMineCar: return "MineCar";
@@ -8249,6 +8250,21 @@ void Domain::Builder::BrewMachines()
                 std::vector<s32> which;
                 const std::vector<NavLine> gates = FartFlight::Gates(nav.Input(), n.mHalf, nullptr, &which);
                 const FartFlight::Point from{n.mX, n.mY - 28};
+                // (nor in the sweep of a motion detector's beam: the fart and the chant for it are not keeping still,
+                // and a Greeter that a beam sees him in comes and zaps him. Zulag 12: "go left very carefully past
+                // the Greeter's motion sensors. Climb up to the SoulStorm Brew Machine, drink one, fart and possess
+                // it", not from by the Greeter's beams at 1637,480.)
+                // (and the Greeters' floors near where the map has them: their beams are not seen from off their
+                // screen. Zulag 12's at 1637 and 1712 on the floor at 480.)
+                for (const Entity& e : world.mEntities)
+                {
+                    watched = watched || (e.mKind == EntityKind::eGreeter && e.mHalf == n.mHalf && std::abs(e.mY2 - n.mY) <= 30 && std::abs(e.CentreX() - n.mX) <= 250);
+                }
+                for (const BeamAt& b : world.mBeams)
+                {
+                    const s32 margin = b.mDrift256 != 0 ? 100 : 60;
+                    watched = watched || (b.mHalf == n.mHalf && n.mY >= b.mY1 - 10 && n.mY <= b.mY2 + 60 && n.mX >= b.mMinX - margin && n.mX <= b.mMaxX + margin);
+                }
                 if (watched)
                 {
                     continue;

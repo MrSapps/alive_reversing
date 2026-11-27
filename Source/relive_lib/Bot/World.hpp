@@ -55,6 +55,9 @@ enum class EntityKind : u8
     eBrew,
     // A flying Slig where the map puts it (FlierAt is one that is about)
     eFlier,
+    // AE's Greeter where the map puts it: it patrols its floor with a motion detector's beam, and one that sees him
+    // moving in it comes and zaps him
+    eGreeter,
     // What makes a flying Slig while its switch mSwitch is on, and another once that one is dead and the switch
     // has come on again
     eFlierSpawner,
