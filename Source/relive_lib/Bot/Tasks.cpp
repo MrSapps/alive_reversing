@@ -12751,6 +12751,26 @@ TaskStep KillTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Do(Prim::Press(bot.SpeakSlap(), 6));
 }
 
+// Whether a drill at work kills at (x, y) within the frames given
+static bool DrilledSoon(const World& world, s32 x, s32 y, bool half, s32 frames)
+{
+    for (const SweepAt& sweep : world.mSweeps)
+    {
+        for (s32 t = 0; sweep.mHalf == half && t <= frames; t += 4)
+        {
+            s32 x1 = 0;
+            s32 y1 = 0;
+            s32 x2 = 0;
+            s32 y2 = 0;
+            if (sweep.At(t, x1, y1, x2, y2) && x >= x1 && x <= x2 && y - (half ? 20 : 40) <= y2 && y >= y1)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const World& world = bot.GetWorld();
@@ -12861,6 +12881,22 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
             }
             mRecruit = std::make_unique<RecruitTask>(mMud);
             mGo.reset();
+            // A drill on its way to it, on his screen: no time to go over to it. Told from where he is (it hears him
+            // anywhere on its screen), all of them there at once. The final Zulag: "Quickly have 'All o' ya' 'Follow
+            // me' to the lift on the right", the drill of 91 coming along the floor of wheels 21 and 22 behind them.
+            const NavGraph& nav = bot.Nav();
+            const s32 cam = nav.CameraOf(mud->mLiveX, mud->mLiveY - 5);
+            if (mud->mLive && mud->mMood == MudMood::eNormal && nav.CameraOf(abe.mX, abe.mY - 5) == cam && DrilledSoon(world, mud->mLiveX, mud->mLiveY, mud->mHalf, 240))
+            {
+                bool others = false;
+                for (const Entity& e : world.mEntities)
+                {
+                    others = others || (e.mKind == EntityKind::eMudokon && e.mId != mMud && e.mLive && !e.mFollowing && nav.CameraOf(e.mLiveX, e.mLiveY - 5) == cam);
+                }
+                bot.Log("a drill is on its way to Mudokon#" + std::to_string(mMud) + ": told from here" + (others ? ", all of them" : ""));
+                mRecruit->SetRemote(true);
+                mRecruit->SetAll(others);
+            }
         }
         const TaskStep step = mRecruit->Next(bot, lastFailed);
         if (step.mKind != TaskStep::Kind::eDone)
