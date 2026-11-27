@@ -5756,6 +5756,19 @@ void Domain::Builder::Exits()
     const World& world = mWorld;
     Domain& d = mD;
     std::set<u32>& huntable = mHuntable;
+    // The end of the game: the brewery's "Final Exit" wheel, turned ("Climb up and turn the wheel marked 'Final
+    // Exit'"). The game takes it from there, to whichever ending he has earned.
+    for (const Entity& wheel : world.mGameEnds ? world.mEntities : std::vector<Entity>{})
+    {
+        const s32 node = wheel.mKind == EntityKind::eWorkWheel && wheel.mSwitch == 100 ? UseNode(nav, wheel, nullptr) : -1;
+        if (node >= 0 && world.Switch(100) == 0)
+        {
+            DomainStep step;
+            step.mKind = StepKind::eUse;
+            step.mEntity = wheel.mId;
+            add("Turn the Final Exit, WorkWheel#" + std::to_string(wheel.mId) + " sw100", {regionFact(node), {Key::Switch(100), 0}}, {{Key::Switch(100), 1}, {Key::kExited, 1}}, 150, step);
+        }
+    }
     for (std::size_t i = 0; i < nav.Exits().size(); i++)
     {
         DomainStep step;

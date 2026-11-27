@@ -876,6 +876,11 @@ struct World final
     std::vector<const void*> mTlvs;
     // The path they are from
     const void* mPath = nullptr;
+    // AE: the brewery's end, where the wheel of switch 100 ("Final Exit") ends the game (WorkWheel::VUpdate)
+    bool mGameEnds = false;
+    // Doors shut for good: one that shuts behind him as he comes out of it, come out of (Door.cpp: close on exit,
+    // and the TLV marked). Its left and bottom.
+    std::vector<std::pair<s32, s32>> mShutDoors;
     s8 mSwitches[256] = {};
     s32 mRescued = 0;
     s32 mKilled = 0;

@@ -2029,6 +2029,26 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     // FeeCo Depot's electric walls by the ways to the executive offices and the brewery: their switches are set by
     // two doors as their screens are shown, from the game's record of which bosses are dealt with (Door.cpp).
     // Taken as they will be then: seen from anywhere else those walls looked shut for good.
+    world.mGameEnds = isAe && map.mCurrentLevel == EReliveLevelIds::eBrewery_Ender;
+    world.mShutDoors.clear();
+    if (world.mPath)
+    {
+        for (auto& cam : static_cast<BinaryPath*>(const_cast<void*>(world.mPath))->GetCameras())
+        {
+            if (!cam)
+            {
+                continue;
+            }
+            for (auto& upTlv : cam->mTlvs.mTlvs)
+            {
+                const relive::Path_TLV& tlv = *upTlv;
+                if (tlv.mTlvType == ReliveTypes::eDoor && static_cast<const relive::Path_Door&>(tlv).mCloseOnExit && tlv.mTlvSpecificMeaning)
+                {
+                    world.mShutDoors.push_back({tlv.mTopLeftX, tlv.mBottomRightY});
+                }
+            }
+        }
+    }
     if (isAe && map.mCurrentLevel == EReliveLevelIds::eFeeCoDepot)
     {
         if (!gVisitedFeecoEnder)

@@ -3505,11 +3505,25 @@ void Bot::NoteGrenadeTargets(const PathKnowledge* know, s32 abeNode)
 // The planning problem of the path as it is now
 Domain Bot::BuildDomain(const PathKnowledge* know, s32 abeNode)
 {
-    const auto allowed = [know](s32 edge)
+    const auto allowed = [know, this](s32 edge)
     {
         if (know->mBannedEdges.count(edge) != 0)
         {
             return false;
+        }
+        // (not through a door shut for good: the final Zulag's at 1386,830, which shut as he came out of it, was
+        // planned through over and over, the ban on it lifted each time nothing else was found)
+        const NavEdge& e = know->mNav.Edges()[edge];
+        if (e.mKind == EdgeKind::eDoor && e.mFeature >= 0)
+        {
+            const NavFeature& door = know->mNav.Input().mFeatures[e.mFeature];
+            for (const std::pair<s32, s32>& shut : mWorld.mShutDoors)
+            {
+                if (door.mKind == FeatureKind::eDoor && door.mX1 == shut.first && door.mY2 == shut.second)
+                {
+                    return false;
+                }
+            }
         }
         // (running jumps taken together are for the way there, with a flying Slig about: to the plan they are
         // the same crossings as the jumps one by one)
