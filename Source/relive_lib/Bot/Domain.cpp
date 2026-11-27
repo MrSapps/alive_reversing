@@ -1151,6 +1151,35 @@ bool Domain::SligWatched(const NavGraph& nav, const World& world, s32 x, s32 y, 
     return any;
 }
 
+// Down onto a floor into the beat of a Slig awake there that is so short that he lands in it wherever it is: it is
+// never far enough off to be got by, and nor is there time to get off its floor. The Slig, or 0. (Zulag 14: down at
+// 1650,980 by the Slig at 1625 bounded by 1575..1699, six times shot.)
+static u32 NarrowBeatLanding(const NavGraph& nav, const World& world, const NavEdge& e)
+{
+    const NavNode& from = nav.Nodes()[e.mFrom];
+    const NavNode& to = nav.Nodes()[e.mTo];
+    if (!nav.Input().mIsAe || to.mY <= from.mY + 30)
+    {
+        return 0;
+    }
+    for (const Entity& slig : world.mEntities)
+    {
+        if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || slig.mState == 1 || slig.mHalf != to.mHalf || slig.mBeatMax <= slig.mBeatMin || world.mFleechKilled.count(slig.mId) != 0)
+        {
+            continue;
+        }
+        const s32 cell = NavGraph::GridStep(slig.mHalf);
+        const s32 at = Domain::SligNode(nav, slig);
+        // (its bounds: it turns two cells short of each, Slig::Brain_21_Walking, so within six cells it walks two
+        // at most)
+        if (at >= 0 && nav.Nodes()[at].mLine == to.mLine && slig.mBeatMax - slig.mBeatMin <= 6 * cell && to.mX >= slig.mBeatMin - cell && to.mX <= slig.mBeatMax + cell)
+        {
+            return slig.mId;
+        }
+    }
+    return 0;
+}
+
 s32 Domain::SligBeat(const NavGraph& nav, const World& world, s32 node)
 {
     const NavNode& n = nav.Nodes()[node];
@@ -3270,7 +3299,9 @@ void Domain::Builder::Start()
     Domain& d = mD;
     s32& regionCount = mRegionCount;
     std::vector<std::pair<s32, s32>>& follows = mFollows;
-    d.mRegions = nav.Regions(&regionCount);
+    // (a drop into the short beat of a Slig awake there is a way of its own: Crossings has it need that Slig dead)
+    d.mRegions = nav.Regions(&regionCount, [&](s32 edge)
+                             { return NarrowBeatLanding(nav, world, nav.Edges()[edge]) != 0; });
 
     // Switches that go on and off with another (a timer trigger's outputs): whatever sets the one sets them
     for (const Entity& e : world.mEntities)
@@ -3738,9 +3769,14 @@ void Domain::Builder::Crossings()
             {
                 beside = beside || ((h.mHidden || h.mHiddenStill) && h.mLine == to.mLine && std::abs(h.mX - to.mX) <= 2 * NavGraph::GridStep(to.mHalf));
             }
-            for (const Entity& slig : brews && nav.Input().mIsAe && to.mY > from.mY + 30 ? world.mEntities : std::vector<Entity>{})
+            for (const Entity& slig : nav.Input().mIsAe && to.mY > from.mY + 30 ? world.mEntities : std::vector<Entity>{})
             {
                 if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || slig.mState == 1 || slig.mHalf != to.mHalf)
+                {
+                    continue;
+                }
+                // (with no Brews, where its beat is so short that he lands in it wherever it is: NarrowBeatLanding)
+                if (!brews && NarrowBeatLanding(nav, world, e) != slig.mId)
                 {
                     continue;
                 }

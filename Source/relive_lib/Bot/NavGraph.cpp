@@ -525,7 +525,7 @@ bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) con
     return true;
 }
 
-std::vector<s32> NavGraph::Regions(s32* count) const
+std::vector<s32> NavGraph::Regions(s32* count, const std::function<bool(s32 edge)>& cut) const
 {
     // Union the ends of every edge that has no barrier and has a way back
     std::vector<s32> parent(mNodes.size());
@@ -544,7 +544,7 @@ std::vector<s32> NavGraph::Regions(s32* count) const
     };
     const auto isBarrier = [&](const NavEdge& e)
     {
-        return Condition(e, nullptr, nullptr);
+        return Condition(e, nullptr, nullptr) || (cut && cut(static_cast<s32>(&e - mEdges.data())));
     };
     for (const NavEdge& e : mEdges)
     {

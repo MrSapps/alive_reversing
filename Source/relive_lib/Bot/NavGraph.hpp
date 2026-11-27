@@ -257,7 +257,8 @@ public:
 
     // Groups of cells Abe can move about in freely both ways, whatever the switches: region number per node.
     // Getting from one region to another takes an edge that is one way or has a barrier.
-    std::vector<s32> Regions(s32* count = nullptr) const;
+    // cut: more edges to take as barriers (Domain: a drop that lands by a Slig with no way past it)
+    std::vector<s32> Regions(s32* count = nullptr, const std::function<bool(s32 edge)>& cut = nullptr) const;
 
     // Whether an edge can only be taken while a switch has a value (through a slam door, an electric wall, a door
     // that starts shut): which switch, and the value that lets Abe through
