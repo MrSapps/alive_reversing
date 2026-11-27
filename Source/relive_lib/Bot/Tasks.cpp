@@ -16379,7 +16379,9 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         };
         if (zThere && inCover(shot.mWaitX, shot.mWaitY))
         {
-            while (back > 0 && !inCover(shot.mWaitX + (shot.mFaceLeft ? back : -back), shot.mWaitY))
+            // (with 10 either way for how far it goes past where it is steered to: Zulag 11, sent back to 1618 it
+            // came to rest at 1608, out of the crate at 1587..1686, and was shot)
+            while (back > 0 && !(inCover(shot.mWaitX + (shot.mFaceLeft ? back : -back) - 10, shot.mWaitY) && inCover(shot.mWaitX + (shot.mFaceLeft ? back : -back) + 10, shot.mWaitY)))
             {
                 back -= 5;
             }
@@ -17143,7 +17145,10 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 mZHeld = 0;
             }
-            else if (mHasCover && faced(bx, by) && std::abs(mCoverX - bx) + std::abs(mCoverY - by) < 200 && mZBack < 600)
+            // (only when that cover is near: further off, it is flown back to the Slig, and a Slig's shots get what
+            // comes at it. Zulag 11: past the one at 1417 from behind, turned back at 1424 for the cover at 1254,
+            // and shot.)
+            else if (mHasCover && faced(bx, by) && std::abs(mCoverX - bx) + std::abs(mCoverY - by) < 60 && mZBack < 600)
             {
                 if (mZBack++ == 0)
                 {
