@@ -2515,6 +2515,31 @@ private:
 // then keeps a few cells ahead of them to where they drop.
 // A foot switch of the floor under him, worked by the Mudokons that follow him there (FollowBelow): from the cells
 // over it, a cell at a time, each time until they stop, until its switch is as it has to be
+// A lift ridden off a stop its mover brings it to while a wheel's switch is on, that switch still on: the wheel
+// turned till the switch goes off (it does when turned long enough, WorkWheel::VUpdate) and the lift goes back, then
+// for a moment, let go as the switch is on, and the lift comes to the stop again (Domain::LiftCalls)
+class LiftCallTask final : public Task
+{
+public:
+    LiftCallTask(u32 wheel, s32 stop)
+        : mWheel(wheel)
+        , mStop(stop)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Bring the lift back with WorkWheel#" + std::to_string(mWheel);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mWheel;
+    s32 mStop;
+    std::unique_ptr<Task> mOff;
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+};
+
 class LeadBelowTask final : public Task
 {
 public:

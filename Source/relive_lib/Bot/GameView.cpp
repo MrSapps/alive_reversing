@@ -1062,6 +1062,8 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mSwitch = t.mSwitchId;
                     e.mHoldOnly = t.mTurnOffWhenStopped;
                     e.mInputs[0] = t.mActivationTime;
+                    // (turned longer than this, it sets its switch off again: WorkWheel::VUpdate)
+                    e.mInputs[1] = t.mTurnOffTime;
                     break;
                 }
                 case ReliveTypes::eMudokon:

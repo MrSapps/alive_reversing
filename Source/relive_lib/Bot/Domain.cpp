@@ -2977,6 +2977,7 @@ struct Domain::Builder final
     void Scrabs();
     void DrillsOverMudokons();
     void FollowersBelow();
+    void LiftCalls();
 
     // An action for the planner, and the step it is
     void add(std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step);
@@ -3214,6 +3215,7 @@ Domain Domain::Builder::Run()
     GuardedLevers();
     PenGates();
     FollowersBelow();
+    LiftCalls();
     // Mudokons led to work wheels together past a Slog that a ring can drop: with it dead, not fed. A bone keeps it
     // a short while, which does for Abe on his own but not for leading a group by. (Zulag 5: the big Slog by the
     // bone sack, fed, was taken as out of the way of the wheels' Mudokons.) Only once no Slogs by a ring are left:
@@ -3570,7 +3572,18 @@ void Domain::Builder::Crossings()
             }
             else
             {
-                pre.push_back({Key::Switch(condSwitch), condValue});
+                // (onto a lift stop its mover brings it to with that switch on, which it is, the lift having been
+                // ridden off since: with it brought back. Zulag 14: the Slig took it down to 880, 40 still on.)
+                const s32 stop = nav.Nodes()[e.mTo].mLiftStop;
+                if (stop >= 0 && nav.Nodes()[e.mFrom].mLiftStop < 0 && nav.Input().mFeatures[stop].mSwitch == condSwitch && world.Switch(condSwitch) == condValue &&
+                    !world.LiftAtStop(nav.Input().mFeatures[stop].mX1, nav.Input().mFeatures[stop].mX2, nav.Nodes()[e.mTo].mY, nav.Input().mFeatures[stop].mA != 0))
+                {
+                    pre.push_back({Key::LiftAt(stop), 1});
+                }
+                else
+                {
+                    pre.push_back({Key::Switch(condSwitch), condValue});
+                }
             }
         }
         s32 throughGate = 0;
@@ -10426,6 +10439,49 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& marked, co
         }
     }
     return targets;
+}
+
+
+
+// A lift a mover brings to a stop while its switch is on, ridden off since with the switch still on: brought back with
+// a wheel of that switch that sets it off again when turned long enough, turned that long and then for a moment
+// (LiftMover: off, it goes back the other way; on, to the stop again). Zulag 14: "Blow up the Slig and bring Abe down
+// here, using the wheel to call the lift", wheel 4004 of switch 40 by the lift at 1525..1600,460.
+void Domain::Builder::LiftCalls()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    for (s32 f = 0; f < static_cast<s32>(nav.Input().mFeatures.size()); f++)
+    {
+        const NavFeature& stop = nav.Input().mFeatures[f];
+        bool isStop = false;
+        s32 stopY = 0;
+        for (const NavNode& n : nav.Nodes())
+        {
+            if (n.mLiftStop == f)
+            {
+                isStop = true;
+                stopY = n.mY;
+            }
+        }
+        if (!isStop || stop.mSwitch <= 1 || stop.mA || world.Switch(stop.mSwitch) == 0 || world.LiftAtStop(stop.mX1, stop.mX2, stopY, false))
+        {
+            continue;
+        }
+        for (const Entity& wheel : world.mEntities)
+        {
+            const s32 node = wheel.mKind == EntityKind::eWorkWheel && wheel.mSwitch == stop.mSwitch && wheel.mInputs[1] > 0 && !wheel.mHoldOnly ? UseNode(nav, wheel, nullptr) : -1;
+            if (node < 0 || mD.mRegions[node] < 0)
+            {
+                continue;
+            }
+            DomainStep step;
+            step.mKind = StepKind::eLiftCall;
+            step.mEntity = wheel.mId;
+            step.mEdge = f;
+            add("Bring the lift back to " + std::to_string(stop.mX1) + ".." + std::to_string(stop.mX2) + "," + std::to_string(stopY) + " with WorkWheel#" + std::to_string(wheel.mId), {regionFact(node), {Key::LiftAt(f), 0}}, {{Key::LiftAt(f), 1}}, 200, step);
+        }
+    }
 }
 
 } // namespace Bot

@@ -469,6 +469,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<FleechLeadTask>(step.mEntity);
         case StepKind::eLeadBelow:
             return std::make_unique<LeadBelowTask>(step.mEntity, static_cast<s32>(step.mOther));
+        case StepKind::eLiftCall:
+            return std::make_unique<LiftCallTask>(step.mEntity, step.mEdge);
         case StepKind::eScrabPen:
             return std::make_unique<ScrabPenTask>(step.mEntity, static_cast<s32>(step.mOther), step.mEdge != 0);
         case StepKind::eLogic:

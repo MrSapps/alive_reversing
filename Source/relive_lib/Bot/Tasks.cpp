@@ -21918,6 +21918,65 @@ void FleechLeadTask::Keep(Bot& bot, const std::set<s32>& edges)
     mKept = edges.empty() ? nullptr : &bot;
 }
 
+TaskStep LiftCallTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* wheel = world.Find(mWheel);
+    if (!wheel || mStop < 0 || mStop >= static_cast<s32>(nav.Input().mFeatures.size()))
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    const NavFeature& stop = nav.Input().mFeatures[mStop];
+    s32 stopY = 0;
+    for (const NavNode& n : nav.Nodes())
+    {
+        stopY = n.mLiftStop == mStop ? n.mY : stopY;
+    }
+    if (mPhase == 0)
+    {
+        // Off: turned long enough
+        if (!mOff)
+        {
+            mOff = std::make_unique<UseTask>(mWheel, 0);
+        }
+        const TaskStep step = mOff->Next(bot, lastFailed);
+        if (step.mKind != TaskStep::Kind::eDone)
+        {
+            return step;
+        }
+        mOff.reset();
+        mPhase = 1;
+        mFrames = 0;
+    }
+    if (mPhase == 1)
+    {
+        // (let go, and off the wheel, before it is turned again)
+        if (mFrames++ < 20 || !bot.Abe().Settled())
+        {
+            return mFrames < 200 ? TaskStep::Do(Prim::Wait(1)) : TaskStep::Failed("he didn't come off the wheel");
+        }
+        mPhase = 2;
+        mFrames = 0;
+    }
+    if (mPhase == 2)
+    {
+        // On: turned till it is, and let go then (turned on, it would go off again)
+        if (world.Switch(wheel->mSwitch) == 0)
+        {
+            return ++mFrames < 120 ? TaskStep::Do(Prim::Wait(1, Btn::eUp)) : TaskStep::Failed("switch " + std::to_string(wheel->mSwitch) + " didn't come on");
+        }
+        bot.Log("switch " + std::to_string(wheel->mSwitch) + " off and on again: the lift comes back to " + std::to_string(stopY));
+        mPhase = 3;
+        mFrames = 0;
+    }
+    if (world.LiftAtStop(stop.mX1, stop.mX2, stopY, stop.mA != 0))
+    {
+        return bot.Abe().Settled() ? TaskStep::Done() : TaskStep::Do(Prim::Wait(2));
+    }
+    return ++mFrames < 900 ? TaskStep::Do(Prim::Wait(2)) : TaskStep::Failed("the lift didn't come back");
+}
+
 TaskStep LeadBelowTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const NavGraph& nav = bot.Nav();

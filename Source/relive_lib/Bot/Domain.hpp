@@ -118,6 +118,8 @@ enum class StepKind : u8
     eStepOn,    // onto the cell mEdge, where a foot switch that turns a gate over is
     eLeadBelow, // from over foot switch mEntity, step about until the Mudokons that follow under him have left its
                 // switch at mOther (FollowBelow)
+    eLiftCall,  // with wheel mEntity, whose switch is on with the lift ridden off: off and on again, the lift
+                // brought back to stop mEdge (a feature)
     eParamiteClear, // take over Paramite mOther from the cell mEdge, have it eat the Fleeches of its floors, call
                 // the other Paramites of those floors to follow it, and leave them all at the end away from
                 // the way out
