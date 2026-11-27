@@ -180,6 +180,8 @@ struct DomainStep final
     s32 mEdge = -1;
     u32 mEntity = 0;
     u32 mOther = 0;
+    // eSligLock: the Sligs the Slig kills after the lock, before it is burst
+    std::vector<u32> mKill;
 };
 
 // A place to throw a rock at something from, and how

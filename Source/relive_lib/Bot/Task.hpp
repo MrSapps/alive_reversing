@@ -2191,6 +2191,11 @@ public:
     {
         return mLure != nullptr || mAtShow;
     }
+    // The Sligs it kills once the lock is open, before it is burst
+    void Kill(const std::vector<u32>& sligs)
+    {
+        mKill = sligs;
+    }
     // The game's number for a Slig that walks (Slig.hpp: Motion_2_Walking)
     static const s32 kSligWalking = 2;
     // And for one that says "Freeze!" as it sees him (Motion_30_SpeakAIFreeze)
@@ -2210,6 +2215,11 @@ private:
     bool mLured = false;
     // With that on another screen: the cell of its floor where it is to see him first, the way there, and whether
     // he is waiting there to be seen
+    std::vector<u32> mKill;
+    std::set<u32> mKillSkip;
+    u32 mHunted = 0;
+    s32 mHuntWaits = 0;
+    s32 mNoWayFrames = 0;
     s32 mPerch = -1;
     s32 mShow = -1;
     std::unique_ptr<GoToTask> mToShow;

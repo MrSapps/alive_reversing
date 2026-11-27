@@ -18195,7 +18195,50 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
             return pulls ? n == pullAt : Domain::AtSligLock(nav, which, n);
         };
     };
-    if (open)
+    // The lock open: the Sligs it is to kill after (mKill), one at a time, the first it can get to, before anything
+    // else. Its way goes to that one's floor, and on that floor the Sligs are shot as below.
+    const Entity* hunt = nullptr;
+    s32 huntLine = -1;
+    s32 huntCam = -1;
+    for (u32 id : open ? mKill : std::vector<u32>{})
+    {
+        const Entity* e = world.Find(id);
+        if (!e || e->mGone || world.mFleechKilled.count(id) != 0 || (e->mLive && (e->mLiveY - e->mY2) * (e->mHalf ? 2 : 1) > 60) || mKillSkip.count(id) != 0)
+        {
+            continue;
+        }
+        const s32 at = e->mLive ? nav.NodeAt(e->mLiveX, e->mLiveY, e->mHalf, 45) : Domain::SligNode(nav, *e);
+        if (at < 0)
+        {
+            continue;
+        }
+        const s32 line = nav.Nodes()[at].mLine;
+        const s32 cam = nav.CameraOf(nav.Nodes()[at].mX, nav.Nodes()[at].mY - 5);
+        if (nav.Nodes()[node].mLine != line && Domain::SligWay(nav, node, [&](s32 n)
+                                                               { return nav.Nodes()[n].mLine == line; }, nullptr, &world).empty())
+        {
+            // (not at once: the lift the lock sends for may be on its way. Zulag 14's at 1525 comes up as 40 opens.)
+            if ((mNoWayFrames += 2) < 600)
+            {
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            bot.Log("the Slig has no way to Slig#" + std::to_string(id) + ": left");
+            mKillSkip.insert(id);
+            mNoWayFrames = 0;
+            continue;
+        }
+        hunt = e;
+        huntLine = line;
+        huntCam = cam;
+        break;
+    }
+    if (hunt && hunt->mId != mHunted)
+    {
+        mHunted = hunt->mId;
+        mStuck = 0;
+        bot.Log("the Slig goes after Slig#" + std::to_string(hunt->mId));
+    }
+    if (open && !hunt)
     {
         // Another lock it can get to from here with what is open now: left to the step that opens that one
         for (const Entity& other : world.mEntities)
@@ -18298,7 +18341,7 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
     }
 
     // At the lever: faced, and pulled (Slig::PullLever: the lever a grid ahead of it)
-    if (pulls && node == pullAt)
+    if (!hunt && pulls && node == pullAt)
     {
         if (me->mMotion != 0)
         {
@@ -18316,7 +18359,7 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
         bot.Log("the Slig pulls Lever#" + std::to_string(mLock));
         return TaskStep::Do(Prim::Wait(3, Btn::eAction));
     }
-    if (!pulls && Domain::AtSligLock(nav, *lock, node))
+    if (!hunt && !pulls && Domain::AtSligLock(nav, *lock, node))
     {
         if (lock->mState == 5 && mLastState != 5 && ++mTries > 4)
         {
@@ -18331,7 +18374,22 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Do(Prim::Wait(2, say));
     }
 
-    std::vector<s32> way = Domain::SligWay(nav, node, goalOf(*lock), nullptr, &world);
+    // (after one to kill: onto its floor, on its screen)
+    const auto huntGoal = [&nav, huntLine, huntCam](s32 n)
+    {
+        return nav.Nodes()[n].mLine == huntLine && nav.CameraOf(nav.Nodes()[n].mX, nav.Nodes()[n].mY - 5) == huntCam;
+    };
+    std::vector<s32> way = hunt ? Domain::SligWay(nav, node, huntGoal, nullptr, &world) : Domain::SligWay(nav, node, goalOf(*lock), nullptr, &world);
+    if (hunt && way.empty())
+    {
+        // (there, and it isn't in sight to be shot: waited for, as long as the hold above)
+        if (mHuntWaits++ > 600)
+        {
+            bot.Log("Slig#" + std::to_string(hunt->mId) + " never came in sight: left");
+            mKillSkip.insert(hunt->mId);
+        }
+        return TaskStep::Do(Prim::Wait(2));
+    }
     if (way.empty())
     {
         return TaskStep::Failed(std::string(pulls ? "the Slig has no way to the lever from " : "the Slig has no way to the lock from ") + std::to_string(me->mX) + "," + std::to_string(me->mY));

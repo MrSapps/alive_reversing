@@ -8118,7 +8118,53 @@ void Domain::Builder::SligLocks()
                 step.mEntity = lock.mId;
                 step.mOther = slig.mId;
                 step.mEdge = static_cast<s32>(lever.mId);
-                add("Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with Slig#" + std::to_string(slig.mId) + " called by Lever#" + std::to_string(lever.mId), pre, gives, 600 + 20 * static_cast<s32>(way.size()), step);
+                const std::string name = "Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with Slig#" + std::to_string(slig.mId) + " called by " + EntityKindName(lever.mKind) + "#" + std::to_string(lever.mId);
+                add(name, pre, gives, 600 + 20 * static_cast<s32>(way.size()), step);
+                // And on from the lock, the Sligs of the map it can get to with what is open then, killed with it
+                // before it is burst (Zulag 14: "Take the lift down. Kill all of the Sligs, moving left to the
+                // end."): SligLockTask, mKill
+                const s32 at = way.empty() ? start : nav.Edges()[way.back()].mTo;
+                std::vector<u32> kill;
+                std::vector<Goap::Fact> killPre = pre;
+                std::vector<Goap::Fact> killGives = gives;
+                for (const Entity& other : world.mEntities)
+                {
+                    const s32 otherAt = other.mKind == EntityKind::eSlig && !other.mGone && other.mSwitch <= 1 && other.mState != 1 && other.mHalf == slig.mHalf ? SligNode(nav, other) : -1;
+                    if (otherAt < 0 || mD.mStart.Has({Key::Mud(other.mId), 2}) || std::find(gives.begin(), gives.end(), Goap::Fact{Key::Mud(other.mId), 2}) != gives.end())
+                    {
+                        continue;
+                    }
+                    const s32 line = nav.Nodes()[otherAt].mLine;
+                    std::vector<Goap::Fact> gates;
+                    const std::vector<s32> on = SligWay(nav, at, [&](s32 n)
+                                                        { return nav.Nodes()[n].mLine == line; }, &gates, nullptr);
+                    if (on.empty() && nav.Nodes()[at].mLine != line)
+                    {
+                        continue;
+                    }
+                    // (only through what is open now, or what the lock and its caller open)
+                    bool shut = false;
+                    for (const Goap::Fact& g : gates)
+                    {
+                        shut = shut || (!(g == Goap::Fact{Key::Switch(lock.mSwitch), 1}) && !(g == Goap::Fact{Key::Switch(lever.mSwitch), 1}) && !mD.mStart.Has(g));
+                    }
+                    if (!shut)
+                    {
+                        kill.push_back(other.mId);
+                        killGives.push_back({Key::Mud(other.mId), 2});
+                    }
+                }
+                if (!kill.empty())
+                {
+                    std::string names;
+                    for (u32 id : kill)
+                    {
+                        names += " #" + std::to_string(id);
+                    }
+                    DomainStep killStep = step;
+                    killStep.mKill = kill;
+                    add(name + ", then kill Sligs" + names + " with it", killPre, killGives, 900 + 20 * static_cast<s32>(way.size()) + 200 * static_cast<s32>(kill.size()), killStep);
+                }
             }
         }
     }
