@@ -170,6 +170,30 @@ std::set<s32> LevelGraph::Wanters(s32 sw) const
     return out;
 }
 
+bool LevelGraph::WantsMet(s32 path, s32 dest, const std::function<bool(s32 sw)>& on) const
+{
+    bool any = false;
+    for (const PathSummary& p : mPaths)
+    {
+        if (p.mPath != path)
+        {
+            continue;
+        }
+        for (const PathSummary::Want& w : p.mWants)
+        {
+            if (w.mLevel == mLevel && w.mPath == dest)
+            {
+                any = true;
+                if (!on(w.mSwitch))
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    return any;
+}
+
 std::vector<s32> LevelGraph::Wanted(s32 path) const
 {
     std::set<s32> all;

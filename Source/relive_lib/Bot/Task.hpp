@@ -403,6 +403,7 @@ private:
     s32 mLost = 0;
     // Frames spent having other Sligs shot on the way
     s32 mKills = 0;
+    s32 mLure = 0;
     GlukkonOrders mOrdersGiven;
 };
 
@@ -555,6 +556,7 @@ public:
 private:
     u32 mSlig;
     s32 mWaits = 0;
+    s32 mOrders = 0;
 };
 
 // The Slogs of a stretch of floor got to come after him (Domain, StepKind::eDrawSlogs): to a cell over their
@@ -1884,6 +1886,10 @@ private:
     s32 mCornerBest = 100000;
     s32 mCornerStall = 0;
     s32 mLift = 0;
+    s32 mSligWaits = 0;
+    bool mPerched = false;
+    bool mClimbed = false;
+    std::unique_ptr<GoToTask> mUp;
     bool mShort = false;
     std::unique_ptr<GoToTask> mGo;
 };

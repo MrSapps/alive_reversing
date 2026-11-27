@@ -723,7 +723,8 @@ bool Bot::Replan(BaseMap& map)
     if (!best.mFound)
     {
         const Goap::Plan& plan = leave;
-        if (plan.mFound && !plan.mSteps.empty() && !errandOpen)
+        // (an errand open is no bar once a door into a path not yet been in has all it wants: NoWayOut)
+        if (plan.mFound && !plan.mSteps.empty() && (!errandOpen || mNewPathWanted == mAbe.mPath))
         {
             best = plan;
             bestGoal = "Leave the path";
@@ -947,7 +948,8 @@ bool Bot::Replan(BaseMap& map)
         const StepKind kind = domain.mSteps[first.mTag].mKind;
         // (in a Glukkon, or just out of one: not chanting for anything else. The Scrab vault's path 2: begun as he
         // chanted, the leading off of its Fleeches was put off twelve times and then had no way.)
-        if (mIsAe && mAbe.mMotion == 112 && (inGlukkon || mInGlukkon) && kind != StepKind::eVoiceLock && kind != StepKind::eSligLever && mGlukkonWaits < 120)
+        // (a wall that is to get a Slig the Glukkon has by it is the Glukkon's to see to as well: "Kill 'em", ZapWaitTask)
+        if (mIsAe && mAbe.mMotion == 112 && (inGlukkon || mInGlukkon) && kind != StepKind::eVoiceLock && kind != StepKind::eSligLever && !(kind == StepKind::eZapWait && inGlukkon) && mGlukkonWaits < 120)
         {
             mGlukkonWaits++;
             mTask.reset();
@@ -2007,6 +2009,31 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 }
             }
         }
+        // Down right by a Slig awake on that floor, out of the shadows, where there are Brews to fart it with: no,
+        // as Domain has it (that Slig dead first). It turns to the landing and shoots. Zulag 9: let down at
+        // 487,1239 by the Slig of level 4 at 512 on the way down the shaft to path 21's door.
+        if (know->mNav.Input().mIsAe && !unseenNow && !to.mHidden && !to.mHiddenStill && to.mY > from.mY + 30 &&
+            (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eRunJump))
+        {
+            bool brews = false;
+            for (const Entity& b : world->mEntities)
+            {
+                brews = brews || (b.mKind == EntityKind::eBrew && !b.mGone);
+            }
+            // (not beside a shadow, as Domain has it: that drop is timed and stepped on from into the shadow)
+            for (const NavNode& h : brews ? know->mNav.Nodes() : std::vector<NavNode>{})
+            {
+                brews = brews && !((h.mHidden || h.mHiddenStill) && h.mLine == to.mLine && std::abs(h.mX - to.mX) <= 2 * NavGraph::GridStep(to.mHalf));
+            }
+            for (const SligAt& slig : brews ? world->mSligs : std::vector<SligAt>{})
+            {
+                if (!slig.mAsleep && !slig.mPossessed && slig.mHalf == to.mHalf && std::abs(slig.mY - to.mY) <= 30 && std::abs(slig.mX - to.mX) <= 75)
+                {
+                    *refused = __LINE__;
+                    return -1;
+                }
+            }
+        }
         // A fall or a hop down is heard by every Slig on the screen it lands on, which turns to it (AE: a noise is
         // heard on its screen, Events.cpp); letting go of a ledge is not (Abe::Motion_16_LandSoft). Dear onto the
         // floor of one awake there, where a hoist down is to be had. (Zulag 9's sixth level: "Lower yourself over
@@ -2122,6 +2149,28 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             for (const Entity& p : world->mEntities)
             {
                 if (p.mKind == EntityKind::eBirdPortal && p.mRescuePortal && p.mHalf == to.mHalf && std::abs(p.mY2 - to.mY) < 30 && std::abs(p.CentreX() - to.mX) < (to.mHalf ? 37 : 75))
+                {
+                    return e.mCost + 3000;
+                }
+            }
+        }
+        // Along a floor past an awake Slig that stands on it, or walks his way: dear. Past it he is in front of it,
+        // and it hears him come up behind it (an awake Slig turns to a footstep, Slig::Brain_*). One that walks away
+        // is followed, not passed: the plan is made again as it goes. Zulag 9's third executive office: to the
+        // lever at 1662,879 along the floor past the one that stands at 1562 rather than up the ledge at 1412
+        // ("Run and climb to the right upper ledge, jump the gap on the right").
+        if (know->mNav.Input().mIsAe && !world->mInvisible && e.mKind == EdgeKind::eWalk)
+        {
+            const NavNode& from = know->mNav.Nodes()[e.mFrom];
+            const NavNode& to = know->mNav.Nodes()[e.mTo];
+            for (const SligAt& slig : world->mSligs)
+            {
+                // (and not to the end of its beat close ahead of where this goes, where it stands and turns: the one
+                // walking off to 1562 there)
+                const bool beat = slig.mBeatMax > slig.mBeatMin;
+                const bool farEnd = !beat || (slig.mFacingLeft ? slig.mBeatMin < std::min(from.mX, to.mX) - 150 : slig.mBeatMax > std::max(from.mX, to.mX) + 150);
+                const bool away = slig.mMotion == 2 && slig.mFacingLeft == (to.mX < from.mX) && farEnd;
+                if (!slig.mAsleep && !slig.mPossessed && !slig.mZShoot && !away && slig.mHalf == from.mHalf && std::abs(slig.mY - from.mY) <= 30 && (slig.mX - from.mX) * (slig.mX - to.mX) < 0)
                 {
                     return e.mCost + 3000;
                 }
@@ -3572,6 +3621,25 @@ std::vector<Goap::Action> Bot::UsableActions(BaseMap& map, const Domain& domain)
 s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions, const Goap::Plan& plan, bool errandOpen, s32& plansFound, Goap::Plan& best, std::string& bestGoal,
                   std::vector<Goap::Fact>& bestFacts, std::string& misses)
 {
+    // A shut door of this path into one of the level not yet been in, with every switch it wants on now: that
+    // path before anything is tried here (Zulag 9: the tasks door to path 21 opened by the three executive
+    // offices, and the security orbs farted at instead). With an errand open too: the wheel of 131 that path 24's
+    // door wants is beyond path 21.
+    if (mNewPathFor != mAbe.mPath && mKnow)
+    {
+        for (const NavExit& x : mKnow->mNav.Exits())
+        {
+            const NavFeature& f = mKnow->mNav.Input().mFeatures[x.mFeature];
+            if (f.mDestPath >= 0 && (f.mDestLevel < 0 || f.mDestLevel == mAbe.mLevel) && mVisitedPaths.count({mAbe.mLevel, f.mDestPath}) == 0 && mLevel.Distance(f.mDestPath) >= 0 &&
+                mLevel.WantsMet(mAbe.mPath, f.mDestPath, [this](s32 sw) { return mWorld.Switch(sw) != 0; }))
+            {
+                mNewPathFor = mAbe.mPath;
+                mNewPathWanted = mAbe.mPath;
+                Log("the door to path " + std::to_string(f.mDestPath) + " has all it wants: on into it");
+                return ThinkAgain() ? 1 : 0;
+            }
+        }
+    }
     // No way out is known yet: change what can be changed, a door it opens may show one. Switches the
     // run has already set once are left alone, so it can't go round in circles.
     // (the nearest looking first, and the first two that can be done are enough to choose from)
@@ -3626,12 +3694,65 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
     {
         brews = brews || (e.mKind == EntityKind::eBrew && !e.mGone);
     }
+    // (not one on the floor and screen of a lever a Glukkon's errand waits on, whatever wants it gone: the Slig is
+    // what pulls that lever for the Glukkon, which can't. The lever of 196 had it wanted gone for the fall onto its
+    // floor. Zulag 9: "destroy all of the Sligs EXCEPT THE ONE ON LEVEL 3", whose lever of 196 opens the way down
+    // for the Glukkon of the third executive office.)
+    const auto forGlukkon = [&](const Entity& slig)
+    {
+        const NavGraph& nav = mKnow->mNav;
+        const s32 sx = slig.mLive ? slig.mLiveX : slig.CentreX();
+        const s32 sy = slig.mLive ? slig.mLiveY : slig.mY2;
+        for (const Entity& lever : mWorld.mEntities)
+        {
+            if (lever.mKind != EntityKind::eLever || lever.mSwitch <= 1 || lever.mHalf != slig.mHalf || std::abs(lever.mY2 - sy) > 40 ||
+                nav.CameraOf(lever.CentreX(), lever.mY2 - 5) != nav.CameraOf(sx, sy - 5))
+            {
+                continue;
+            }
+            for (const Goap::Action& other : actions)
+            {
+                if (domain.mSteps[other.mTag].mKind != StepKind::eVoiceLock)
+                {
+                    continue;
+                }
+                for (const Goap::Fact& f : other.mPre)
+                {
+                    if (f.mKey == Key::Switch(lever.mSwitch))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    };
+    // (and not while there is a path of the level not yet been in that it goes on from: that first, as below.
+    // Zulag 9: the tasks door open with the three executive offices done, and the Sligs gone for instead.)
+    if (brews && mNewPathFor != mAbe.mPath && mKnow)
+    {
+        for (const NavExit& x : mKnow->mNav.Exits())
+        {
+            const NavFeature& f = mKnow->mNav.Input().mFeatures[x.mFeature];
+            // (one whose door wants nothing still off: a door that is open by the switches that it waits on)
+            brews = brews && !(f.mDestPath >= 0 && (f.mDestLevel < 0 || f.mDestLevel == mAbe.mLevel) && mVisitedPaths.count({mAbe.mLevel, f.mDestPath}) == 0 && mLevel.Distance(f.mDestPath) >= 0 &&
+                               mLevel.WantsMet(mAbe.mPath, f.mDestPath, [this](s32 sw) { return mWorld.Switch(sw) != 0; }));
+        }
+    }
     for (const Goap::Action& a : brews ? actions : std::vector<Goap::Action>{})
     {
+        // (not for a lever whose switch is on already: that one is done with. Zulag 9's second executive office, the
+        // Slig that pulled the lever of 191 for the Glukkon, gone for next instead of the first office.)
+        const DomainStep& use = domain.mSteps[a.mTag];
+        const Entity* lever = use.mKind == StepKind::eUse ? mWorld.Find(use.mEntity) : nullptr;
+        if (lever && lever->mKind == EntityKind::eLever && lever->mSwitch > 1 && mWorld.Switch(lever->mSwitch) != 0)
+        {
+            continue;
+        }
         for (const Goap::Fact& f : a.mPre)
         {
             const Entity* slig = f.mKey >= Key::Mud(0) && f.mKey < Key::Mud(0) + 1000000 && f.mValue == 2 ? mWorld.Find(static_cast<u32>(f.mKey - Key::Mud(0))) : nullptr;
-            if (slig && slig->mKind == EntityKind::eSlig && !domain.mStart.Has(f) && std::find(deaths.begin(), deaths.end(), f) == deaths.end() &&
+            if (slig && slig->mKind == EntityKind::eSlig && !domain.mStart.Has(f) && std::find(deaths.begin(), deaths.end(), f) == deaths.end() && !forGlukkon(*slig) &&
                 mExplored.count({mAbe.mLevel * 1000 + mAbe.mPath, f.mKey}) == 0)
             {
                 deaths.push_back(f);
@@ -3699,6 +3820,7 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
     }
     std::stable_sort(tries.begin(), tries.end(), [](const std::pair<s32, Goap::Fact>& a, const std::pair<s32, Goap::Fact>& b)
                      { return a.first < b.first; });
+    s32 bestWeighed = best.mFound ? best.mCost : 0;
     for (const auto& entry : tries)
     {
         // (one more looked at while the best so far goes by Slogs that sleep)
@@ -3733,8 +3855,17 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
                 sub.mCost += 100000;
             }
         }
-        if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || sub.mCost < best.mCost))
+        // (by the same weighing as the order they are looked at in: a Slig got rid of before an orb, see above)
+        const bool deathFact = fact.mKey >= Key::Mud(0);
+        bool orbFact = false;
+        for (const Entity& e : deathFact ? std::vector<Entity>{} : mWorld.mEntities)
         {
+            orbFact = orbFact || (e.mKind == EntityKind::eSecurityOrb && Key::Switch(World::HazardSwitch(e.mId)) == fact.mKey);
+        }
+        const s32 weighed = deathFact ? sub.mCost / 2 : sub.mCost + (orbFact ? 1000 : 0);
+        if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || weighed < bestWeighed))
+        {
+            bestWeighed = weighed;
             best = sub;
             bestGoal = fact.mKey >= Key::Mud(0) ? "Get rid of Slig#" + std::to_string(fact.mKey - Key::Mud(0)) : "Try switch " + std::to_string(fact.mKey - 1000) + "=" + std::to_string(fact.mValue);
             bestFacts = {fact};

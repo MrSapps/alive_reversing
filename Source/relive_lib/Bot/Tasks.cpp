@@ -5355,6 +5355,30 @@ TaskStep GoToTask::HoistDownStep(Bot& bot, const std::string& lastFailed, const 
             shadeCell = on.mTo;
         }
     }
+    // (any landing in the open: not while an awake Slig of that floor and screen faces it. Hung from the ledge he is
+    // not seen; down on the floor he is. Zulag 9's third executive office: "When the Slig leaves, go down and drink a
+    // Brew"; let down with the two walking his way, he was shot as he landed.)
+    if (nav.Input().mIsAe && !land.mHidden && !beside && !bot.GetWorld().mInvisible && mDropWait < 3000)
+    {
+        for (const SligAt& s : bot.GetWorld().mSligs)
+        {
+            if (s.mAsleep || s.mPossessed || s.mHalf != land.mHalf || std::abs(s.mY - land.mY) > 30 || nav.CameraOf(s.mX, s.mY - 5) != nav.CameraOf(land.mX, land.mY - 5))
+            {
+                continue;
+            }
+            const bool faces = s.mFacingLeft == (land.mX < s.mX);
+            if (faces && std::abs(s.mX - land.mX) < 350)
+            {
+                if (mDropWait == 0)
+                {
+                    bot.Log("a Slig faces where he would be let down at " + std::to_string(land.mX) + "," + std::to_string(land.mY) + ": not till it turns");
+                }
+                mDropWait += 2;
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(2));
+            }
+        }
+    }
     if (nav.Input().mIsAe && (land.mHidden || beside) && mDropWait < 1500)
     {
         for (const SligAt& s : bot.GetWorld().mSligs)
@@ -7542,6 +7566,54 @@ TaskStep ZapWaitTask::Next(Bot& bot, const std::string&)
     {
         bot.Log("the walls are on across the floor of Slig#" + std::to_string(mSlig) + ": until it has walked into one");
     }
+    // (one a Glukkon he is in has by it, the wall at its back: "Kill 'em" has it back into the wall as it shoots.
+    // Zulag 9's first executive office: "Saying "Kill 'em" will then make him back into the electric fence and fry
+    // himself.")
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const GlukkonAt* me = nullptr;
+    for (const GlukkonAt& g : world.mGlukkons)
+    {
+        me = g.mPossessed ? &g : me;
+    }
+    for (const SligAt& s : me ? world.mSligs : std::vector<SligAt>{})
+    {
+        const SligAt* live = &s;
+        if (live->mAsleep || live->mPossessed || std::abs(live->mY - me->mY) > 20 || nav.CameraOf(live->mX, live->mY - 5) != nav.CameraOf(me->mX, me->mY - 5))
+        {
+            continue;
+        }
+        bool behind = false;
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            const s32 wx = (f.mX1 + f.mX2) / 2;
+            behind = behind || (f.mKind == FeatureKind::eBarrier && f.mBeam && f.mSwitch > 1 && bot.GetWorld().Switch(f.mSwitch) == (f.mStartClosed ? 0 : 1) && f.mHalf == me->mHalf &&
+                                std::abs(f.mY2 - me->mY) <= 40 && (wx < live->mX) == (me->mX > live->mX) && std::abs(wx - live->mX) <= 60);
+        }
+        if (behind)
+        {
+            if (me->mFacingLeft != (live->mX < me->mX))
+            {
+                return TaskStep::Do(Prim::Wait(1, live->mX < me->mX ? Btn::eLeft : Btn::eRight));
+            }
+            // ("Hey" for its attention, then "Kill 'em" once it has turned to listen; the shot's recoil is the step
+            // back into the wall, Slig::Motion_6_Shoot)
+            if (++mOrders > 300)
+            {
+                return TaskStep::Failed("the Slig did not back into the wall");
+            }
+            if (mOrders % 40 == 1)
+            {
+                return TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+            }
+            if (mOrders % 40 == 15)
+            {
+                bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": \"Kill 'em\" to the Slig at " + std::to_string(live->mX) + ", the wall at its back");
+                return TaskStep::Do(Prim::Wait(3, Btn::eSpeak5));
+            }
+            return TaskStep::Do(Prim::Wait(3));
+        }
+    }
     if (++mWaits > 60)
     {
         return TaskStep::Failed("the Slig did not walk into the wall");
@@ -8483,6 +8555,37 @@ static void GlukkonRide(Bot& bot, const GlukkonAt& me, s32 hereNode, GlukkonOrde
     step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak4));
 }
 
+// The trap door a voice lock opens on its Glukkon's floor, with an awake Slig of that floor and screen across it from
+// the lock's box: that Slig is called over it once it is open, and falls through. (Zulag 9's second executive office:
+// "Tell the Glukkon Voice Lock to "Do it" to drop the trapdoor, then tell the Slig to "C'mere" and fall through it.")
+// Gives the door, and the side of it (-1 left, 1 right) the Glukkon stands on.
+static const NavFeature* LureDoor(const NavGraph& nav, const World& world, const Entity& lock, const GlukkonAt& me, s32& side)
+{
+    for (const NavFeature& door : nav.Input().mFeatures)
+    {
+        if (door.mKind != FeatureKind::eTrapDoor || door.mSwitch != lock.mSwitch || door.mHalf != me.mHalf || std::abs(door.mY1 - me.mY) > 30 || door.mX2 < lock.mX1 || door.mX1 > lock.mX2)
+        {
+            continue;
+        }
+        for (const SligAt& slig : world.mSligs)
+        {
+            // (on its screen or walking its beat just off it: called once it is back)
+            if (slig.mAsleep || slig.mPossessed || slig.mHalf != me.mHalf || std::abs(slig.mY - me.mY) > 30 || std::abs(slig.mX - (door.mX1 + door.mX2) / 2) > 450)
+            {
+                continue;
+            }
+            // (the box has room beside the door on the side away from the Slig)
+            side = slig.mX > door.mX2 ? -1 : slig.mX < door.mX1 ? 1 : 0;
+            const s32 room = side < 0 ? door.mX1 - lock.mX1 : lock.mX2 - door.mX2;
+            if (side != 0 && room >= 20)
+            {
+                return &door;
+            }
+        }
+    }
+    return nullptr;
+}
+
 TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const World& world = bot.GetWorld();
@@ -8522,11 +8625,57 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return TaskStep::Do(Prim::Wait(4));
         }
+        // (the door it opened between it and a Slig: "Hey", then "Come here" until the Slig is down through it)
+        s32 side = 0;
+        if (me && mLure < 900 && world.Switch(lock->mSwitch) != 0 && LureDoor(bot.Nav(), world, *lock, *me, side))
+        {
+            mLure += 3;
+            // (turned to it, by a tap: a Slig only listens to a Glukkon that faces it, Slig::NearOrFacingActiveChar.
+            // Held, the turn goes on into a step.)
+            if (me->mMotion != 0)
+            {
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            if (me->mFacingLeft != (side > 0))
+            {
+                return TaskStep::Do(Prim::Wait(1, side > 0 ? Btn::eLeft : Btn::eRight));
+            }
+            // (heard on the screen only)
+            bool onScreen = false;
+            for (const SligAt& slig : world.mSligs)
+            {
+                onScreen = onScreen || (!slig.mPossessed && !slig.mAsleep && std::abs(slig.mY - me->mY) <= 30 && bot.Nav().CameraOf(slig.mX, slig.mY - 5) == bot.Nav().CameraOf(me->mX, me->mY - 5));
+            }
+            if (!onScreen)
+            {
+                return TaskStep::Do(Prim::Wait(3));
+            }
+            if (mLure % 90 == 3)
+            {
+                bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": \"Come here\" to the Slig across the open trap door");
+                return TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+            }
+            if (mLure % 90 == 45)
+            {
+                return TaskStep::Do(Prim::Wait(3, Btn::eSpeak2));
+            }
+            return TaskStep::Do(Prim::Wait(3));
+        }
         return TaskStep::Done();
     }
     if (me)
     {
         const bool inBox = me->mX >= lock->mX1 + 3 && me->mX <= lock->mX2 - 3 && me->mY >= lock->mY1 && me->mY <= lock->mY2 + 4;
+        // (with a Slig across the door the lock opens: off the door first, on the box's side away from the Slig)
+        s32 side = 0;
+        const NavFeature* lure = inBox && me->mMotion == 0 ? LureDoor(bot.Nav(), world, *lock, *me, side) : nullptr;
+        // (a cell back from it where the box has room: a step too many in the turn to the Slig is not into the hole)
+        const s32 back = lure && (side < 0 ? lure->mX1 - lock->mX1 : lock->mX2 - lure->mX2) >= 45 ? 30 : 8;
+        if (lure && (side < 0 ? me->mX > lure->mX1 - back : me->mX < lure->mX2 + back) && (mWalked += 2) < 1500)
+        {
+            mInBox = 0;
+            return TaskStep::Do(Prim::Wait(2, side < 0 ? Btn::eLeft : Btn::eRight));
+        }
         if (!inBox)
         {
             mInBox = 0;
@@ -9144,8 +9293,9 @@ TaskStep SligLeverTask::Next(Bot& bot, const std::string& lastFailed)
         }
     }
     // (or, from over the lever's floor, the one of that floor on its screen nearest the lever: "Come here" brings
-    // it along under the Glukkon, past the lever, where it stops)
-    if (!slig && stand.mY < lever->mY2 - 40)
+    // it along under the Glukkon, past the lever, where it stops. Or from under it: Zulag 9's second executive
+    // office, "Tell the Slig to move to beside the lever, pull it", the Glukkon on the floor below.)
+    if (!slig && std::abs(stand.mY - lever->mY2) > 40)
     {
         for (const SligAt& s : world.mSligs)
         {
@@ -11303,6 +11453,12 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         {
             orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
         }
+        // (nor with a Glukkon on it: the chant takes the Glukkon before any Slig, Abe::FindObjectToPossess. Zulag 9's
+        // third executive office: he chanted at the Slig under 1637,879 for 2400 frames in the Glukkon.)
+        for (const GlukkonAt& g : world.mGlukkons)
+        {
+            orb = orb || (!g.mPossessed && nav.CameraOf(g.mX, g.mY - 5) == cam);
+        }
         const s32 sligY = slig->mY;
         const bool half = slig->mHalf;
         const NavGraph* graph = &nav;
@@ -11407,6 +11563,16 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
     if (abe.mMove == Move::eCrouch)
     {
         return TaskStep::Do(Prim::Press(Btn::eUp));
+    }
+    // (what the chant took was a Glukkon, not the Slig: no more of it)
+    for (const GlukkonAt& g : world.mGlukkons)
+    {
+        if (g.mPossessed)
+        {
+            mGaveUp = true;
+            mPhase = 0;
+            return TaskStep::Failed("the chant took a Glukkon, not the Slig");
+        }
     }
     // Chant while it is on this screen: it takes a couple of seconds of it being there
     mFrames += 20;
@@ -14963,7 +15129,108 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return TaskStep::Failed("no Brew in him");
         }
-        if (bot.AbeNode() != at)
+        // (Sligs awake on the machine's floor and screen: not down to it while one faces it. Zulag 9's third
+        // executive office: "When the Slig leaves, go down and drink a Brew, then climb back up.")
+        const auto sligOn = [&](s32 node, bool facing)
+        {
+            if (node < 0)
+            {
+                return false;
+            }
+            const NavNode& n = nav.Nodes()[node];
+            for (const SligAt& s : world.mSligs)
+            {
+                // (on the screen or near it: one just off it walks on in while he chants)
+                if (!s.mAsleep && !s.mPossessed && s.mHalf == n.mHalf && std::abs(s.mY - n.mY) <= 30 && std::abs(s.mX - n.mX) < 700 &&
+                    (!facing || (s.mFacingLeft == (n.mX < s.mX) && std::abs(s.mX - n.mX) < 400)))
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+        // (hung from a ledge: up on it first, for anything; hung, the Slig below sees him)
+        if (bot.Abe().mMove == Move::eHang && world.mBrew && brew)
+        {
+            return TaskStep::Do(Prim::Press(Btn::eUp));
+        }
+        // (and not till each Slig of that floor that walks a beat is long enough from seeing the machine for the way down
+        // and the drink: 80 frames of it at the machine. With the two of Zulag 9's third executive office he was down
+        // as the near one turned, and shot at the machine.)
+        bool soon = false;
+        if (brew && at >= 0 && bot.AbeNode() >= 0 && bot.AbeNode() != at && nav.Nodes()[bot.AbeNode()].mLine != nav.Nodes()[at].mLine)
+        {
+            const NavNode& m = nav.Nodes()[at];
+            const s32 camW = nav.Input().mCamW;
+            const s32 camX1 = m.mX / camW * camW;
+            for (const SligAt& s : world.mSligs)
+            {
+                if (!s.mAsleep && !s.mPossessed && s.mHalf == m.mHalf && std::abs(s.mY - m.mY) <= 30 && s.mBeatMax > s.mBeatMin && std::abs(s.mX - m.mX) < 700)
+                {
+                    // (with the stand at the end of the beat it walks to, away from the machine: the time there is
+                    // the window, "When the Slig leaves")
+                    const bool away = s.mFacingLeft ? m.mX > s.mBeatMax : m.mX < s.mBeatMin;
+                    const s32 pause = away ? (s.mFacingLeft ? s.mPauseLeft : s.mPauseRight) : 0;
+                    soon = soon || s.FramesUntilSees(m.mX, camX1, camX1 + camW) + pause < 130;
+                }
+            }
+        }
+        // (waited for from the ledge over the machine nearest it, with a hoist down onto its floor: "Go left and jump
+        // up to the left ledge. When the Slig leaves, go down and drink a Brew, then climb back up." From a floor
+        // further off, the way there takes up the window.)
+        if (brew && at >= 0 && bot.AbeNode() >= 0 && bot.AbeNode() != at && nav.Nodes()[bot.AbeNode()].mLine != nav.Nodes()[at].mLine && sligOn(at, false) && !mPerched && mSligWaits < 3000)
+        {
+            const NavNode& m = nav.Nodes()[at];
+            s32 perch = -1;
+            for (std::size_t i = 0; i < nav.Edges().size(); i++)
+            {
+                const NavEdge& e = nav.Edges()[i];
+                const NavNode& from = nav.Nodes()[e.mFrom];
+                const NavNode& to = nav.Nodes()[e.mTo];
+                if (e.mKind == EdgeKind::eHoistDown && to.mLine == m.mLine && std::abs(to.mX - m.mX) <= 2 * NavGraph::GridStep(m.mHalf) &&
+                    (perch < 0 || std::abs(from.mX - m.mX) < std::abs(nav.Nodes()[perch].mX - m.mX)))
+                {
+                    perch = e.mFrom;
+                }
+            }
+            if (perch >= 0 && bot.AbeNode() != perch)
+            {
+                // (set off for it as for the machine itself, when the Sligs give the time: the way there is across their
+                // floor, here from the platform at 1412,880 down to 1312,980 and along it)
+                if (!mGo && (sligOn(at, true) || soon) && mSligWaits < 3000)
+                {
+                    if (mSligWaits++ == 0)
+                    {
+                        bot.Log("a Slig is about the Brew machine's floor: off to the ledge over it when they give the time");
+                    }
+                    return TaskStep::Do(Prim::Wait(2));
+                }
+                if (!mGo)
+                {
+                    bot.Log("to the ledge over the Brew machine, " + std::to_string(nav.Nodes()[perch].mX) + "," + std::to_string(nav.Nodes()[perch].mY) + ", to wait for the Sligs there");
+                    mGo = std::make_unique<GoToTask>("to the ledge over the Brew machine", [perch](s32 n)
+                                                     { return n == perch; });
+                }
+                TaskStep step;
+                if (!RunGo(mGo, bot, lastFailed, step))
+                {
+                    return step;
+                }
+                mGo.reset();
+                mPerched = step.mKind != TaskStep::Kind::eFailed;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            mPerched = true;
+        }
+        if (brew && at >= 0 && bot.AbeNode() >= 0 && bot.AbeNode() != at && nav.Nodes()[bot.AbeNode()].mLine != nav.Nodes()[at].mLine && (sligOn(at, true) || soon) && mSligWaits < 3000)
+        {
+            if (mSligWaits++ == 0)
+            {
+                bot.Log("a Slig faces the Brew machine: down to it when it has turned");
+            }
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        if (bot.AbeNode() != at && !(world.mBrew && brew))
         {
             TaskStep step;
             if (!mGo)
@@ -14992,6 +15259,51 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
                 return TaskStep::Failed("the machine gave no Brew");
             }
             return TaskStep::Do(Prim::Wait(3, Btn::eUp));
+        }
+        // (and drunk, off that floor before the fart and the chant, where a Slig of it is: up the way he came, or any
+        // other floor of the screen near by)
+        if (brew && !drop && !mClimbed && sligOn(bot.AbeNode(), false))
+        {
+            const s32 here = bot.AbeNode();
+            const NavNode& h = nav.Nodes()[here];
+            const NavGraph* g = &nav;
+            if (!mUp)
+            {
+                const World* w = &world;
+                mUp = std::make_unique<GoToTask>("off the floor of the Sligs to fart", [g, h, w](s32 n)
+                                                 {
+                                                     const NavNode& c = g->Nodes()[n];
+                                                     if (std::abs(c.mY - h.mY) <= 40 || g->CameraOf(c.mX, c.mY - 5) != g->CameraOf(h.mX, h.mY - 5) || c.mHalf != h.mHalf)
+                                                     {
+                                                         return false;
+                                                     }
+                                                     for (const SligAt& s : w->mSligs)
+                                                     {
+                                                         if (!s.mAsleep && !s.mPossessed && std::abs(s.mY - c.mY) <= 30)
+                                                         {
+                                                             return false;
+                                                         }
+                                                     }
+                                                     return true;
+                                                 });
+            }
+            TaskStep step;
+            if (!RunGo(mUp, bot, lastFailed, step))
+            {
+                return step;
+            }
+            mClimbed = true;
+            mUp.reset();
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                bot.Log("no floor off the Sligs' to fart from: from here");
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        // (hung from the ledge he went up to: up on it first, the Slig below sees him hanging)
+        if (bot.Abe().mMove == Move::eHang)
+        {
+            return TaskStep::Do(Prim::Press(Btn::eUp));
         }
         // (his back to the mine: the fart is made behind him)
         if (drop && target->mKind == EntityKind::eMine && bot.Abe().mFacingLeft != (target->CentreX() > bot.Abe().mX))

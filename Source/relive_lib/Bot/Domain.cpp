@@ -436,8 +436,19 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
             const s32 next = nav.NodeAt(nx, at.mY, half, 12);
             if (next >= 0 && std::abs(nav.Nodes()[next].mX - nx) <= step / 2)
             {
-                relax(next, false, sw, value);
-                if (!nav.Nodes()[next].mHazard)
+                // (onto a trap door only while it is shut, and with a jump over it the other way: open, it walks
+                // into the hole. Zulag 9's second executive office, the door of 192 opened by its voice lock.)
+                const s32 door = nav.Nodes()[next].mTrapDoor;
+                const bool onDoor = door >= 0 && door != at.mTrapDoor && nav.Input().mFeatures[door].mSwitch > 1 && sw == 0;
+                if (onDoor)
+                {
+                    relax(next, false, nav.Input().mFeatures[door].mSwitch, nav.Input().mFeatures[door].mStartClosed ? 0 : 1);
+                }
+                else
+                {
+                    relax(next, false, sw, value);
+                }
+                if (!nav.Nodes()[next].mHazard && !onDoor)
                 {
                     continue;
                 }
@@ -3647,6 +3658,44 @@ void Domain::Builder::Crossings()
         {
             std::swap(pre, other);
         }
+        // Down onto a floor right by a Slig awake on it, out of the shadows, where there are Brews to fart it with:
+        // with it dead. It turns to the landing and shoots. (Zulag 9: "fly your farts up the shaft to destroy all of
+        // the Sligs"; let down at 487,1239 by the one of level 4 at 512, he was shot.)
+        {
+            const NavNode& from = nav.Nodes()[e.mFrom];
+            const NavNode& to = nav.Nodes()[e.mTo];
+            bool brews = false;
+            for (const Entity& b : world.mEntities)
+            {
+                brews = brews || (b.mKind == EntityKind::eBrew && !b.mGone);
+            }
+            // (not beside a shadow: let down as it turns away, he steps into that, GoToTask::HoistDownStep. Zulag 9's
+            // second level: "Lower yourself over the edge when the Slig is facing right, drop and immediately sneak
+            // one step forward to the shadow.")
+            bool beside = false;
+            for (const NavNode& h : nav.Nodes())
+            {
+                beside = beside || ((h.mHidden || h.mHiddenStill) && h.mLine == to.mLine && std::abs(h.mX - to.mX) <= 2 * NavGraph::GridStep(to.mHalf));
+            }
+            for (const Entity& slig : brews && !beside && nav.Input().mIsAe && !to.mHidden && !to.mHiddenStill && to.mY > from.mY + 30 ? world.mEntities : std::vector<Entity>{})
+            {
+                if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || slig.mState == 1 || slig.mHalf != to.mHalf)
+                {
+                    continue;
+                }
+                const s32 sx = slig.mLive ? slig.mLiveX : slig.CentreX();
+                const s32 sy = slig.mLive ? slig.mLiveY : slig.mY2;
+                const s32 at = nav.NodeAt(sx, sy, slig.mHalf, 30);
+                if (at >= 0 && nav.Nodes()[at].mLine == to.mLine && std::abs(sx - to.mX) <= 75)
+                {
+                    pre.push_back({Key::Mud(slig.mId), 2});
+                    if (both)
+                    {
+                        other.push_back({Key::Mud(slig.mId), 2});
+                    }
+                }
+            }
+        }
         // From or onto a floor Sligs watch with no shadow to go by (SligWatched): unseen, or with those Sligs dead
         bool sligFloor = false;
         {
@@ -4622,6 +4671,17 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
                 other.mOther = 1;
                 add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on from the trap door", altPre, gives, 100, other);
             }
+            // (or from its other side, where that is another region: dearer than the side it is pulled from as a
+            // rule. Zulag 9's first executive office: the lever of 198 that turned the electric wall on, from the
+            // gate's side of the wall, to turn it off again.)
+            else if (alt >= 0 && alt != node && d.mRegions[alt] != d.mRegions[node])
+            {
+                std::vector<Goap::Fact> altPre = pre;
+                altPre[0] = regionFact(alt);
+                DomainStep other = step;
+                other.mOther = 1;
+                add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on from its other side", altPre, gives, useCost + 100, other);
+            }
         }
         // A lock Fleeches guard: unseen they do not find him at it. The Mudanchee trial's last: its
         // door takes a while to open after the slap, the Fleeches of its room wake as he comes and
@@ -4835,6 +4895,14 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
             offPre.push_back({Key::kInvisNow, 1});
         }
         add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " off", offPre, {{key, 0}}, 150, step);
+        const s32 alt = entity.mKind == EntityKind::eLever && node >= 0 ? UseNode(nav, entity, nullptr, 1) : -1;
+        if (alt >= 0 && alt != node && d.mRegions[alt] != d.mRegions[node])
+        {
+            offPre[0] = regionFact(alt);
+            DomainStep other = step;
+            other.mOther = 1;
+            add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " off from its other side", offPre, {{key, 0}}, 250, other);
+        }
     }
 }
 
@@ -6226,7 +6294,9 @@ void Domain::Builder::addForGlukkon(const GlukkonSource& glukkon, const std::str
     const NavGraph& nav = mNav;
     const World& world = mWorld;
     // (one a switch calls in: while that switch is on, which it is no more once it is dead)
-    if (glukkon.mSpawn > 1)
+    // (not the one he is in: it is here, whatever its switch. Zulag 9's third executive office: through the
+    // teleporter the game had set 187 back to 0, and the plan was for another Glukkon.)
+    if (glukkon.mSpawn > 1 && !glukkon.mPossessed)
     {
         needs.push_back({Key::Switch(glukkon.mSpawn), 1});
     }
@@ -6267,11 +6337,56 @@ void Domain::Builder::addForGlukkon(const GlukkonSource& glukkon, const std::str
             }
         }
     }
+    const auto watchedAt = [&](const NavNode& node)
+    {
+        for (const SligAt& slig : world.mSligs)
+        {
+            if (!slig.mAsleep && !slig.mPossessed && slig.mHalf == node.mHalf && std::abs(slig.mY - node.mY) <= 30 && nav.CameraOf(slig.mX, slig.mY - 5) == cam)
+            {
+                return true;
+            }
+        }
+        // (or one a spawner with its switch on drops onto that floor, out yet or not: lever 206 there)
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eSlig && !e.mGone && e.mSwitch > 1 && world.Switch(e.mSwitch) != 0 && e.mHalf == node.mHalf && e.mY2 < node.mY &&
+                nav.CameraOf(e.CentreX(), node.mY - 5) == cam)
+            {
+                // (the first floor under where it drops, and no other: there, the floor at 1499, not the platform of
+                // 1399 beside it)
+                s32 land = -1;
+                for (const NavNode& other : nav.Nodes())
+                {
+                    if (other.mHalf == node.mHalf && other.mY > e.mY2 && std::abs(other.mX - e.CentreX()) <= 13 && (land < 0 || other.mY < land))
+                    {
+                        land = other.mY;
+                    }
+                }
+                if (land >= 0 && std::abs(node.mY - land) <= 30)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    bool anyClear = false;
+    for (const NavNode& node : nav.Nodes())
+    {
+        anyClear = anyClear || (node.mHalf == glukkon.mHalf && !node.mHazard && nav.CameraOf(node.mX, node.mY - 5) == cam && !watchedAt(node));
+    }
     std::set<s32> from;
     for (const s32 n : order)
     {
         const NavNode& node = nav.Nodes()[n];
-        if (node.mHalf != glukkon.mHalf || node.mHazard || nav.CameraOf(node.mX, node.mY - 5) != cam || !from.insert(mD.mRegions[n]).second)
+        if (node.mHalf != glukkon.mHalf || node.mHazard || nav.CameraOf(node.mX, node.mY - 5) != cam)
+        {
+            continue;
+        }
+        // (not from a floor an awake Slig walks on that screen, where there is somewhere else on it: the chant is
+        // done in its sight. Zulag 9's second executive office: "pull the lever and immediately jump to the upper
+        // platform. Possess the Glukkon"; he waited above for the Slig to leave the floor under him, for good.)
+        if ((anyClear && watchedAt(node)) || !from.insert(mD.mRegions[n]).second)
         {
             continue;
         }
@@ -6969,6 +7084,27 @@ void Domain::Builder::MudLevers()
 // security orb there (no chanting it over: the orb zaps him as he chants). Pulled, he is shot: not while it is about.
 // (Zulag 9's first screen: lever 174 by the Slig of 512..576 under the orb at 565,374. Tried for want of anything
 // else, he was shot there each time.)
+// A Glukkon on the screen cam, or about to be: one that is about, or one that a switch on calls in there (or the
+// switch "calling" is about to be set). A chant there takes it before any Slig, Abe::FindObjectToPossess.
+static bool GlukkonOn(const NavGraph& nav, const World& world, s32 cam, s32 calling)
+{
+    for (const GlukkonAt& g : world.mGlukkons)
+    {
+        if (!g.mPossessed && nav.CameraOf(g.mX, g.mY - 5) == cam)
+        {
+            return true;
+        }
+    }
+    for (const GlukkonSpawn& spawn : world.mGlukkonSpawn)
+    {
+        if (spawn.mSwitch > 1 && (world.Switch(spawn.mSwitch) != 0 || spawn.mSwitch == calling) && nav.CameraOf(spawn.mX, spawn.mY - 5) == cam)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void Domain::Builder::GuardedLevers()
 {
     const NavGraph& nav = mNav;
@@ -6987,7 +7123,11 @@ void Domain::Builder::GuardedLevers()
         {
             orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
         }
-        if (!orb)
+        // (or a Glukkon there: the chant takes it, not the Slig, Abe::FindObjectToPossess. Zulag 9's third executive
+        // office, the lever of 189 on the beat of the Slig at 1612..1762: "Possess the Glukkon, then ... tell a Slig
+        // below to "C'mere" and "Do it" to pull the lever below.")
+        const bool glukkon = GlukkonOn(nav, world, cam, 0);
+        if (!orb && !glukkon)
         {
             continue;
         }
@@ -6999,7 +7139,19 @@ void Domain::Builder::GuardedLevers()
             const s32 sx = slig.CentreX();
             const bool byIt = slig.mBeatMax <= slig.mBeatMin && std::abs(sx - lever.CentreX()) <= 75 && nav.CameraOf(sx, slig.mY2 - 5) == cam;
             // (asleep or not, the one right by it: the pull wakes it)
-            if (slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch <= 1 && (slig.mState != 1 || byIt) && slig.mHalf == lever.mHalf && std::abs(slig.mY2 - lever.mY2) <= 40 &&
+            // (one a spawner over that floor has let out too, its switch on: whether it is down yet or not, it
+            // walks the floor it drops onto. There, the one 187 lets out with the Glukkon.)
+            if (slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch > 1 && world.Switch(slig.mSwitch) != 0)
+            {
+                if (slig.mHalf == lever.mHalf && slig.mY2 < lever.mY2 && nav.CameraOf(sx, lever.mY2 - 5) == cam && std::abs(sx - lever.CentreX()) <= 200)
+                {
+                    guarded[lever.mId].push_back(slig.mId);
+                }
+                continue;
+            }
+            // (the Glukkon there is for those a spawner lets out, above: a Slig of the map's under it is taken over
+            // or got by as it was)
+            if (orb && slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch <= 1 && (slig.mState != 1 || byIt) && slig.mHalf == lever.mHalf && std::abs(slig.mY2 - lever.mY2) <= 40 &&
                 (byIt || (slig.mBeatMax > slig.mBeatMin && nav.CameraOf(slig.mBeatMin, slig.mY2 - 5) == cam && nav.CameraOf(slig.mBeatMax, slig.mY2 - 5) == cam && lever.mX2 >= slig.mBeatMin && lever.mX1 <= slig.mBeatMax)))
             {
                 guarded[lever.mId].push_back(slig.mId);
@@ -7119,9 +7271,27 @@ void Domain::Builder::GlukkonCalls()
             bool with = false;
             for (const SligAt& slig : world.mSligs)
             {
-                with = with || (glukkon.mPossessed && !slig.mPossessed && !slig.mAsleep && slig.mHalf == glukkon.mHalf && std::abs(slig.mY - glukkon.mY) <= 20 &&
-                                nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(glukkon.mX, glukkon.mY - 5));
+                // (brought along on foot only: it does not follow down through a floor. Zulag 9's third executive
+                // office: the Glukkon dropped by the voice lock of 195 to the lever of 196, the Slig stayed above.)
+                with = with || (glukkon.mPossessed && !slig.mPossessed && !slig.mAsleep && slig.mHalf == glukkon.mHalf && std::abs(slig.mY - glukkon.mY) <= 20 && std::abs(lever.mY2 - glukkon.mY) <= 30 &&
+                                nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(glukkon.mX, glukkon.mY - 5) && FloorOpen(nav.Input(), world, slig.mX, lever.CentreX(), lever.mY2 + 4, lever.mHalf));
             }
+            // (or one of the path's Sligs that is on the lever's own floor and screen already, which the Glukkon goes
+            // down to: that screen need not be loaded while the Glukkon is above it. There, the Slig of level 3, "use
+            // the Slig to pull the lever (aren't you glad you kept him alive now?)")
+            bool onFloor = false;
+            for (const Entity& e : world.mEntities)
+            {
+                const s32 ex = e.mLive ? e.mLiveX : e.CentreX();
+                const s32 ey = e.mLive ? e.mLiveY : e.mY2;
+                // (with nothing shut between it and the lever: Zulag 9's first executive office, the Slig behind the
+                // gate whose own lever is on the Glukkon's side)
+                onFloor = onFloor || (e.mKind == EntityKind::eSlig && !e.mGone && e.mSwitch <= 1 && e.mState != 1 && e.mHalf == lever.mHalf && std::abs(ey - lever.mY2) <= 30 &&
+                                nav.CameraOf(ex, ey - 5) == nav.CameraOf(lever.CentreX(), lever.mY2 - 5) && FloorOpen(nav.Input(), world, ex, lever.CentreX(), lever.mY2 + 4, lever.mHalf));
+            }
+            // (with the one he is in: a plan of it from the start is the Barracks' and FeeCo's, left as they were)
+            onFloor = onFloor && glukkon.mPossessed;
+            with = with || onFloor;
             if ((!spawner && !with) || now == after || glukkon.mHalf != lever.mHalf)
             {
                 continue;
@@ -7130,13 +7300,30 @@ void Domain::Builder::GlukkonCalls()
             // the lever's screen and floor that it can, on the side away from where the Slig comes down (the
             // Slig stops at a lever on its way to what calls it). Not within a mine's blast, if the Slig's way
             // goes over mines: the Barracks' war room, "stand one step back from the gate".
+            // (or, with the Slig on the lever's floor already, the floor under the lever, from which it is called to
+            // the lever over it: Zulag 9's second executive office, "Tell the Slig to move to beside the lever, pull it")
+            s32 underY = -1;
+            for (const NavNode& n : onFloor ? nav.Nodes() : std::vector<NavNode>{})
+            {
+                if (n.mHalf == lever.mHalf && std::abs(n.mX - leverX) <= cell && n.mY > lever.mY2 + 30 && n.mY <= lever.mY2 + 260 && (underY < 0 || n.mY < underY) &&
+                    nav.CameraOf(n.mX, n.mY - 5) == nav.CameraOf(lever.CentreX(), lever.mY2 - 5))
+                {
+                    underY = n.mY;
+                }
+            }
             bool added = false;
-            for (s32 k = 1; k <= 10 && !added; k++)
+            // (first, with a Slig there already, a place got to with nothing to open: it hears him through a gate
+            // between them, SligLeverTask. Zulag 9's first executive office, "tell the Slig to "C'mere" to beside
+            // the gate, then "Do it" to pull the lever"; planned with the gate opened first, which only Abe could,
+            // in front of that Slig.)
+            for (s32 free = with && !spawner ? 1 : 0; free >= 0 && !added; free--)
+            for (s32 pass = 0; pass < (underY >= 0 ? 2 : 1) && !added; pass++)
+            for (s32 k = pass == 0 ? 1 : 0; k <= (pass == 0 ? 10 : 1) && !added; k++)
             {
                 for (s32 side = -1; side <= 1 && !added; side += 2)
                 {
                     const s32 sx = leverX + side * k * cell;
-                    const s32 stand = nav.NodeAt(sx, lever.mY2, lever.mHalf, 30);
+                    const s32 stand = nav.NodeAt(sx, pass == 0 ? lever.mY2 : underY, lever.mHalf, 30);
                     if (stand < 0 || std::abs(nav.Nodes()[stand].mX - sx) > cell / 2 || nav.Nodes()[stand].mHazard || nav.CameraOf(sx, lever.mY2 - 5) != nav.CameraOf(lever.CentreX(), lever.mY2 - 5) ||
                         (k > 1 && (sx < leverX) == (spawnX < leverX)))
                     {
@@ -7158,7 +7345,7 @@ void Domain::Builder::GlukkonCalls()
                     {
                         own = own || f.mKey == Key::Switch(lever.mSwitch);
                     }
-                    if (own)
+                    if (own || (free == 1 && !needs.empty()))
                     {
                         continue;
                     }
@@ -7739,6 +7926,11 @@ void Domain::Builder::SligLocks()
                 {
                     orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
                 }
+                // (and none with a Glukkon on that screen: see below)
+                if (GlukkonOn(nav, world, cam, lever.mSwitch))
+                {
+                    continue;
+                }
                 // (with an orb there: taken over from out of a well on the lock's screen, where it comes after him.
                 // The brewery's fourth Zulag: "Pull the lever to summon a Slig. When he passes right, climb down
                 // behind him and run left. He'll chase you, so jump into the well on the next screen. Possess
@@ -7833,6 +8025,9 @@ void Domain::Builder::SligLocks()
                 {
                     orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
                 }
+                // (nor with a Glukkon on that screen: the chant takes it before the Slig, Abe::FindObjectToPossess.
+                // Zulag 9's third executive office, where the Glukkon is the one to call the Slig.)
+                orb = orb || GlukkonOn(nav, world, cam, lever.mSwitch);
                 if (orb || nav.CameraOf(nav.Nodes()[start].mX, nav.Nodes()[start].mY - 5) != cam)
                 {
                     continue;

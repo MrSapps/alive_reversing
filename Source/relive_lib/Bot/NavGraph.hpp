@@ -167,6 +167,9 @@ struct NavEdge final
     s32 mFence = -1;
     // A fall that ends hung from a ledge under where he went off, not stood on the floor it is the end of
     bool mHung = false;
+    // A fall or a hoist down that lands on a trap door (its feature): only while that is shut, open he goes on down
+    // through it (Zulag 9's second executive office: off the platform at 1237,1400 onto the door of 192, open)
+    s32 mOnTrap = -1;
 };
 
 // A grid cell of floor Abe can stand on

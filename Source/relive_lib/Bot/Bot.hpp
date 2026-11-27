@@ -86,6 +86,9 @@ struct BotMemory
     std::pair<s32, s32> mRegionGoal{0, 0};
     // The path in which any path not yet visited became good enough to leave by
     s32 mNewPathFor = -1;
+    // The path in which a door into one not yet been in was found to have all it wants (NoWayOut): on into it,
+    // errands open or not
+    s32 mNewPathWanted = -1;
     // Where he came into the path he is in. Of two ways out to the same place, the one he has just come in by
     // is not the one meant (a vault's own door is), until nothing else is left to try (mBackFor: in that path)
     std::pair<s32, s32> mArrivedKey{-1, -1};

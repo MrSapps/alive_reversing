@@ -409,6 +409,19 @@ bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) con
         }
         return true;
     }
+    if (edge.mOnTrap >= 0 && edge.mFeature < 0)
+    {
+        const NavFeature& trap = mInput.mFeatures[edge.mOnTrap];
+        if (switchId)
+        {
+            *switchId = trap.mSwitch;
+        }
+        if (openValue)
+        {
+            *openValue = trap.mStartClosed ? 0 : 1;
+        }
+        return true;
+    }
     if (edge.mFence >= 0)
     {
         const NavFeature& fence = mInput.mFeatures[edge.mFence];
@@ -2237,6 +2250,27 @@ void NavGraph::Build(const NavInput& input)
         edges[i].mFeature = trap;
         const NavNode over = mNodes[edges[i].mTo];
         trapFall(edges[i].mFrom, over, trap, edges[i].mLeft);
+    }
+    // (only onto a door whose way down through it would kill: through one that is safe to fall through, landing on
+    // it open is the way down. And only a fall or a hoist down onto it: a hop or a jump onto one is how the way
+    // down through it is taken, the Mudomo vault's path 12 hop onto the door at 687,660.)
+    std::set<s32> safeThrough;
+    for (const NavEdge& e : edges)
+    {
+        if (e.mKind == EdgeKind::eFall && mNodes[e.mFrom].mTrapDoor >= 0 && e.mFeature == mNodes[e.mFrom].mTrapDoor)
+        {
+            safeThrough.insert(e.mFrom);
+        }
+    }
+    for (std::size_t i = 0; i < made; i++)
+    {
+        NavEdge& e = edges[i];
+        const s32 trap = mNodes[e.mTo].mTrapDoor;
+        if (trap >= 0 && mNodes[e.mFrom].mTrapDoor != trap && e.mFeature < 0 && mInput.mFeatures[trap].mSwitch > 1 && safeThrough.count(e.mTo) == 0 &&
+            (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHoistDown))
+        {
+            e.mOnTrap = trap;
+        }
     }
     for (std::size_t i = 0; i < mNodes.size(); i++)
     {

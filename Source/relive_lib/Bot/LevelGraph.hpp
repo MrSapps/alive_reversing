@@ -56,6 +56,8 @@ public:
     std::set<s32> ErrandExits(s32 from, const std::function<bool(s32 path, s32 sw)>& open) const;
     // The switches of `path` that Wanted is about for some other path
     std::vector<s32> Errands(s32 path) const;
+    // Whether `path` has a shut door into `dest` (of this level) and every switch it wants is on
+    bool WantsMet(s32 path, s32 dest, const std::function<bool(s32 sw)>& on) const;
     std::string Text() const;
     // Whether a path that `seen` does not hold can be got to from `from` through the level's paths, not by way
     // of `avoid`
