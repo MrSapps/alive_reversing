@@ -16203,7 +16203,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                     FlierFlight::GrenadeAt(bx, by, flown.mFacingLeft, t, gx, gy);
                     const s32 fx = foe->mX + foe->mVelX * t / 256;
                     const s32 fy = foe->mY + foe->mVelY * t / 256;
-                    if (std::abs(gx - fx) <= 16 && gy >= fy - 22 && gy <= fy + 8 && std::abs(fx - bx) >= 50)
+                    if (std::abs(gx - fx) <= 16 && gy >= fy - 22 && gy <= fy + 8 && std::abs(fx - bx) >= 70)
                     {
                         mFoeThrown++;
                         mFoeSaid = 3;
@@ -16220,17 +16220,42 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             const u32 towards = foe->mX < bx ? Btn::eLeft : Btn::eRight;
             if (behind)
             {
-                const s32 px = foe->mX + (east ? 100 : -100);
+                // (as near behind it as a grenade thrown from there comes down on it, and above it if need be: from
+                // 100 behind at its height the grenade had fallen past it. Zulag 11's by the lever, never thrown at.)
+                s32 px = foe->mX + (east ? 100 : -100);
+                s32 py = foe->mY;
+                bool found = false;
+                // (no nearer than 70: its blast reaches it, Zulag 11's thrown at from 60)
+                for (s32 dx = 70; dx <= 150 && !found; dx += 10)
+                {
+                    for (s32 dy = 0; dy >= -70 && !found; dy -= 10)
+                    {
+                        const s32 cx = foe->mX + (east ? dx : -dx);
+                        const s32 cy = foe->mY + dy;
+                        for (s32 t = 3; t <= 18 && !found; t++)
+                        {
+                            s32 gx = 0;
+                            s32 gy = 0;
+                            FlierFlight::GrenadeAt(cx, cy, east, t, gx, gy);
+                            if (std::abs(gx - foe->mX) <= 12 && gy >= foe->mY - 18 && gy <= foe->mY + 4)
+                            {
+                                found = true;
+                                px = cx;
+                                py = cy;
+                            }
+                        }
+                    }
+                }
                 std::vector<std::pair<s32, s32>> corners;
                 const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
-                if (std::abs(px - bx) + std::abs(foe->mY - by) > 12 && Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, px, foe->mY, &gatesNow, corners, &bot.GetWorld()))
+                if (std::abs(px - bx) + std::abs(py - by) > 12 && Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, px, py, &gatesNow, corners, &bot.GetWorld()))
                 {
                     if (mFoeSaid != 1)
                     {
                         mFoeSaid = 1;
-                        bot.Log("another flying Slig at " + std::to_string(foe->mX) + "," + std::to_string(foe->mY) + ": behind it, to " + std::to_string(px) + "," + std::to_string(foe->mY));
+                        bot.Log("another flying Slig at " + std::to_string(foe->mX) + "," + std::to_string(foe->mY) + ": behind it, to " + std::to_string(px) + "," + std::to_string(py));
                     }
-                    return corners.empty() ? steerTo(px, foe->mY) : steerTo(corners[0].first, corners[0].second);
+                    return corners.empty() ? steerTo(px, py) : steerTo(corners[0].first, corners[0].second);
                 }
             }
             // In front of it, and it is not coming at him (then it is waited for with a grenade, at about its
