@@ -8840,7 +8840,45 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 sligsAhead = orb && slig;
             }
-            if (!mOrdersGiven.mFollow && (liftOnWay || (near && sligsAhead && std::abs(near->mX - me->mX) <= 150)))
+            // (the Slig help calls is made by a spawner only with its screen the one shown: with help called and none
+            // come, to that screen first. Zulag 14: "At the very right end, shout Help! and get the Slig to follow you
+            // back left to the lift", the spawner of 43 at 1775,780; called from 687,980, none came.)
+            bool toHelp = false;
+            if (!mOrdersGiven.mFollow && liftOnWay && !near)
+            {
+                const s32 myCam = bot.Nav().CameraOf(me->mX, me->mY - 5);
+                for (const Entity& spawner : world.mEntities)
+                {
+                    if (toHelp || spawner.mKind != EntityKind::eSlig || spawner.mGone || spawner.mSwitch <= 1 || spawner.mHalf != me->mHalf || world.Switch(spawner.mSwitch) == 0 ||
+                        std::find(world.mGlukkonHelp.begin(), world.mGlukkonHelp.end(), spawner.mSwitch) == world.mGlukkonHelp.end())
+                    {
+                        continue;
+                    }
+                    const s32 land = Domain::SligNode(bot.Nav(), spawner);
+                    if (land < 0 || bot.Nav().CameraOf(bot.Nav().Nodes()[land].mX, bot.Nav().Nodes()[land].mY - 5) == myCam)
+                    {
+                        continue;
+                    }
+                    const NavNode& at = bot.Nav().Nodes()[land];
+                    std::vector<s32> helpNodes;
+                    std::vector<bool> helpHops;
+                    std::vector<bool> helpLifts;
+                    if (Domain::GlukkonWayTo(bot.Nav(), world, me->mX, me->mY, me->mHalf, at.mX - 100, at.mX + 100, at.mY, nullptr, &helpNodes, &helpHops, &helpLifts) && helpNodes.size() >= 2 &&
+                        std::find(helpLifts.begin(), helpLifts.end(), true) == helpLifts.end())
+                    {
+                        if (!mToHelp)
+                        {
+                            mToHelp = true;
+                            bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": to the screen of the spawner of " + std::to_string(spawner.mSwitch) + " at " + std::to_string(at.mX) + "," + std::to_string(at.mY) + ", whose Slig its help calls");
+                        }
+                        toHelp = true;
+                        nodes = helpNodes;
+                        hops = helpHops;
+                        lifts = helpLifts;
+                    }
+                }
+            }
+            if (!toHelp && !mOrdersGiven.mFollow && (liftOnWay || (near && sligsAhead && std::abs(near->mX - me->mX) <= 150)))
             {
                 if (me->mMotion != 0 || mOrdersGiven.mQuiet > 0)
                 {

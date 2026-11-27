@@ -391,6 +391,8 @@ private:
     bool mChantHere = false;
     // "Hey" and "Come here" said to a Slig behind it before a jump
     s32 mGapCalls = 0;
+    // On its way to the screen of the spawner of the Slig its help calls
+    bool mToHelp = false;
     s32 mWalked = 0;
     // Frames in the lock's box since it was come into (or since the last try), and the tries
     s32 mInBox = 0;
