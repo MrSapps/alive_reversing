@@ -1917,6 +1917,7 @@ void NavGraph::Build(const NavInput& input)
             {
                 bool needed = false;
                 s32 overTrap = -1;
+                bool overPlate = false;
                 for (s32 k = 1; k <= 2; k++)
                 {
                     const s32 mx = k == 1 ? nx : StepX(nx, dir, n.mHalf);
@@ -1931,12 +1932,18 @@ void NavGraph::Build(const NavInput& input)
                     {
                         overTrap = mNodes[mid].mTrapDoor;
                     }
+                    // (or a plate there, hopped over not to be stepped on: Zulag 13's at 1175..1199,1140 turns on the
+                    // electric wall at 1250 that is off)
+                    else if (mInput.mIsAe && FeatureAt(FeatureKind::ePlate, mx, my - 5, n.mHalf))
+                    {
+                        overPlate = true;
+                    }
                 }
                 const s32 to = NodeOnLine(hopLine, hx);
                 // (a trap door is a gap while it is open, and only then: shut it is floor, and walked over. Hopped
                 // from floor to floor.)
                 const bool trapOnly = !needed && overTrap >= 0 && to >= 0 && n.mTrapDoor < 0 && mNodes[to].mTrapDoor < 0;
-                if ((needed || trapOnly) && to >= 0 && std::abs(mNodes[to].mX - hx) <= step / 2 && !mNodes[to].mHazard)
+                if ((needed || trapOnly || overPlate) && to >= 0 && std::abs(mNodes[to].mX - hx) <= step / 2 && !mNodes[to].mHazard)
                 {
                     const s32 barrier = BarrierBetween(n.mX, n.mX + dir * step * 3, n.mY, n.mHalf);
                     AddEdge(edges, from, to, EdgeKind::eHop, kHopCost, trapOnly && barrier < 0 ? overTrap : barrier, left);
