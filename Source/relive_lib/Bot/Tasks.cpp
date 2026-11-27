@@ -16179,7 +16179,10 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             // (on the way to a lever, not one behind it: it is flown away from. The Barracks' path 14: the
             // one the lever of 214 lets out at 786, with the next lever the other way.)
             const s32 goal = lever ? lever->CentreX() : bx;
-            if (lever && (f.mX - bx) * (goal - bx) < 0 && std::abs(f.mX - bx) > 60)
+            // (but not one that faces this way at the lever's height: the way up to the lever is into its sight.
+            // Zulag 11: the one at 2129,1140 by the lever at 1962,1200, "kill the flying Slig and pull the lever".)
+            const bool watches = lever && f.mFacingLeft == (bx < f.mX) && std::abs(f.mY - lever->mY2) < 90;
+            if (lever && !watches && (f.mX - bx) * (goal - bx) < 0 && std::abs(f.mX - bx) > 60)
             {
                 continue;
             }
