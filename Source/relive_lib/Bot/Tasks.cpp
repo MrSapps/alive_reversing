@@ -16631,8 +16631,37 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             mBoxSeen.mBoxOver = std::max(mBoxSeen.mBoxOver, world.mFlown.mBoxOver);
             mBoxSeen.mBoxUnder = std::max(mBoxSeen.mBoxUnder, world.mFlown.mBoxUnder);
             const FlownAt& fl = mBoxSeen;
-            const auto covered = [&nav, &fl](s32 x, s32 y)
+            // (and anywhere on a screen with no Sligs of the background, nor one within 40. Zulag 11: the way up to the
+            // lever at 1962,1200 was all "in the open", and no plan was found.)
+            // (the screens of the Sligs of the background: those the map has of the other size from the flying Slig,
+            // and those seen there. Not every screen with crates: Zulag 11's screen over the shaft to the lever has
+            // crates and none of them.)
+            std::vector<s32> crateCams;
+            for (const Entity& e : world.mEntities)
             {
+                if (e.mKind == EntityKind::eSlig && !e.mGone && e.mHalf != flown.mHalf)
+                {
+                    crateCams.push_back(nav.CameraOf(e.CentreX(), e.mY2 - 5));
+                }
+            }
+            for (const SligAt& sl : world.mSligs)
+            {
+                if (sl.mZShoot && !sl.mPossessed)
+                {
+                    crateCams.push_back(nav.CameraOf(sl.mX, sl.mY - 5));
+                }
+            }
+            const auto covered = [&nav, &fl, &crateCams](s32 x, s32 y)
+            {
+                bool crates = false;
+                for (const s32 dx : {-40, 0, 40})
+                {
+                    crates = crates || std::find(crateCams.begin(), crateCams.end(), nav.CameraOf(x + dx, y)) != crateCams.end();
+                }
+                if (!crates)
+                {
+                    return true;
+                }
                 for (const NavFeature& f : nav.Input().mFeatures)
                 {
                     if (f.mKind == FeatureKind::eZCover && f.mX1 <= x - std::max(fl.mBoxLeft, fl.mBoxRight) - 2 && x + std::max(fl.mBoxLeft, fl.mBoxRight) + 2 <= f.mX2 &&
@@ -16735,7 +16764,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                         py = cy;
                     }
                 }
-                const s32 need = open / 3 + (ends && open > 0 ? 40 : 0) + 15;
+                const s32 need = open / 3 + (ends && open > 0 ? 40 : 0) + 10;
                 // (how long each keeps its back to it, from what it has been seen to do: a Slig that stands turns
                 // to and fro on a timer, Zulag 11's at 1417,1399 away for 142..168 frames and back for 13; one that
                 // walks a beat as its walk and pause. The least seen yet, and none known until one whole time
@@ -16819,18 +16848,25 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                                                                      }
                                                                  }
                                                                  return least == 100000 ? 60 : least;
-                                                             }()) - 15) * 3);
+                                                             }()) - 10) * 3);
                     // (and again when other Sligs come to be seen: those of the next screen are not seen from this
                     // one, and the plan was made without them)
+                    // (and when what is known of how long they keep their backs to it changes)
+                    s32 watchSum = 0;
+                    for (const auto& kv : mZWatch)
+                    {
+                        watchSum += kv.second.mLeast[0] * 7 + kv.second.mLeast[1] * 13 + static_cast<s32>(kv.first % 1000);
+                    }
                     s32 sligsKnown = 0;
                     for (const SligAt& sl : world.mSligs)
                     {
                         sligsKnown += sl.mAsleep || sl.mPossessed ? 0 : 1;
                     }
-                    if ((mCoverPlan.empty() && (std::abs(mCoverPlanX - bx) > 10 || std::abs(mCoverPlanY - by) > 10)) || mCoverPlanGoal != shot.mWaitX * 4096 + shot.mWaitY || mCoverPlanBudget != budget || mCoverPlanSligs != sligsKnown)
+                    if ((mCoverPlan.empty() && (std::abs(mCoverPlanX - bx) > 10 || std::abs(mCoverPlanY - by) > 10)) || mCoverPlanGoal != shot.mWaitX * 4096 + shot.mWaitY || mCoverPlanBudget != budget || mCoverPlanSligs != sligsKnown || mCoverPlanWatch != watchSum)
                     {
                         mCoverPlanBudget = budget;
                         mCoverPlanSligs = sligsKnown;
+                        mCoverPlanWatch = watchSum;
                         mCoverPlanX = bx;
                         mCoverPlanY = by;
                         mCoverPlanGoal = shot.mWaitX * 4096 + shot.mWaitY;
@@ -16947,6 +16983,50 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                             }
                             return n;
                         };
+                        // (how far in the open a link may go: as long as the Sligs of the background on the screens
+                        // it crosses in the open have been seen to keep their backs to it, the least of them, 60 frames
+                        // for one not yet seen through a whole time; the others are not there to see it. Zulag 11: the
+                        // shaft up to the lever at 2037 is 275 in the open, only under the Slig of screen 8.)
+                        const auto linkBudget = [&](const std::vector<std::pair<s32, s32>>& line)
+                        {
+                            std::vector<s32> cams;
+                            for (std::size_t k = 1; k < line.size(); k++)
+                            {
+                                const s32 ax = line[k - 1].first;
+                                const s32 ay = line[k - 1].second;
+                                const s32 len = std::max(std::abs(line[k].first - ax), std::abs(line[k].second - ay));
+                                for (s32 d = 5; d <= len; d += 5)
+                                {
+                                    const s32 qx = ax + (line[k].first - ax) * d / len;
+                                    const s32 qy = ay + (line[k].second - ay) * d / len;
+                                    if (!covered(qx, qy))
+                                    {
+                                        for (const s32 dx : {-40, 0, 40})
+                                        {
+                                            if (std::find(cams.begin(), cams.end(), nav.CameraOf(qx + dx, qy)) == cams.end())
+                                            {
+                                                cams.push_back(nav.CameraOf(qx + dx, qy));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            s32 least = 100000;
+                            bool any = false;
+                            for (const auto& kv : mZWatch)
+                            {
+                                if (std::find(cams.begin(), cams.end(), static_cast<s32>(kv.first / 4096u)) == cams.end())
+                                {
+                                    continue;
+                                }
+                                any = true;
+                                for (const s32 l : kv.second.mLeast)
+                                {
+                                    least = std::min(least, l >= 0 ? l : 60);
+                                }
+                            }
+                            return std::max(0, ((any ? least : 60) - 10) * 3);
+                        };
                         const std::size_t n = zones.size();
                         // (each link: its way, from a place of the one zone to a place of the other)
                         std::vector<std::vector<std::vector<std::pair<s32, s32>>>> link(n, std::vector<std::vector<std::pair<s32, s32>>>(n));
@@ -16973,7 +17053,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                                     const s32 cx = j % 3 == 0 ? zb.mX1 : j % 3 == 1 ? (zb.mX1 + zb.mX2) / 2 : zb.mX2;
                                     const s32 cy = j / 3 == 0 ? zb.mY1 : j / 3 == 1 ? (zb.mY1 + zb.mY2) / 2 : zb.mY2;
                                     const s32 far = std::abs(cx - px) + std::abs(cy - py);
-                                    if (std::max(std::abs(cx - px), std::abs(cy - py)) <= budget + 200)
+                                    if (std::max(std::abs(cx - px), std::abs(cy - py)) <= budget + 400)
                                     {
                                         tries.push_back({far, px, py, cx, cy});
                                     }
@@ -17007,7 +17087,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                                         way.push_back({cx, cy});
                                     }
                                     const s32 o = openAlong(way);
-                                    if (o <= budget && (bestO < 0 || o < bestO))
+                                    if (o <= linkBudget(way) && (bestO < 0 || o < bestO))
                                     {
                                         bestO = o;
                                         best = way;
@@ -17118,7 +17198,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                             ax = mCoverPlan[k].first;
                             ay = mCoverPlan[k].second;
                         }
-                        if (o == 0 || backFor(on, oX1, oX2, bx, mCoverPlan[upTo].first) >= o / 3 + 15)
+                        if (o == 0 || backFor(on, oX1, oX2, bx, mCoverPlan[upTo].first) >= o / 3 + 10)
                         {
                             const std::pair<s32, s32> hop = mCoverPlan[upTo];
                             bot.Log("in cover at " + std::to_string(bx) + "," + std::to_string(by) + ": over to " + std::to_string(hop.first) + "," + std::to_string(hop.second) + " (" + std::to_string(upTo + 1) + " legs), " + std::to_string(o) + " in the open, while the Sligs of the background have their backs to it");

@@ -2028,6 +2028,7 @@ private:
     s32 mCoverPlanGoal = 0;
     s32 mCoverPlanBudget = -1;
     s32 mCoverPlanSligs = -1;
+    s32 mCoverPlanWatch = -1;
     bool mZGoing = false;
     s32 mZRetries = 0;
     bool mRetarget = false;
