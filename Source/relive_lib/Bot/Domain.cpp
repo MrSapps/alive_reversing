@@ -2917,7 +2917,26 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
             const NavEdge& e = nav.Edges()[edge];
             s32 condSwitch = 0;
             s32 condValue = 0;
-            if (nav.Condition(e, &condSwitch, &condValue))
+            // (and through a danger a switch stops, stopped: a Mudokon is not timed through drills as he is. The
+            // final Zulag: "'Work' together, then get him to 'Follow me' again right past the drills to the lift",
+            // the three of 210 at 1675..1799,980 that his wheels of 204 and 205 stop)
+            bool danger = false;
+            const NavNode& into = nav.Nodes()[e.mTo];
+            for (const s32 sweep : {into.mSweep, into.mSweepHigh})
+            {
+                const NavFeature* f = sweep >= 0 ? &nav.Input().mFeatures[sweep] : nullptr;
+                for (const Entity& drill : f && !danger ? world.mEntities : std::vector<Entity>{})
+                {
+                    // (a drill its switch turns on and off: Drill.cpp, one that starts on runs while that is off)
+                    if (drill.mKind == EntityKind::eDrill && drill.mX1 == f->mX1 && drill.mY1 == f->mY1 && drill.mSwitch > 1 && drill.mInputs[0] == 1)
+                    {
+                        danger = true;
+                        condSwitch = drill.mSwitch;
+                        condValue = drill.mInputs[1] ? 1 : 0;
+                    }
+                }
+            }
+            if (danger || nav.Condition(e, &condSwitch, &condValue))
             {
                 const Goap::Fact fact{Key::Switch(condSwitch), condValue};
                 bool have = false;
