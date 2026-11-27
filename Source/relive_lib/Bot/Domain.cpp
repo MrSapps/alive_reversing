@@ -700,7 +700,11 @@ s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s
                     for (s32 i = n.mFirstEdge; i < n.mFirstEdge + n.mEdgeCount && next < 0; i++)
                     {
                         const NavEdge& e = nav.Edges()[i];
-                        if (e.mKind == EdgeKind::eWalk && nav.Nodes()[e.mTo].mLine == n.mLine && (nav.Nodes()[e.mTo].mX - n.mX) * side > 0)
+                        // (nor a door: a walk that waits on a switch. The final Zulag's Shrykull portal at 1287,980, with
+                        // the slam door of 200, which its own rescue opens, two cells to the left of it.)
+                        s32 sw = 0;
+                        s32 value = 0;
+                        if (e.mKind == EdgeKind::eWalk && nav.Nodes()[e.mTo].mLine == n.mLine && (nav.Nodes()[e.mTo].mX - n.mX) * side > 0 && !nav.Condition(e, &sw, &value))
                         {
                             next = e.mTo;
                         }
