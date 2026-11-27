@@ -793,6 +793,22 @@ s32 NavGraph::WellOut(s32 featureIdx, s32 when, s32 depth, s32 knownSwitch, s32 
             const s32 line = FloorBelow(centre + 2 * GridStep(f.mHalf), f.mY1 - 20, f.mHalf, &fy);
             return line >= 0 ? NodeOnLine(line, centre + 2 * GridStep(f.mHalf)) : -1;
         }
+        // (thrown up to a point a little under a floor, he goes on up past it and comes down on that floor.
+        // Measured in Zulag 12: the well at 450,640 throws him to 479,533, and he lands on the floor at 480 by the
+        // open trap door, not back down on the ledge at 660 the well is on)
+        if (y < f.mY1 - 40)
+        {
+            s32 fy = 0;
+            const s32 line = FloorBelow(x, y - 80, f.mHalf, &fy);
+            if (line >= 0 && fy < y && y - fy <= 80)
+            {
+                const s32 on = NodeOnLine(line, x);
+                if (on >= 0)
+                {
+                    return on;
+                }
+            }
+        }
         return Thrown(x, y, centre, f.mHalf, depth, knownSwitch, knownValue);
     }
     // An express well: he is put in the well it names in the camera it names, and shot out of that one
