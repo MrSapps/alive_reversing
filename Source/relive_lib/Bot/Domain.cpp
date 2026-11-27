@@ -1391,15 +1391,57 @@ s32 Domain::SligLockPerch(const NavGraph& nav, const World& world, const Entity&
     {
         return -1;
     }
-    const s32 cam = nav.CameraOf(lock.CentreX(), lock.mY2 - 5);
-    for (const Entity& e : world.mEntities)
+    const auto orbOn = [&](s32 cam)
     {
-        if (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam)
+        bool orb = false;
+        for (const Entity& e : world.mEntities)
         {
-            return -1;
+            orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
         }
-    }
+        return orb;
+    };
+    const s32 cam = nav.CameraOf(lock.CentreX(), lock.mY2 - 5);
     const NavNode& floor = nav.Nodes()[start];
+    if (orbOn(cam))
+    {
+        // With one on the lock's screen too: from a ledge over the Slig's floor where it goes on to another screen
+        // with none, off that floor (the Slig comes after him that far and can't get up). Zulag 14: "Jump over him,
+        // running right, and jump over the long gap again. Hoist up, run and jump to the upper right platform, and
+        // possess the Slig from there", the one at 2150..2250,360 over the floor at 1600..2000,460.
+        s32 ledge = -1;
+        s32 ledgeOff = 0;
+        for (s32 n = 0; n < static_cast<s32>(nav.Nodes().size()); n++)
+        {
+            const NavNode& at = nav.Nodes()[n];
+            const s32 there = nav.CameraOf(at.mX, at.mY - 5);
+            if (at.mHalf != floor.mHalf || at.mHazard || at.mLine == floor.mLine || there == cam || orbOn(there) || at.mY > floor.mY - 45 || floor.mY - at.mY > 150)
+            {
+                continue;
+            }
+            // (the Slig's floor goes on to that screen)
+            s32 near = -1;
+            for (s32 m = 0; m < static_cast<s32>(nav.Nodes().size()); m++)
+            {
+                const NavNode& on = nav.Nodes()[m];
+                if (on.mLine == floor.mLine && on.mHalf == floor.mHalf && nav.CameraOf(on.mX, on.mY - 5) == there && (near < 0 || std::abs(on.mX - at.mX) < std::abs(nav.Nodes()[near].mX - at.mX)))
+                {
+                    near = m;
+                }
+            }
+            if (near < 0)
+            {
+                continue;
+            }
+            // (the one nearest the end of it)
+            const s32 off = std::abs(at.mX - nav.Nodes()[near].mX);
+            if (ledge < 0 || off < ledgeOff)
+            {
+                ledge = n;
+                ledgeOff = off;
+            }
+        }
+        return ledge;
+    }
     s32 best = -1;
     for (const NavEdge& e : nav.Edges())
     {

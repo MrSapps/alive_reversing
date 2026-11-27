@@ -559,7 +559,8 @@ struct Domain final
     static bool AtSligLock(const NavGraph& nav, const Entity& lock, s32 node);
     // With an orb on the screen of the lever that calls the Slig for a lock: where to take it over from instead.
     // Out of a well of the Slig's floor on the lock's screen, on another level there, with no orb on that screen
-    // (the Slig comes after him to the well). Or -1.
+    // (the Slig comes after him to the well). With one on the lock's screen too, a ledge over the end of the
+    // Slig's floor on the next screen instead. Or -1.
     static s32 SligLockPerch(const NavGraph& nav, const World& world, const Entity& lock, const Entity& slig);
     // The Sligs (entities) a Slig on the cells of a way walks into: those on the same stretches of floor, with
     // no gate or wall between
