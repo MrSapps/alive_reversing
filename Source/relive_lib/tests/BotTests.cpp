@@ -8102,9 +8102,10 @@ TEST(BotFlierTargets, ASligUnderASecurityOrbIsOneForTheFlyingSligWithThePlacesTo
     World given = FlierColumnWorld();
     given.mNoBomb.insert(1001);
     EXPECT_TRUE(Domain::FlierTargets(in, given, given.mEntities[0]).empty());
+    // (twice a flight for a Slig, Domain::FlierTargets: Zulag 11's are four screens down from the spawner)
     World far = FlierColumnWorld();
-    far.mEntities[0].mX1 += 1100;
-    far.mEntities[0].mX2 += 1100;
+    far.mEntities[0].mX1 += 2500;
+    far.mEntities[0].mX2 += 2500;
     EXPECT_TRUE(Domain::FlierTargets(in, far, far.mEntities[0]).empty());
     // (a Slig a spawner makes is not there to be thrown at)
     World spawned = FlierColumnWorld();

@@ -345,7 +345,8 @@ struct Domain final
     // A way through the air for a flying Slig (FartFlight::Route) that keeps to the screens the path has:
     // those with something of its floors and walls in them. Past the last screen there is nothing to stop a
     // way on the grid, and nothing to fly in either.
-    static bool FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 toX, s32 toY, const std::vector<NavLine>* shut, std::vector<std::pair<s32, s32>>& corners);
+    // (world: where the lifts are, whose platforms are in the way at their stops; without it no lift stop is)
+    static bool FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 toX, s32 toY, const std::vector<NavLine>* shut, std::vector<std::pair<s32, s32>>& corners, const World* world = nullptr);
     // How near such a Slig, along its floor and up or down from it, a cell is one it shoots him in
     static const s32 kFlierTargetX = 250;
     static const s32 kFlierTargetY = 30;

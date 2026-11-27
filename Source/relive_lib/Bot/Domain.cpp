@@ -7841,7 +7841,7 @@ void Domain::Builder::Fliers()
             {
                 const FlierFlight::Shot pull = FlierFlight::LeverPull(lever.CentreX(), lever.mY2 - 4, side == 1);
                 std::vector<std::pair<s32, s32>> corners;
-                way = FlierWay(nav.Input(), spawner.mHalf, fromX, fromY, pull.mX, pull.mY, &shut, corners);
+                way = FlierWay(nav.Input(), spawner.mHalf, fromX, fromY, pull.mX, pull.mY, &shut, corners, &world);
             }
             const std::string own = "Use " + std::string(EntityKindName(lever.mKind)) + "#" + std::to_string(lever.mId) + " sw" + std::to_string(lever.mSwitch) + " o";
             const std::size_t count = d.mActions.size();
@@ -7894,7 +7894,7 @@ void Domain::Builder::Fliers()
                 continue;
             }
             std::vector<std::pair<s32, s32>> corners;
-            if (!FlierWay(nav.Input(), spawner.mHalf, fromX, fromY, lock.CentreX(), (lock.mY1 + lock.mY2) / 2, &shut, corners))
+            if (!FlierWay(nav.Input(), spawner.mHalf, fromX, fromY, lock.CentreX(), (lock.mY1 + lock.mY2) / 2, &shut, corners, &world))
             {
                 continue;
             }
@@ -9297,9 +9297,24 @@ bool Domain::OnFlierTargetsFloor(const NavGraph& nav, const FlierTarget& target,
     return !target.mMine && std::abs(n.mY - target.mFloorY) <= kFlierTargetY && std::abs(n.mX - target.mX) <= kFlierTargetX;
 }
 
-bool Domain::FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 toX, s32 toY, const std::vector<NavLine>* shut, std::vector<std::pair<s32, s32>>& corners)
+bool Domain::FlierWay(const NavInput& built, bool half, s32 fromX, s32 fromY, s32 toX, s32 toY, const std::vector<NavLine>* shut, std::vector<std::pair<s32, s32>>& corners, const World* world)
 {
     corners.clear();
+    // (without the floors NavGraph::Build makes of a lift's stops: a shaft is a way down through the air, Zulag 11's
+    // at 1179..1247 and 2129..2197. The platform itself is somewhere in it, and flown into it pushes it back.)
+    NavInput in = built;
+    in.mLines.erase(std::remove_if(in.mLines.begin(), in.mLines.end(), [&built, world](const NavLine& line)
+                                   {
+                                       for (const NavFeature& f : built.mFeatures)
+                                       {
+                                           if (f.mKind == FeatureKind::eLiftStop && line.mY1 == line.mY2 && line.mY1 == f.mY1 && line.mX1 == f.mX1 + 4 && line.mX2 == f.mX2 - 4)
+                                           {
+                                               return !world || !world->LiftAtStop(f.mX1, f.mX2, f.mY1, f.mA != 0);
+                                           }
+                                       }
+                                       return false;
+                                   }),
+                   in.mLines.end());
     // It is 17 to each side of its point: every floor and ceiling as much longer at each end, every wall there
     // again as far to each side, so that the way keeps its sides clear of their ends (measured in the Barracks'
     // path 1: flown up past the end of a ledge with its point two pixels clear of it, it hung under the ledge)
@@ -9355,7 +9370,7 @@ bool Domain::FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 t
         }
     }
     std::vector<FartFlight::Point> way;
-    if (!FartFlight::Route(in, half, FartFlight::Point{fromX, fromY}, FartFlight::Point{toX, toY}, 2000, way, nullptr, &more))
+    if (!FartFlight::Route(in, half, FartFlight::Point{fromX, fromY}, FartFlight::Point{toX, toY}, 4000, way, nullptr, &more))
     {
         // The way is looked for on a grid 25 wide, and a gap it fits through with little to spare may lie
         // between two of the grid's columns: looked for again with everything a little to one side. (The
@@ -9376,7 +9391,7 @@ bool Domain::FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 t
                 line.mX1 += shift;
                 line.mX2 += shift;
             }
-            if (FartFlight::Route(moved, half, FartFlight::Point{fromX + shift, fromY}, FartFlight::Point{toX + shift, toY}, 2000, way, nullptr, &movedMore))
+            if (FartFlight::Route(moved, half, FartFlight::Point{fromX + shift, fromY}, FartFlight::Point{toX + shift, toY}, 4000, way, nullptr, &movedMore))
             {
                 for (FartFlight::Point& p : way)
                 {
@@ -9756,8 +9771,28 @@ std::vector<Domain::OrbTarget> Domain::OrbTargets(const NavInput& in, const Worl
     return targets;
 }
 
-std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& in, const World& world, const Entity& spawner)
+std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& marked, const World& world, const Entity& spawner)
 {
+    // (without the floors kept off for its targets, GameView's MarkFlierTargets: those are no walls in the air, and
+    // with them in the planning saw every grenade and way blocked. Zulag 11's Sligs at 1650 and 1750.)
+    NavInput in = marked;
+    // (nor the floors NavGraph::Build makes of a lift's stops: the platform is at one of them, and the shaft is the
+    // way down through the air. Zulag 11's flying Slig, down the lift shafts at 1179..1247 and 2129..2197.)
+    in.mLines.erase(std::remove_if(in.mLines.begin(), in.mLines.end(), [&marked, &world](const NavLine& line)
+                                   {
+                                       for (const NavFeature& f : marked.mFeatures)
+                                       {
+                                           if (f.mKind == FeatureKind::eLiftStop && line.mY1 == line.mY2 && line.mY1 == f.mY1 && line.mX1 == f.mX1 + 4 && line.mX2 == f.mX2 - 4)
+                                           {
+                                               return !world.LiftAtStop(f.mX1, f.mX2, f.mY1, f.mA != 0);
+                                           }
+                                       }
+                                       return false;
+                                   }),
+                   in.mLines.end());
+    in.mFeatures.erase(std::remove_if(in.mFeatures.begin(), in.mFeatures.end(), [](const NavFeature& f)
+                                      { return f.mKind == FeatureKind::eDanger && f.mA == 1 && f.mSwitch == World::HazardSwitch(f.mId); }),
+                       in.mFeatures.end());
     std::vector<FlierTarget> targets;
     const FartFlight::Point from{spawner.CentreX(), (spawner.mY1 + spawner.mY2) / 2};
     // What is shut as things are (gates, electric walls, trap doors), and which feature each is
@@ -9799,7 +9834,9 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& in, const 
             }
         }
         // (and within a flight of the spawner: a way through the air is not looked for to the other end of the path)
-        if (!orb || floorY < 0 || floorY - slig.mY1 > 60 || std::abs(slig.CentreX() - from.mX) + std::abs(floorY - from.mY) > kFlierReach)
+        // (twice as far for Sligs: Zulag 11's flying Slig is let out at the top left and its Sligs are four screens
+        // down)
+        if (!orb || floorY < 0 || floorY - slig.mY1 > 60 || std::abs(slig.CentreX() - from.mX) + std::abs(floorY - from.mY) > (mine ? kFlierReach : 2 * kFlierReach))
         {
             continue;
         }
@@ -9853,9 +9890,9 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& in, const 
                 can = can && FartFlight::Open(in, slig.mHalf, FartFlight::Point{shot.mWaitX + side, shot.mWaitY}, FartFlight::Point{shot.mX + side, shot.mY - kFlierSide});
             }
             std::vector<std::pair<s32, s32>> corners;
-            if (can && !FlierWay(in, slig.mHalf, from.mX, from.mY, shot.mWaitX, shot.mWaitY, &shut, corners))
+            if (can && !FlierWay(in, slig.mHalf, from.mX, from.mY, shot.mWaitX, shot.mWaitY, &shut, corners, &world))
             {
-                can = FlierWay(in, slig.mHalf, from.mX, from.mY, shot.mWaitX, shot.mWaitY, nullptr, corners);
+                can = FlierWay(in, slig.mHalf, from.mX, from.mY, shot.mWaitX, shot.mWaitY, nullptr, corners, &world);
                 std::vector<FartFlight::Point> way;
                 for (const std::pair<s32, s32>& corner : corners)
                 {

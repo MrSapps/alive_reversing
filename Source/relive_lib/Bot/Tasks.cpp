@@ -15597,7 +15597,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 std::vector<std::pair<s32, s32>> corners;
                 const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
-                if (Domain::FlierWay(nav.Input(), flown.mHalf, flown.mX100 / 100, flown.mY100 / 100, e.CentreX(), (e.mY1 + e.mY2) / 2, &gatesNow, corners))
+                if (Domain::FlierWay(nav.Input(), flown.mHalf, flown.mX100 / 100, flown.mY100 / 100, e.CentreX(), (e.mY1 + e.mY2) / 2, &gatesNow, corners, &bot.GetWorld()))
                 {
                     mLock = e.mId;
                     bot.Log("SligLock#" + std::to_string(e.mId) + " is shut and the flying Slig can get to it: that first");
@@ -16016,7 +16016,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                             const s64 dy = line.mY1 + ly * k / 1000 - (gy - 15);
                             std::vector<std::pair<s32, s32>> corners;
                             const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
-                            if (dx * dx + dy * dy <= 100 && Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, x, y, &gatesNow, corners))
+                            if (dx * dx + dy * dy <= 100 && Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, x, y, &gatesNow, corners, &bot.GetWorld()))
                             {
                                 found = true;
                                 mAmbushX = x;
@@ -16055,7 +16055,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 std::vector<std::pair<s32, s32>> corners;
                 const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
-                Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, mAmbushFromX, mAmbushFromY, &gatesNow, corners);
+                Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, mAmbushFromX, mAmbushFromY, &gatesNow, corners, &bot.GetWorld());
                 return corners.empty() ? steerTo(mAmbushFromX, mAmbushFromY) : steerTo(corners[0].first, corners[0].second);
             }
         }
@@ -16086,7 +16086,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 std::vector<std::pair<s32, s32>> corners;
                 const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
-                Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, mAmbushX, mAmbushY, &gatesNow, corners);
+                Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, mAmbushX, mAmbushY, &gatesNow, corners, &bot.GetWorld());
                 return corners.empty() ? steerTo(mAmbushX, mAmbushY) : steerTo(corners[0].first, corners[0].second);
             }
             else if (flown.mMotion == 0 && flown.mFacingLeft != left)
@@ -16170,7 +16170,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                 const s32 px = foe->mX + (east ? 100 : -100);
                 std::vector<std::pair<s32, s32>> corners;
                 const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
-                if (std::abs(px - bx) + std::abs(foe->mY - by) > 12 && Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, px, foe->mY, &gatesNow, corners))
+                if (std::abs(px - bx) + std::abs(foe->mY - by) > 12 && Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, px, foe->mY, &gatesNow, corners, &bot.GetWorld()))
                 {
                     if (mFoeSaid != 1)
                     {
@@ -16221,7 +16221,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             const s32 column = mFoeX + (mFoeLeft ? 3 : -3);
             std::vector<std::pair<s32, s32>> corners;
             const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
-            if (++mFoeRoundFrames > 400 || (std::abs(column - bx) <= 4 && still) || !Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, column, mSafeY, &gatesNow, corners))
+            if (++mFoeRoundFrames > 400 || (std::abs(column - bx) <= 4 && still) || !Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, column, mSafeY, &gatesNow, corners, &bot.GetWorld()))
             {
                 mFoeRound = false;
                 mState = 0;
@@ -16370,7 +16370,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         const std::vector<NavLine> gates = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
         // (to a little way out from where it waits: it faces the way it flies, so it is to come to that place
         // flying at the Slig)
-        if (!Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, shot.mWaitX + (shot.mFaceLeft ? kFlierRunIn : -kFlierRunIn), shot.mWaitY, &gates, mWay))
+        if (!Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, shot.mWaitX + (shot.mFaceLeft ? kFlierRunIn : -kFlierRunIn), shot.mWaitY, &gates, mWay, &bot.GetWorld()))
         {
             bot.Log("no way through the air from " + std::to_string(bx) + "," + std::to_string(by) + " to " + std::to_string(shot.mWaitX) + "," + std::to_string(shot.mWaitY));
             mShot++;
