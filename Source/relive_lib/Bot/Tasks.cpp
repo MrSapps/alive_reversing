@@ -11055,7 +11055,7 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
     // Sorry is said with a pat on the back, from the cell next to it. Anything else from a cell or two away.
     // (and so is a slap)
     // (for the sorry that is still to be said: once said, a sad one stays sad, and is talked to as any other)
-    const bool close = mud->mLive && ((mud->mMood == MudMood::eUpset && mSaidHello && mSorries < 3) || (mud->mMood == MudMood::eWired && mCalm));
+    const bool close = mud->mLive && ((mud->mMood == MudMood::eUpset && (mSaidHello || mud->mState / 100 == 8) && mSorries < 3) || (mud->mMood == MudMood::eWired && mCalm));
     s32 minHalf = close ? 1 : 3;
     const s32 maxHalf = close ? 3 : 5;
     // (from the next cell where no cell a cell or two away on its floor can be got to: Zulag 5's Mudokon at
@@ -11189,7 +11189,10 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
     bot.Log("talk to Mudokon#" + std::to_string(mMud) + " at " + std::to_string(mud->mLiveX) + " mood " + std::to_string(static_cast<s32>(mud->mMood)) + (mud->mFollowing ? " following" : "") + " state " + std::to_string(mud->mState));
     // (hello until it listens: a sorry is heard only then. The final Zulag's at 1562,980, "Say 'Hi' and 'Sorry' to
     // the Mudokon, then get him to follow you": told sorry as it scrubbed, for 1200 frames.)
-    if (!listening && !mud->mFollowing)
+    // (not an angry one at its lever, Brain_8_AngryWorker: that hears nothing but sorry. The final Zulag's at
+    // 1262,1500, the lever of the trap door of 16.)
+    const bool angry = mud->mState / 100 == 8;
+    if (!listening && !mud->mFollowing && !angry)
     {
         mSaidHello = true;
         return TaskStep::Do(Prim::Press(bot.SpeakHello(), 6));
