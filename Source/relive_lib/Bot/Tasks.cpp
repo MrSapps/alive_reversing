@@ -13771,7 +13771,9 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
         {
             const s32 n = nav.NodeAt(nav.Nodes()[fromNode].mX + dir * cells * cell, nav.Nodes()[fromNode].mY, farWheel->mHalf, 8);
             std::vector<s32> path;
-            if (n >= 0 && nav.CameraOf(nav.Nodes()[n].mX, nav.Nodes()[n].mY - 5) == cam && nav.FindPath(fromNode, n, [](const NavEdge& e)
+            // (and not a lift's stop: no floor there without the lift. The final Zulag: 1212,1500, past wheel 17, the
+            // stop of the lift that 55 sends down)
+            if (n >= 0 && nav.Nodes()[n].mLiftStop < 0 && nav.CameraOf(nav.Nodes()[n].mX, nav.Nodes()[n].mY - 5) == cam && nav.FindPath(fromNode, n, [](const NavEdge& e)
                                        { return e.mKind == EdgeKind::eWalk && e.mFeature < 0 ? e.mCost : -1; }, path))
             {
                 return n;
