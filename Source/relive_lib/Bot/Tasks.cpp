@@ -13603,13 +13603,16 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
     const s32 cell = NavGraph::GridStep(farWheel->mHalf);
     const s32 away = farWheel->CentreX() >= mTeam.mFromX ? 1 : -1;
     // A cell up to so many on from a wheel, by plain floor
+    // (on the wheel's screen: one gone off it has the ones stopped at the wheels come after him again. The final
+    // Zulag: past wheel 205 at 1812 to 1887, on the next screen, and the Mudokon left wheel 204 for him.)
     const auto beyond = [&](s32 fromNode, s32 dir, s32 cells)
     {
+        const s32 cam = nav.CameraOf(nav.Nodes()[fromNode].mX, nav.Nodes()[fromNode].mY - 5);
         for (; cells >= 1; cells--)
         {
             const s32 n = nav.NodeAt(nav.Nodes()[fromNode].mX + dir * cells * cell, nav.Nodes()[fromNode].mY, farWheel->mHalf, 8);
             std::vector<s32> path;
-            if (n >= 0 && nav.FindPath(fromNode, n, [](const NavEdge& e)
+            if (n >= 0 && nav.CameraOf(nav.Nodes()[n].mX, nav.Nodes()[n].mY - 5) == cam && nav.FindPath(fromNode, n, [](const NavEdge& e)
                                        { return e.mKind == EdgeKind::eWalk && e.mFeature < 0 ? e.mCost : -1; }, path))
             {
                 return n;
