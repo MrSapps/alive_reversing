@@ -10214,6 +10214,16 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
     const s32 node = Domain::UseNode(bot.Nav(), *entity, &faceLeft, mSide);
     // Under a drill that goes over his head: stood up only for as long as it is away
     const Entity* over = bot.AbeNode() == node ? GoToTask::SweepHigh(bot.Nav(), bot.GetWorld(), node) : nullptr;
+    // (a wheel on only while turned that calls a Glukkon in: done once that is out, its switch off again or not)
+    bool called = false;
+    for (const GlukkonAt& glukkon : bot.GetWorld().mGlukkons)
+    {
+        called = called || (entity->mKind == EntityKind::eWorkWheel && entity->mHoldOnly && mWant == 1 && glukkon.mSpawnSwitch == entity->mSwitch && glukkon.mOut);
+    }
+    if (called)
+    {
+        return bot.Abe().Settled() ? TaskStep::Done() : TaskStep::Do(Prim::Wait(2));
+    }
     if (bot.GetWorld().Switch(entity->mSwitch) == mWant)
     {
         // A lift it sends for: until that is there

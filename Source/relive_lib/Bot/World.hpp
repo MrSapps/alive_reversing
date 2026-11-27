@@ -429,6 +429,9 @@ struct GlukkonAt final
     s32 mMotion = 0;
     // The switch that calls it in again once it is dead (0: none): the game puts it back to 0 as it dies
     s32 mSpawnSwitch = 0;
+    // Out: one a switch calls in is there from the frames its switch is first on, whatever the switch is after
+    // (Glukkon::Brain_5_WaitToSpawn); till then it waits unseen and can't be taken over
+    bool mOut = true;
 };
 
 // A Glukkon of the path that a switch calls in, and where it comes

@@ -2206,6 +2206,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             glukkon.mPossessed = pObj == sControlledCharacter;
             glukkon.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
             glukkon.mSpawnSwitch = static_cast<const ::Glukkon*>(pObj)->SpawnSwitchId();
+            glukkon.mOut = pObj->GetCanBePossessed();
             world.mGlukkons.push_back(glukkon);
         }
     }

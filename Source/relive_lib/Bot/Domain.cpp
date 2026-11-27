@@ -2960,6 +2960,8 @@ struct Domain::Builder final
         bool mHalf = false;
         bool mPossessed = false;
         s32 mSpawn = 0;
+        // (called in and out: its switch is no matter any more)
+        bool mOut = false;
     };
     std::vector<GlukkonSource> GlukkonSources() const;
     // What a Glukkon is had to do (first, then what its way needs): by one he is in, from where he stands; else
@@ -4307,6 +4309,29 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
         {
             add("Throw meat for Paramite#" + std::to_string(shy) + " and get invisibility from " + name, withMeat(pre), {{Key::kInvis, 1}, {Key::kInvisNow, 1}}, 300, meatStep);
             d.mActions.back().mSpend = {Key::kMeat, 1};
+        }
+    }
+    // A wheel on only while it is turned that calls a Glukkon in: turned till that is out (Zulag 14: "climb up
+    // to the right and turn the wheel to summon a Glukkon. Possess him."). Its switch is planned as on: the
+    // Glukkon out is planned with as if it were (addForGlukkon).
+    if (node >= 0 && entity.mHoldOnly && entity.mKind == EntityKind::eWorkWheel && entity.mSwitch > 1)
+    {
+        bool calls = false;
+        for (const GlukkonSpawn& spawn : world.mGlukkonSpawn)
+        {
+            calls = calls || spawn.mSwitch == entity.mSwitch;
+        }
+        bool out = false;
+        for (const GlukkonAt& glukkon : world.mGlukkons)
+        {
+            out = out || (glukkon.mSpawnSwitch == entity.mSwitch && glukkon.mOut);
+        }
+        if (calls && !out)
+        {
+            step.mKind = StepKind::eUse;
+            std::vector<Goap::Fact> pre{regionFact(node), {Key::Switch(entity.mSwitch), 0}};
+            pre.insert(pre.end(), guards.begin(), guards.end());
+            add("Call the Glukkon with " + name, pre, {{Key::Switch(entity.mSwitch), 1}}, 150, step);
         }
     }
     if (node < 0 || entity.mHoldOnly || entity.mSwitch <= 1)
@@ -6347,7 +6372,7 @@ std::vector<Domain::Builder::GlukkonSource> Domain::Builder::GlukkonSources() co
     std::vector<GlukkonSource> sources;
     for (const GlukkonAt& glukkon : mWorld.mGlukkons)
     {
-        sources.push_back({glukkon.mX, glukkon.mY, glukkon.mHalf, glukkon.mPossessed, glukkon.mSpawnSwitch});
+        sources.push_back({glukkon.mX, glukkon.mY, glukkon.mHalf, glukkon.mPossessed, glukkon.mSpawnSwitch, glukkon.mOut});
     }
     for (const GlukkonSpawn& spawn : mWorld.mGlukkonSpawn)
     {
@@ -6358,7 +6383,7 @@ std::vector<Domain::Builder::GlukkonSource> Domain::Builder::GlukkonSources() co
         }
         if (!about)
         {
-            sources.push_back({spawn.mX, spawn.mY, spawn.mHalf, false, spawn.mSwitch});
+            sources.push_back({spawn.mX, spawn.mY, spawn.mHalf, false, spawn.mSwitch, false});
         }
     }
     return sources;
@@ -6371,7 +6396,9 @@ void Domain::Builder::addForGlukkon(const GlukkonSource& glukkon, const std::str
     // (one a switch calls in: while that switch is on, which it is no more once it is dead)
     // (not the one he is in: it is here, whatever its switch. Zulag 9's third executive office: through the
     // teleporter the game had set 187 back to 0, and the plan was for another Glukkon.)
-    if (glukkon.mSpawn > 1 && !glukkon.mPossessed)
+    // (nor one out already: a wheel that is on only while turned calls it in and goes off again. Zulag 14's at
+    // 675,860.)
+    if (glukkon.mSpawn > 1 && !glukkon.mPossessed && !glukkon.mOut)
     {
         needs.push_back({Key::Switch(glukkon.mSpawn), 1});
     }
