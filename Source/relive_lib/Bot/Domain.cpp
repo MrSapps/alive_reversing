@@ -5667,6 +5667,14 @@ void Domain::Builder::Exits()
         {
             pre.push_back({Key::Switch(f.mSwitch), 1});
         }
+        // (and one that starts open shuts once its switch is on, Door.cpp: Hub 2's doors to the Zulags it has done,
+        // gone for again and again in the run through the brewery)
+        // (a door's own switch, not a tasks door's "all on", which the door acts on only while it is shown: the
+        // Mudomo hub's door to path 7 was gone through with it so)
+        if (f.mKind == FeatureKind::eDoor && !f.mStartClosed && f.mSwitch > 1 && f.mSwitch < 256)
+        {
+            pre.push_back({Key::Switch(f.mSwitch), 0});
+        }
         // (a well that leads out only with its switch on)
         if (f.mKind == FeatureKind::eWellExpress && f.mSwitch > 1 && f.mDestPath < 0 && f.mOnDestPath >= 0)
         {

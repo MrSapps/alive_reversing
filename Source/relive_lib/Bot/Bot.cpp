@@ -1119,8 +1119,26 @@ bool Bot::ExitAllowed(BaseMap& map, const NavFeature& exit, bool* sideTrip)
     }
     // A door elsewhere wants a switch that is got at through one of the ways out of here (a hub and the paths
     // around it): that way, and no other while there is one
-    const std::set<s32> errands = mLevel.ErrandExits(mAbe.mPath, [this](s32 path, s32 sw)
-                                                     { return mWorld.Switch(sw) == 0 && mErrandsLeft.count({mAbe.mLevel * 1000 + path, sw}) == 0; });
+    std::set<s32> errands = mLevel.ErrandExits(mAbe.mPath, [this](s32 path, s32 sw)
+                                               { return mWorld.Switch(sw) == 0 && mErrandsLeft.count({mAbe.mLevel * 1000 + path, sw}) == 0; });
+    // (not by a door that is shut for good, one that a switch on has shut: Hub 2's doors to the Zulags it has done.
+    // With none left, the errand is no bar to the other ways out.)
+    for (auto it = errands.begin(); mKnow && it != errands.end();)
+    {
+        bool open = false;
+        for (const NavFeature& f : mKnow->mNav.Input().mFeatures)
+        {
+            if (f.mKind == FeatureKind::eDoor && f.mDestPath == *it && (f.mDestLevel < 0 || f.mDestLevel == mAbe.mLevel))
+            {
+                open = open || f.mSwitch <= 1 || f.mSwitch >= 256 || mWorld.Switch(f.mSwitch) == (f.mStartClosed ? 1 : 0);
+            }
+            else if (f.mDestPath == *it && (f.mDestLevel < 0 || f.mDestLevel == mAbe.mLevel))
+            {
+                open = true;
+            }
+        }
+        it = open ? std::next(it) : errands.erase(it);
+    }
     if (!errands.empty())
     {
         return errands.count(destPath) != 0;
