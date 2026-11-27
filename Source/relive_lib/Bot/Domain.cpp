@@ -2876,6 +2876,38 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
         pre.push_back({Key::Mud(mud->mId), 0});
     }
     team.mAbeWheel = abeWheel->mId;
+    // (and the way from his wheel to each of them: he goes to it to say "hello" and "work", and that way's gates are
+    // wanted as well. The final Zulag: the three UXBs between wheel 205 and the Mudokon by wheel 204.)
+    {
+        const s32 from = UseNode(nav, *abeWheel, nullptr);
+        const NavGraph::EdgeCost abeCost = [](const NavEdge& e)
+        {
+            return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop ? e.mCost : -1;
+        };
+        std::vector<const Entity*> told = manned;
+        for (const Candidate& c : candidates)
+        {
+            told.push_back(c.mMud);
+        }
+        for (const Entity* mud : told)
+        {
+            std::vector<s32> way;
+            const s32 to = UseNode(nav, *mud, nullptr);
+            if (from < 0 || to < 0 || !nav.FindPath(from, to, abeCost, way, nullptr))
+            {
+                continue;
+            }
+            for (s32 edge : way)
+            {
+                s32 sw = 0;
+                s32 value = 0;
+                if (nav.Condition(nav.Edges()[edge], &sw, &value) && std::find(pre.begin(), pre.end(), Goap::Fact{Key::Switch(sw), value}) == pre.end())
+                {
+                    pre.push_back({Key::Switch(sw), value});
+                }
+            }
+        }
+    }
     for (const Candidate& c : candidates)
     {
         team.mMuds.push_back(c.mMud->mId);
