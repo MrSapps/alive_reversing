@@ -182,6 +182,10 @@ struct SligAt final
     s32 mSightDelay = 0;
     // AE: it shoots from the background into the foreground (see SligCycle)
     bool mZShoot = false;
+    // ... and what it does now looks for that: not in the pause at the end of its beat, nor in its turn
+    bool mZLooks = false;
+    // AE: the frames left of its pause at the end of its beat, 0 when it is not in it
+    s32 mPauseLeftNow = 0;
     // and then: the frames it waits before it does, and the shots it fires each time
     s32 mZShootDelay = 0;
     s32 mZShots = 1;
@@ -239,6 +243,12 @@ struct FlownAt final
     bool mCanThrow = false;
     // The game's motion number (0: idle, the only one a lever is pulled from)
     s32 mMotion = 0;
+    // Its box now (VGetBoundingRect), as how far it reaches each way from its point: wholly inside a z cover it
+    // isn't shot by the Sligs of the background
+    s32 mBoxLeft = 0;
+    s32 mBoxRight = 0;
+    s32 mBoxOver = 0;
+    s32 mBoxUnder = 0;
 };
 
 // A Slog that is about. Awake it runs Abe down wherever he is.

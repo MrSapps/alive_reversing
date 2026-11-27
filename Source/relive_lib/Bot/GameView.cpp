@@ -2117,6 +2117,8 @@ void GameView::ReadWorld(BaseMap& map, World& world)
                 }
                 slig.mWake = wakeCells * (slig.mHalf ? 13 : 25);
                 slig.mZShoot = slig.mHalf && static_cast<::Slig*>(pObj)->CanZShoot();
+                slig.mZLooks = slig.mZShoot && static_cast<::Slig*>(pObj)->LooksToZShoot();
+                slig.mPauseLeftNow = static_cast<::Slig*>(pObj)->PauseFramesLeft();
                 static_cast<::Slig*>(pObj)->ZShootTiming(slig.mZShootDelay, slig.mZShots);
             }
             else
@@ -2398,6 +2400,14 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             world.mFlown.mFacingLeft = pObj->GetAnimation().GetFlipX();
             world.mFlown.mCanThrow = pFlier->GrenadeReady();
             world.mFlown.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
+            const PSX_RECT box = pObj->VGetBoundingRect();
+            // (from the point the bot has for it, where it is going: it is drawn some 20 under that)
+            const s32 px = world.mFlown.mX100 / 100;
+            const s32 py = world.mFlown.mY100 / 100;
+            world.mFlown.mBoxLeft = px - box.x;
+            world.mFlown.mBoxRight = box.w - px;
+            world.mFlown.mBoxOver = py - box.y;
+            world.mFlown.mBoxUnder = box.h - py;
         }
     }
 

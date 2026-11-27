@@ -459,6 +459,18 @@ public:
     {
         return mSligTlv.mCanZShoot;
     }
+    // For the bot: whether what it does now looks for a target to shoot from the background (Brain_15_Idle,
+    // Brain_21_Walking and Brain_33_Paused do; Brain_32_Inactive and its turn do not), and it is not behind a
+    // crate itself (IsInZCover(this): then it does not shoot)
+    bool LooksToZShoot()
+    {
+        return (BrainIs(&Slig::Brain_15_Idle) || BrainIs(&Slig::Brain_21_Walking) || BrainIs(&Slig::Brain_33_Paused)) && !IsInZCover(this);
+    }
+    // For the bot: the frames left of its pause at the end of its beat (0 when not in it)
+    s32 PauseFramesLeft()
+    {
+        return BrainIs(&Slig::Brain_32_Inactive) && field_120_timer > static_cast<s32>(sGnFrame) ? field_120_timer - static_cast<s32>(sGnFrame) : 0;
+    }
     // For the bot: the frames it waits before it shoots from the background at what it has seen, and how many times
     void ZShootTiming(s32& delay, s32& times) const
     {

@@ -16278,10 +16278,29 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             }
             return TaskStep::Do(Prim::Wait(1));
         }
+        // (where a Slig of the background is there and it threw from in front of a crate: from there again, when
+        // the Slig comes back under where it comes down. Elsewhere it is seen. Zulag 11: Slig#7000 walks
+        // 1662..1762, and the throw for it where it stood was from 1820,1440, out in the open.)
+        const s32 side = std::max(mBoxSeen.mBoxLeft, mBoxSeen.mBoxRight);
+        bool coveredThrow = false;
+        bool zHere = false;
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            coveredThrow = coveredThrow || (f.mKind == FeatureKind::eZCover && f.mX1 <= shot.mWaitX - side - 2 && shot.mWaitX + side + 2 <= f.mX2 && f.mY1 <= shot.mWaitY - mBoxSeen.mBoxOver - 4 && shot.mWaitY + mBoxSeen.mBoxUnder + 4 <= f.mY2);
+        }
+        for (const SligAt& sl : world.mSligs)
+        {
+            zHere = zHere || (!sl.mPossessed && !sl.mAsleep && sl.mZShoot && nav.CameraOf(sl.mX, sl.mY - 5) == nav.CameraOf(bx, by));
+        }
         if (++mSince > fuse + 25 && (live || mSince > fuse + 150))
         {
             bot.Log("the grenade from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY) + " did not get Slig#" + std::to_string(mTarget) + (live ? " (it is at " + std::to_string(live->mX) + "," + std::to_string(live->mY) + ", motion " + std::to_string(live->mMotion) + ")" : " (it is not to be seen)") + ": from somewhere else");
-            if (live && live->mMotion == 0 && target && std::abs(live->mX - target->mX) > 30 && mStoodAt.count(mTarget) == 0)
+            if (live && target && coveredThrow && zHere && mZRetries < 6)
+            {
+                mZRetries++;
+                bot.Log("from the same place in front of the crate again, for when it is back under it");
+            }
+            else if (live && live->mMotion == 0 && target && std::abs(live->mX - target->mX) > 30 && mStoodAt.count(mTarget) == 0)
             {
                 mStoodAt[mTarget] = live->mX;
                 mTargetsIn = 0;
@@ -16295,7 +16314,36 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             mState = 0;
             mLegFrames = 0;
         }
-        return steerTo(shot.mWaitX + (shot.mFaceLeft ? kFlierBack : -kFlierBack), shot.mWaitY);
+        // (no further back than it is still in front of the crate it threw from, where a Slig of the background is
+        // there to see it: Zulag 11, back to 1815 from the throw at 1781, out of the crate at 1737..1834, and
+        // shot by the one walking 1631..1688)
+        s32 back = kFlierBack;
+        bool zThere = false;
+        for (const SligAt& sl : world.mSligs)
+        {
+            zThere = zThere || (!sl.mPossessed && !sl.mAsleep && sl.mZShoot && nav.CameraOf(sl.mX, sl.mY - 5) == nav.CameraOf(bx, by));
+        }
+        const auto inCover = [&nav, this](s32 x, s32 y)
+        {
+            const s32 side = std::max(mBoxSeen.mBoxLeft, mBoxSeen.mBoxRight);
+            for (const NavFeature& f : nav.Input().mFeatures)
+            {
+                if (f.mKind == FeatureKind::eZCover && f.mX1 <= x - side - 2 && x + side + 2 <= f.mX2 && f.mY1 <= y - mBoxSeen.mBoxOver - 4 && y + mBoxSeen.mBoxUnder + 4 <= f.mY2)
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+        if (zThere && inCover(shot.mWaitX, shot.mWaitY))
+        {
+            while (back > 0 && !inCover(shot.mWaitX + (shot.mFaceLeft ? back : -back), shot.mWaitY))
+            {
+                back -= 5;
+            }
+            back = std::max(back, 0);
+        }
+        return steerTo(shot.mWaitX + (shot.mFaceLeft ? back : -back), shot.mWaitY);
     }
     // A Slig shoots what is on its level and in front of it
     const auto seenAt = [&world, &flown, bx](s32 y)
@@ -16491,6 +16539,579 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             mHasLastSlig = false;
             return TaskStep::Do(Prim::Wait(1));
         }
+        // The Sligs of the background shoot it anywhere on their screen while they face it, unless it is wholly in
+        // front of a crate (Slig::ToZShoot, Bullet::InZBulletCover). From cover it goes on into the open only while
+        // none of them on that screen faces where it goes, and caught in the open by one it goes back to the cover it
+        // came from. Zulag 11: "Hide from the Sligs in the background by staying in front of crates as you move to
+        // the right" (the one standing at 1417,1399, the one walking 1631..1688,1420).
+        mZClock++;
+        for (const SligAt& sl : world.mSligs)
+        {
+            if (!sl.mZShoot || sl.mPossessed)
+            {
+                continue;
+            }
+            // (which way it faces, 2 while it turns: how long it keeps facing each way is its own, wherever the
+            // flying Slig is)
+            const s32 face = sl.mMotion == 5 ? 2 : sl.mFacingLeft ? 0 : 1;
+            // (known by its screen and its floor: the Sligs have no id here, and one of the background to a floor of
+            // a screen is what there is)
+            ZWatch& w = mZWatch[static_cast<u32>(nav.CameraOf(sl.mX, sl.mY - 5)) * 4096u + static_cast<u32>(sl.mY & 4095)];
+            if (w.mSince < 0)
+            {
+                w.mSince = mZClock;
+                w.mFace = face;
+                w.mWhole = false;
+            }
+            else if (w.mFace != face)
+            {
+                if (w.mFace < 2 && w.mWhole && (w.mLeast[w.mFace] < 0 || mZClock - w.mSince < w.mLeast[w.mFace]))
+                {
+                    w.mLeast[w.mFace] = mZClock - w.mSince;
+                }
+                w.mFace = face;
+                w.mSince = mZClock;
+                w.mWhole = true;
+            }
+        }
+        bool zCovered = false;
+        bool zWatched = false;
+        {
+            // (its box as it is now, moved to there; a margin for the bob and the turn)
+            // (the most of each way it has been seen to reach: its box goes with its frames, 44..52 over its point as it
+            // bobs, and a frame of it out of the cover is a frame it is seen)
+            mBoxSeen.mBoxLeft = std::max(mBoxSeen.mBoxLeft, world.mFlown.mBoxLeft);
+            mBoxSeen.mBoxRight = std::max(mBoxSeen.mBoxRight, world.mFlown.mBoxRight);
+            mBoxSeen.mBoxOver = std::max(mBoxSeen.mBoxOver, world.mFlown.mBoxOver);
+            mBoxSeen.mBoxUnder = std::max(mBoxSeen.mBoxUnder, world.mFlown.mBoxUnder);
+            const FlownAt& fl = mBoxSeen;
+            const auto covered = [&nav, &fl](s32 x, s32 y)
+            {
+                for (const NavFeature& f : nav.Input().mFeatures)
+                {
+                    if (f.mKind == FeatureKind::eZCover && f.mX1 <= x - std::max(fl.mBoxLeft, fl.mBoxRight) - 2 && x + std::max(fl.mBoxLeft, fl.mBoxRight) + 2 <= f.mX2 &&
+                        f.mY1 <= y - fl.mBoxOver - 4 && y + fl.mBoxUnder + 4 <= f.mY2)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            const auto faced = [&nav, &world](s32 x, s32 y)
+            {
+                for (const SligAt& sl : world.mSligs)
+                {
+                    if (!sl.mPossessed && !sl.mAsleep && sl.mZShoot && nav.CameraOf(sl.mX, sl.mY - 5) == nav.CameraOf(x, y) && sl.mFacingLeft == (x < sl.mX))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            const s32 nx = bx + std::max(-20, std::min(20, tx - bx));
+            const s32 ny = by + std::max(-20, std::min(20, ty - by));
+            zCovered = covered(bx, by);
+            for (const SligAt& sl : world.mSligs)
+            {
+                zWatched = zWatched || (!sl.mPossessed && !sl.mAsleep && sl.mZShoot && nav.CameraOf(sl.mX, sl.mY - 5) == nav.CameraOf(bx, by));
+            }
+            // (a stretch begun is flown to its end before anything else is decided: it starts in cover)
+            // (flown here, its places one by one, not as corners of its way: the way's own rules pass corners by)
+            while (mZGoing && mZStretch.size() > 1 && std::abs(mZStretch.front().first - bx) <= 8 && std::abs(mZStretch.front().second - by) <= 8)
+            {
+                mZStretch.erase(mZStretch.begin());
+            }
+            if (mZGoing && ((mZStretch.size() <= 1 && std::abs(mZGoX - bx) <= 8 && std::abs(mZGoY - by) <= 8 && covered(bx, by)) || ++mZGoFrames > 300))
+            {
+                mZGoing = false;
+                mZStretch.clear();
+            }
+            if (mZGoing)
+            {
+                return steerTo(mZStretch.empty() ? mZGoX : mZStretch.front().first, mZStretch.empty() ? mZGoY : mZStretch.front().second);
+            }
+            if (false)
+            {
+            }
+            else if (covered(bx, by))
+            {
+                mCoverX = bx;
+                mCoverY = by;
+                mHasCover = true;
+                // (out of it only when each of them on the screens it crosses in the open has its back to it for
+                // as long as it is out: its walk on to the end of its beat, its pause there and its turn, as Abe's
+                // way between crates has it. At some 3 a frame, to the next cover on its way or to the end of it
+                // and a throw.)
+                s32 open = 0;
+                s32 openX1 = 1 << 30;
+                s32 openX2 = -(1 << 30);
+                s32 routeEndX = bx;
+                bool ends = true;
+                std::vector<s32> cams;
+                {
+                    s32 px = bx;
+                    s32 py = by;
+                    for (std::size_t c = mCorner; c <= mWay.size() && ends; c++)
+                    {
+                        const s32 cx = c < mWay.size() ? mWay[c].first : shot.mWaitX;
+                        const s32 cy = c < mWay.size() ? mWay[c].second : shot.mWaitY;
+                        const s32 len = std::max(std::abs(cx - px), std::abs(cy - py));
+                        for (s32 d = 5; d <= len; d += 5)
+                        {
+                            const s32 qx = px + (cx - px) * d / len;
+                            const s32 qy = py + (cy - py) * d / len;
+                            if (covered(qx, qy))
+                            {
+                                if (open > 0)
+                                {
+                                    ends = false;
+                                    break;
+                                }
+                                continue;
+                            }
+                            open += 5;
+                            openX1 = std::min(openX1, qx);
+                            openX2 = std::max(openX2, qx);
+                            routeEndX = qx;
+                            // (and the screen next to it within 40: the game's camera goes over to the next a
+                            // little after it does, and the Sligs of the one it left still see it. Zulag 11: shot at
+                            // 1510 by the one at 1417.)
+                            for (const s32 dx : {-40, 0, 40})
+                            {
+                                const s32 cam = nav.CameraOf(qx + dx, qy);
+                                if (std::find(cams.begin(), cams.end(), cam) == cams.end())
+                                {
+                                    cams.push_back(cam);
+                                }
+                            }
+                        }
+                        px = cx;
+                        py = cy;
+                    }
+                }
+                const s32 need = open / 3 + (ends && open > 0 ? 40 : 0) + 15;
+                // (how long each keeps its back to it, from what it has been seen to do: a Slig that stands turns
+                // to and fro on a timer, Zulag 11's at 1417,1399 away for 142..168 frames and back for 13; one that
+                // walks a beat as its walk and pause. The least seen yet, and none known until one whole time
+                // away has been seen.)
+                // (the least of the frames each has its back to it yet; -1 for one that faces it or is not known)
+                // (which way it has to face: its back to every place flown in the open, all to one side of it; one
+                // flown past in the open sees it from one side or the other, -1. Zulag 11's walking 1631..1688,
+                // from the cover over it at 1619..1654 to the one at 1769.)
+                const auto backFor = [&](const std::vector<s32>& on, s32 x1, s32 x2, s32 fromX, s32 toX)
+                {
+                    s32 least = 100000;
+                    for (const SligAt& sl : world.mSligs)
+                    {
+                        if (sl.mPossessed || sl.mAsleep || !sl.mZShoot || std::find(on.begin(), on.end(), nav.CameraOf(sl.mX, sl.mY - 5)) == on.end())
+                        {
+                            continue;
+                        }
+                        // (its back to it: facing right with it to the left of it, and the other way about)
+                        // (not looking at all in its pause at the end of its beat, nor in the turn after it, some
+                        // 10: past it then, or under it, or whichever way it faces. Zulag 11: flown past the one at
+                        // 1417 as it stood there facing right, and not shot.)
+                        const s32 quiet = sl.mZLooks ? 0 : sl.mPauseLeftNow + 10;
+                        const auto it = mZWatch.find(static_cast<u32>(nav.CameraOf(sl.mX, sl.mY - 5)) * 4096u + static_cast<u32>(sl.mY & 4095));
+                        // (flown past it in the open: only from behind it, as it faces the way it flies, until it is
+                        // by it; then off from it at speed its shots go behind it (Bullet, eZBullet_3: aimed twice
+                        // its speed and 16 a shot back from its point, and its box goes 17 back). Zulag 11: past the
+                        // one at 1417 facing right, flown on right at 3 a frame, and not got.)
+                        if (x1 <= sl.mX + 10 && x2 >= sl.mX - 10)
+                        {
+                            const bool right = toX > fromX;
+                            const s32 face = sl.mFacingLeft ? 0 : 1;
+                            const s32 by = std::abs(sl.mX - fromX) / 3 + 10;
+                            s32 has = -1;
+                            if (!sl.mZLooks)
+                            {
+                                has = quiet;
+                            }
+                            else if (face == (right ? 1 : 0) && it != mZWatch.end() && it->second.mFace == face && it->second.mLeast[face] >= 0)
+                            {
+                                has = it->second.mLeast[face] - (mZClock - it->second.mSince);
+                            }
+                            least = std::min(least, (right ? toX > sl.mX + 40 : toX < sl.mX - 40) && has >= by ? 100000 : -1);
+                            continue;
+                        }
+                        const s32 back = x2 < sl.mX ? 1 : 0;
+                        const bool known = it != mZWatch.end() && it->second.mLeast[back] >= 0;
+                        s32 left = -1;
+                        if (sl.mZLooks)
+                        {
+                            left = known && it->second.mFace == back ? it->second.mLeast[back] - (mZClock - it->second.mSince) : -1;
+                        }
+                        else
+                        {
+                            // (facing it in the pause, it turns its back after; facing away, it turns to it after)
+                            const s32 face = sl.mFacingLeft ? 0 : 1;
+                            left = face != back && known ? quiet + it->second.mLeast[back] : quiet;
+                        }
+                        least = std::min(least, left);
+                    }
+                    return least;
+                };
+                bool clear = backFor(cams, openX1, openX2, bx, routeEndX) >= need;
+                // Its way on is too long in the open: from crate to crate instead, straight to the nearest place in
+                // front of one that is nearer where it goes, as soon as the Sligs there give it the time. Zulag
+                // 11's screen 6: its way at 1350 has 180 in the open, under the Slig walking 1365..1417 with its
+                // back to it for 78 frames; from the crate at 1124..1288 by the one at 1411..1534 it is 130.
+                if (open > 0 && (!clear || !mCoverPlan.empty() || mCoverPlanBudget < 0))
+                {
+                    // (the places: a grid in front of each crate near, where it goes, and where it is; a hop is
+                    // straight, nothing in its way at its sides, and no longer in the open than the Sligs there
+                    // have shown they keep their backs to it, 60 frames until that is known)
+                    const s32 side = std::max(fl.mBoxLeft, fl.mBoxRight);
+                    const s32 budget = std::max(0, (std::max(backFor(cams, openX1, openX2, bx, routeEndX) < 0 ? 0 : 60, [&]()
+                                                             {
+                                                                 s32 least = 100000;
+                                                                 for (const auto& kv : mZWatch)
+                                                                 {
+                                                                     for (const s32 l : kv.second.mLeast)
+                                                                     {
+                                                                         least = l >= 0 ? std::min(least, l) : least;
+                                                                     }
+                                                                 }
+                                                                 return least == 100000 ? 60 : least;
+                                                             }()) - 15) * 3);
+                    // (and again when other Sligs come to be seen: those of the next screen are not seen from this
+                    // one, and the plan was made without them)
+                    s32 sligsKnown = 0;
+                    for (const SligAt& sl : world.mSligs)
+                    {
+                        sligsKnown += sl.mAsleep || sl.mPossessed ? 0 : 1;
+                    }
+                    if ((mCoverPlan.empty() && (std::abs(mCoverPlanX - bx) > 10 || std::abs(mCoverPlanY - by) > 10)) || mCoverPlanGoal != shot.mWaitX * 4096 + shot.mWaitY || mCoverPlanBudget != budget || mCoverPlanSligs != sligsKnown)
+                    {
+                        mCoverPlanBudget = budget;
+                        mCoverPlanSligs = sligsKnown;
+                        mCoverPlanX = bx;
+                        mCoverPlanY = by;
+                        mCoverPlanGoal = shot.mWaitX * 4096 + shot.mWaitY;
+                        mCoverPlan.clear();
+                        // (the crates' places as zones: within one it goes where it likes in cover; from one to
+                        // another, between the two places of them nearest each other, by the way it flies there,
+                        // round floors: Zulag 11's screen 6, from the crate at 1124..1288 over the floor at 1440 to
+                        // the low ones by the Sligs' floor, "all the way down past the arrow")
+                        struct Zone final
+                        {
+                            s32 mX1;
+                            s32 mY1;
+                            s32 mX2;
+                            s32 mY2;
+                        };
+                        std::vector<Zone> zones{{bx, by, bx, by}, {shot.mWaitX, shot.mWaitY, shot.mWaitX, shot.mWaitY}};
+                        for (const NavFeature& f : nav.Input().mFeatures)
+                        {
+                            const Zone z{f.mX1 + side + 4, f.mY1 + fl.mBoxOver + 6, f.mX2 - side - 4, f.mY2 - fl.mBoxUnder - 6};
+                            if (f.mKind != FeatureKind::eZCover || z.mX1 > z.mX2 || z.mY1 > z.mY2 || !covered((z.mX1 + z.mX2) / 2, (z.mY1 + z.mY2) / 2) ||
+                                std::min(bx, shot.mWaitX) - 300 > f.mX2 || f.mX1 > std::max(bx, shot.mWaitX) + 300)
+                            {
+                                continue;
+                            }
+                            // (cut where a floor or ceiling crosses it, with the flying Slig's height each side of
+                            // that: the two parts are not flown between in cover. Zulag 11's crate at 1124..1288,
+                            // across the floor at 1440.)
+                            std::vector<s32> cuts;
+                            // (its own floors and ceilings: not those of the background, the half-size ones)
+                            const s32 flatTypes[] = {flown.mHalf ? 4 : 0, flown.mHalf ? 7 : 3, flown.mHalf ? 18 : 17, flown.mHalf ? 36 : 32};
+                            for (const NavLine& line : nav.Input().mLines)
+                            {
+                                if (line.mY1 == line.mY2 && std::find(std::begin(flatTypes), std::end(flatTypes), line.mType) != std::end(flatTypes) && std::min(line.mX1, line.mX2) - side <= z.mX2 && std::max(line.mX1, line.mX2) + side >= z.mX1 && line.mY1 > z.mY1 - fl.mBoxUnder && line.mY1 < z.mY2 + fl.mBoxOver)
+                                {
+                                    cuts.push_back(line.mY1);
+                                }
+                            }
+                            std::sort(cuts.begin(), cuts.end());
+                            s32 top = z.mY1;
+                            for (std::size_t c = 0; c <= cuts.size(); c++)
+                            {
+                                // (over a line its point is no lower than the line less what is under it; under one,
+                                // no higher than the line and what is over it)
+                                const s32 bottom = c < cuts.size() ? std::min(z.mY2, cuts[c] - std::max(0, fl.mBoxUnder) - 4) : z.mY2;
+                                // (less the levels of the Sligs of the floors near: a crate hides it from the ones
+                                // of the background only. Zulag 11's at 1762,1499 shot it in front of the crate at
+                                // 1459..1635, at 1544,1489.)
+                                // (those not seen yet too: the floors of the Sligs it is to bomb, from the map)
+                                std::vector<std::pair<s32, s32>> levels;
+                                for (const SligAt& sl : world.mSligs)
+                                {
+                                    if (!sl.mAsleep && !sl.mPossessed && !sl.mZShoot && sl.mHalf == flown.mHalf)
+                                    {
+                                        levels.push_back({sl.mX, sl.mY});
+                                    }
+                                }
+                                for (const Domain::FlierTarget& t : mTargets)
+                                {
+                                    if (!t.mMine)
+                                    {
+                                        levels.push_back({t.mX, t.mFloorY});
+                                    }
+                                }
+                                std::vector<std::pair<s32, s32>> parts{{top, bottom}};
+                                for (const std::pair<s32, s32>& lv : levels)
+                                {
+                                    // (on its screen, or within 40 of it: a Slig shoots on its own screen only)
+                                    const s32 cam = nav.CameraOf(lv.first, lv.second - 5);
+                                    if (nav.CameraOf(z.mX1 - 40, (top + bottom) / 2) != cam && nav.CameraOf(z.mX2 + 40, (top + bottom) / 2) != cam && nav.CameraOf((z.mX1 + z.mX2) / 2, (top + bottom) / 2) != cam)
+                                    {
+                                        continue;
+                                    }
+                                    const s32 lo = lv.second - FlierFlight::kLevelOver - 4;
+                                    const s32 hi = lv.second + FlierFlight::kLevelUnder + 4;
+                                    std::vector<std::pair<s32, s32>> cut;
+                                    for (const std::pair<s32, s32>& part : parts)
+                                    {
+                                        if (part.first < lo)
+                                        {
+                                            cut.push_back({part.first, std::min(part.second, lo - 1)});
+                                        }
+                                        if (part.second > hi)
+                                        {
+                                            cut.push_back({std::max(part.first, hi + 1), part.second});
+                                        }
+                                    }
+                                    parts = cut;
+                                }
+                                for (const std::pair<s32, s32>& part : parts)
+                                {
+                                    if (part.first <= part.second)
+                                    {
+                                        zones.push_back(Zone{z.mX1, part.first, z.mX2, part.second});
+                                    }
+                                }
+                                if (c < cuts.size())
+                                {
+                                    top = std::max(top, cuts[c] + fl.mBoxOver + 4);
+                                }
+                            }
+                        }
+                        const auto openAlong = [&covered](const std::vector<std::pair<s32, s32>>& line)
+                        {
+                            s32 n = 0;
+                            for (std::size_t k = 1; k < line.size(); k++)
+                            {
+                                const s32 ax = line[k - 1].first;
+                                const s32 ay = line[k - 1].second;
+                                const s32 len = std::max(std::abs(line[k].first - ax), std::abs(line[k].second - ay));
+                                for (s32 d = 5; d <= len; d += 5)
+                                {
+                                    n += covered(ax + (line[k].first - ax) * d / len, ay + (line[k].second - ay) * d / len) ? 0 : 5;
+                                }
+                            }
+                            return n;
+                        };
+                        const std::size_t n = zones.size();
+                        // (each link: its way, from a place of the one zone to a place of the other)
+                        std::vector<std::vector<std::vector<std::pair<s32, s32>>>> link(n, std::vector<std::vector<std::pair<s32, s32>>>(n));
+                        std::vector<std::vector<s32>> linkOpen(n, std::vector<s32>(n, -1));
+                        for (std::size_t a = 0; a < n; a++)
+                        {
+                            for (std::size_t b = a + 1; b < n; b++)
+                            {
+                                const Zone& za = zones[a];
+                                const Zone& zb = zones[b];
+                                // (between the corners and middles of the two, the nearest dozen pairs: a floor may
+                                // cross a zone, its nearest place under it, and a zone may be in a pocket only part
+                                // of it is flown into. Zulag 11's crate at 1124..1288 with the floor at 1440 across
+                                // it, and the one at 1265..1340 under that floor's end.)
+                                s32 bestO = -1;
+                                std::vector<std::pair<s32, s32>> best;
+                                std::vector<std::array<s32, 5>> tries;
+                                for (s32 c = 0; c < 81; c++)
+                                {
+                                    const s32 i = c % 9;
+                                    const s32 j = c / 9;
+                                    const s32 px = i % 3 == 0 ? za.mX1 : i % 3 == 1 ? (za.mX1 + za.mX2) / 2 : za.mX2;
+                                    const s32 py = i / 3 == 0 ? za.mY1 : i / 3 == 1 ? (za.mY1 + za.mY2) / 2 : za.mY2;
+                                    const s32 cx = j % 3 == 0 ? zb.mX1 : j % 3 == 1 ? (zb.mX1 + zb.mX2) / 2 : zb.mX2;
+                                    const s32 cy = j / 3 == 0 ? zb.mY1 : j / 3 == 1 ? (zb.mY1 + zb.mY2) / 2 : zb.mY2;
+                                    const s32 far = std::abs(cx - px) + std::abs(cy - py);
+                                    if (std::max(std::abs(cx - px), std::abs(cy - py)) <= budget + 200)
+                                    {
+                                        tries.push_back({far, px, py, cx, cy});
+                                    }
+                                }
+                                std::sort(tries.begin(), tries.end());
+                                tries.erase(std::unique(tries.begin(), tries.end()), tries.end());
+                                if (tries.size() > 12)
+                                {
+                                    tries.resize(12);
+                                }
+                                for (const std::array<s32, 5>& t : tries)
+                                {
+                                    const s32 px = t[1];
+                                    const s32 py = t[2];
+                                    const s32 cx = t[3];
+                                    const s32 cy = t[4];
+                                    std::vector<std::pair<s32, s32>> way{{px, py}};
+                                    bool through = true;
+                                    for (const s32 dx : {-side, 0, side})
+                                    {
+                                        through = through && FartFlight::Open(nav.Input(), flown.mHalf, FartFlight::Point{px + dx, py - 10}, FartFlight::Point{cx + dx, cy - 10});
+                                    }
+                                    std::vector<std::pair<s32, s32>> corners;
+                                    if (!through && !Domain::FlierWay(nav.Input(), flown.mHalf, px, py, cx, cy, nullptr, corners, &world))
+                                    {
+                                        continue;
+                                    }
+                                    way.insert(way.end(), corners.begin(), corners.end());
+                                    if (way.back() != std::make_pair(cx, cy))
+                                    {
+                                        way.push_back({cx, cy});
+                                    }
+                                    const s32 o = openAlong(way);
+                                    if (o <= budget && (bestO < 0 || o < bestO))
+                                    {
+                                        bestO = o;
+                                        best = way;
+                                    }
+                                }
+                                if (bestO < 0)
+                                {
+                                    continue;
+                                }
+                                const s32 o = bestO;
+                                // (from the middle of the one and on to the middle of the other, in cover: stopped at
+                                // the edge of one it is a little out of it. Zulag 11: at 1315 by the crate's place
+                                // that ends at 1311.)
+                                std::vector<std::pair<s32, s32>> way = best;
+                                way.insert(way.begin(), std::make_pair((za.mX1 + za.mX2) / 2, (za.mY1 + za.mY2) / 2));
+                                way.push_back(std::make_pair((zb.mX1 + zb.mX2) / 2, (zb.mY1 + zb.mY2) / 2));
+                                linkOpen[a][b] = linkOpen[b][a] = o;
+                                link[a][b] = way;
+                                link[b][a] = std::vector<std::pair<s32, s32>>(way.rbegin(), way.rend());
+                            }
+                        }
+                        // (Dijkstra over the zones, the cost what is flown in the open and a little for the way)
+                        std::vector<s32> dist(n, 1 << 30);
+                        std::vector<s32> prev(n, -1);
+                        std::vector<u8> done(n, 0);
+                        dist[0] = 0;
+                        for (std::size_t round = 0; round < n; round++)
+                        {
+                            std::size_t u = n;
+                            for (std::size_t k = 0; k < n; k++)
+                            {
+                                if (!done[k] && dist[k] < (1 << 30) && (u == n || dist[k] < dist[u]))
+                                {
+                                    u = k;
+                                }
+                            }
+                            if (u == n || u == 1)
+                            {
+                                break;
+                            }
+                            done[u] = 1;
+                            for (std::size_t v = 1; v < n; v++)
+                            {
+                                if (done[v] || linkOpen[u][v] < 0)
+                                {
+                                    continue;
+                                }
+                                const s32 cost = dist[u] + linkOpen[u][v] * 10 + std::abs(link[u][v].back().first - link[u][v].front().first) + std::abs(link[u][v].back().second - link[u][v].front().second);
+                                if (cost < dist[v])
+                                {
+                                    dist[v] = cost;
+                                    prev[v] = static_cast<s32>(u);
+                                }
+                            }
+                        }
+                        // (the plan, a hop to each place of each link: in a zone, from where it came in to where it
+                        // goes out is in cover)
+                        for (s32 k = 1; prev[static_cast<std::size_t>(k)] >= 0; k = prev[static_cast<std::size_t>(k)])
+                        {
+                            const std::vector<std::pair<s32, s32>>& way = link[static_cast<std::size_t>(prev[static_cast<std::size_t>(k)])][static_cast<std::size_t>(k)];
+                            mCoverPlan.insert(mCoverPlan.begin(), way.begin(), way.end());
+                        }
+                        bot.Log("in cover at " + std::to_string(bx) + "," + std::to_string(by) + ": " + (mCoverPlan.empty() ? std::string("no way from crate to crate with at most ") + std::to_string(budget) + " in the open a hop" : std::to_string(mCoverPlan.size()) + " hops from crate to crate, at most " + std::to_string(budget) + " in the open each"));
+                    }
+                    if (!mCoverPlan.empty())
+                    {
+                        while (!mCoverPlan.empty() && std::abs(mCoverPlan.front().first - bx) <= 6 && std::abs(mCoverPlan.front().second - by) <= 6)
+                        {
+                            mCoverPlan.erase(mCoverPlan.begin());
+                        }
+                    }
+                    if (!mCoverPlan.empty())
+                    {
+                        // (the stretch on to the next place of the plan in cover, at once: in the open it does not
+                        // stop)
+                        std::size_t upTo = 0;
+                        while (upTo + 1 < mCoverPlan.size() && !covered(mCoverPlan[upTo].first, mCoverPlan[upTo].second))
+                        {
+                            upTo++;
+                        }
+                        s32 o = 0;
+                        s32 oX1 = 1 << 30;
+                        s32 oX2 = -(1 << 30);
+                        std::vector<s32> on;
+                        s32 ax = bx;
+                        s32 ay = by;
+                        for (std::size_t k = 0; k <= upTo; k++)
+                        {
+                            const s32 len = std::max(1, std::max(std::abs(mCoverPlan[k].first - ax), std::abs(mCoverPlan[k].second - ay)));
+                            for (s32 d = 5; d <= len; d += 5)
+                            {
+                                const s32 qx = ax + (mCoverPlan[k].first - ax) * d / len;
+                                const s32 qy = ay + (mCoverPlan[k].second - ay) * d / len;
+                                if (!covered(qx, qy))
+                                {
+                                    o += 5;
+                                    oX1 = std::min(oX1, qx);
+                                    oX2 = std::max(oX2, qx);
+                                    for (const s32 dx : {-40, 0, 40})
+                                    {
+                                        if (std::find(on.begin(), on.end(), nav.CameraOf(qx + dx, qy)) == on.end())
+                                        {
+                                            on.push_back(nav.CameraOf(qx + dx, qy));
+                                        }
+                                    }
+                                }
+                            }
+                            ax = mCoverPlan[k].first;
+                            ay = mCoverPlan[k].second;
+                        }
+                        if (o == 0 || backFor(on, oX1, oX2, bx, mCoverPlan[upTo].first) >= o / 3 + 15)
+                        {
+                            const std::pair<s32, s32> hop = mCoverPlan[upTo];
+                            bot.Log("in cover at " + std::to_string(bx) + "," + std::to_string(by) + ": over to " + std::to_string(hop.first) + "," + std::to_string(hop.second) + " (" + std::to_string(upTo + 1) + " legs), " + std::to_string(o) + " in the open, while the Sligs of the background have their backs to it");
+                            mZStretch.assign(mCoverPlan.begin(), mCoverPlan.begin() + static_cast<std::ptrdiff_t>(upTo + 1));
+                            mCoverPlan.erase(mCoverPlan.begin(), mCoverPlan.begin() + static_cast<std::ptrdiff_t>(upTo + 1));
+                            mCoverPlanX = hop.first;
+                            mCoverPlanY = hop.second;
+                            mZHeld = 0;
+                            mZGoing = true;
+                            mZGoX = hop.first;
+                            mZGoY = hop.second;
+                            mZGoFrames = 0;
+                            return steerTo(mZStretch.front().first, mZStretch.front().second);
+                        }
+                    }
+                }
+                if (open > 0 && (!clear || !mCoverPlan.empty()) && mZHeld < 3000)
+                {
+                    if (mZHeld++ == 0)
+                    {
+                        bot.Log("in cover at " + std::to_string(bx) + "," + std::to_string(by) + ": " + std::to_string(open) + " in the open on, " + std::to_string(need) + " frames; waiting for the Sligs of the background there to walk away with that to go");
+                    }
+                    return steerTo(bx, by);
+                }
+                mZHeld = 0;
+            }
+            else if (mHasCover && faced(bx, by) && std::abs(mCoverX - bx) + std::abs(mCoverY - by) < 200 && mZBack < 600)
+            {
+                if (mZBack++ == 0)
+                {
+                    bot.Log("in the open at " + std::to_string(bx) + "," + std::to_string(by) + " (box " + std::to_string(fl.mBoxLeft) + "/" + std::to_string(fl.mBoxRight) + "/" + std::to_string(fl.mBoxOver) + "/" + std::to_string(fl.mBoxUnder) + ") with a Slig of the background facing it: back to cover at " + std::to_string(mCoverX) + "," + std::to_string(mCoverY));
+                }
+                return steerTo(mCoverX, mCoverY);
+            }
+            else
+            {
+                mZBack = 0;
+            }
+        }
         // Off every Slig's level now, the next leg is not begun while it leads onto the level of one that faces
         // this way: it waits where it is for its back
         if (!seenAt(by) && mHeld < 600)
@@ -16572,6 +17193,12 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         // 40 high, for 2,500 frames.)
         {
             const s32 left = std::abs(shot.mWaitX - bx) + std::abs(shot.mWaitY - by);
+            // (not from cover on the screen of a Slig of the background: out of it, it is shot before it is back.
+            // Zulag 11, from 1622,1440 down to 1621,1484 under the one at 1584,1420, which turned and shot.)
+            if (zCovered && zWatched)
+            {
+                mProgressFrames = 0;
+            }
             if (mProgressFrames == 0 || left + 40 < mProgressLeft)
             {
                 mProgressFrames = 1;

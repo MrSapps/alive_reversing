@@ -2009,6 +2009,36 @@ public:
 
 private:
     s32 mAimWaits = 0;
+    s32 mZHeld = 0;
+    s32 mZBack = 0;
+    // The Sligs of the background seen from the flying Slig: since when each has faced it or had its back to it,
+    // and the least time it has had its back to it, start to end
+    struct ZWatch final
+    {
+        s32 mSince = -1;
+        s32 mFace = 0;
+        bool mWhole = false;
+        s32 mLeast[2] = {-1, -1};
+    };
+    std::map<u32, ZWatch> mZWatch;
+    // The hops from crate to crate still to go, worked out from where it was and for where it goes
+    std::vector<std::pair<s32, s32>> mCoverPlan;
+    s32 mCoverPlanX = -100000;
+    s32 mCoverPlanY = -100000;
+    s32 mCoverPlanGoal = 0;
+    s32 mCoverPlanBudget = -1;
+    s32 mCoverPlanSligs = -1;
+    bool mZGoing = false;
+    s32 mZRetries = 0;
+    std::vector<std::pair<s32, s32>> mZStretch;
+    FlownAt mBoxSeen;
+    s32 mZGoX = 0;
+    s32 mZGoY = 0;
+    s32 mZGoFrames = 0;
+    s32 mZClock = 0;
+    s32 mCoverX = 0;
+    s32 mCoverY = 0;
+    bool mHasCover = false;
     s32 mAimShift = 0;
     // A Slig on a level the way goes through was seen to face this way (its back since is all ahead), and the
     // frames waited for one that only showed its back

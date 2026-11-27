@@ -9932,6 +9932,59 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& marked, co
         {
             target.mNeeds.clear();
         }
+        // With a Slig of the background awake on the screen, first the places to wait and throw from that are in
+        // front of a crate: it shoots the flying Slig anywhere else on its screen once it faces it, and a Slig
+        // that walks turns before a throw is done. Zulag 11: the throw from 1554,1440 for Slig#7000, in the
+        // open, and the one at 1584,1420 turned and shot it. (Its box as measured there: 28 to each side, 30
+        // over its point and 11 under: it is drawn some 20 under where it is going.)
+        // (or crates there in front of which the Sligs of the background do not see: they are there for them, and
+        // those of the next screen are not seen yet)
+        bool zWatched = false;
+        for (const SligAt& other : world.mSligs)
+        {
+            zWatched = zWatched || (!other.mPossessed && !other.mAsleep && other.mZShoot && screen(other.mX, other.mY - 5) == screen(slig.CentreX(), slig.mY1));
+        }
+        for (const NavFeature& f : in.mFeatures)
+        {
+            zWatched = zWatched || (f.mKind == FeatureKind::eZCover && screen((f.mX1 + f.mX2) / 2, (f.mY1 + f.mY2) / 2) == screen(slig.CentreX(), slig.mY1));
+        }
+        if (zWatched)
+        {
+            const auto covered = [&in](s32 x, s32 y)
+            {
+                for (const NavFeature& f : in.mFeatures)
+                {
+                    if (f.mKind == FeatureKind::eZCover && f.mX1 <= x - 30 && x + 30 <= f.mX2 && f.mY1 <= y - 34 && y + 15 <= f.mY2)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            // (and of those in cover, the nearest where it comes from first: one further on is past more of the
+            // Sligs of the background, and one of them on its beat between may never let it by. Zulag 11: the
+            // throw from 1770 for Slig#7000 is past the one walking 1631..1688, the cover at 1587..1686 is over
+            // Slig#7000 itself.)
+            std::stable_sort(target.mShots.begin(), target.mShots.end(), [&covered, &from](const FlierFlight::Shot& a, const FlierFlight::Shot& b)
+                             {
+                                 const bool ca = covered(a.mX, a.mY) && covered(a.mWaitX, a.mWaitY);
+                                 const bool cb = covered(b.mX, b.mY) && covered(b.mWaitX, b.mWaitY);
+                                 if (ca != cb)
+                                 {
+                                     return ca;
+                                 }
+                                 // (and of those as near, the higher: a throw turns the Sligs of the floor on the
+                                 // screen to it, and they shoot some 55 over their floor, while it is drawn some 20
+                                 // under its point. Zulag 11: shot at 1440 over the floor at 1499.)
+                                 if (!ca)
+                                 {
+                                     return false;
+                                 }
+                                 const s32 na = std::abs(a.mWaitX - from.mX) / 60;
+                                 const s32 nb = std::abs(b.mWaitX - from.mX) / 60;
+                                 return na != nb ? na < nb : a.mY < b.mY;
+                             });
+        }
         if (!target.mShots.empty() || needsKnown)
         {
             targets.push_back(target);
