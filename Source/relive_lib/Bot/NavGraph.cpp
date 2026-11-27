@@ -2149,8 +2149,15 @@ void NavGraph::Build(const NavInput& input)
             }
             const s32 px = (portal.mX1 + portal.mX2) / 2;
             const s32 before = portal.mDir == 0 ? px - n.mX : n.mX - px;
-            // (one that leads out of the path is a way out of it, from the cell it is hopped into from: ExitTask)
-            if (portal.mDestPath >= 0)
+            // (one that leads out of the path is a way out of it, from the cell it is hopped into from: ExitTask. So
+            // is one into a screen of the path with nowhere there to come out: the game's end, its movie plays. The
+            // final Zulag's at 687,1160, to camera 15: "chant and jump through the bird portal ... the bad ending")
+            bool comesOut = false;
+            for (const NavFeature& out : mInput.mFeatures)
+            {
+                comesOut = comesOut || (out.mKind == FeatureKind::ePortalExit && out.mCamera == portal.mDestCamera && out.mHalf == portal.mHalf);
+            }
+            if (portal.mDestPath >= 0 || !comesOut)
             {
                 if (before >= 0 && (before + step / 2) / step == 2)
                 {
