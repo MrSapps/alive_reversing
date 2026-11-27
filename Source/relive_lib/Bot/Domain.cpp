@@ -7946,7 +7946,9 @@ void Domain::Builder::SligLocks()
             }
             for (const Entity& lever : world.mEntities)
             {
-                if (lever.mKind != EntityKind::eLever || lever.mSwitch != slig.mSwitch)
+                // (or a wheel: Zulag 14, "Climb to the upper wheel and turn it to summon a Slig ... possess the
+                // Slig ... talk to the Slig Voice Lock")
+                if ((lever.mKind != EntityKind::eLever && lever.mKind != EntityKind::eWorkWheel) || lever.mSwitch != slig.mSwitch)
                 {
                     continue;
                 }
