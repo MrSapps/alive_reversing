@@ -13682,6 +13682,26 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Failed("no wheel");
     }
+    // (they are led past their own wheels: where his is not on their floor, past the last of theirs. The final
+    // Zulag: wheel 17 at 1287,1500 theirs, his 18 up a hoist at 1437,1400.)
+    {
+        const s32 abeAt = Domain::UseNode(nav, *farWheel, nullptr);
+        const Entity* lastTheirs = nullptr;
+        for (u32 id : mTeam.mFree)
+        {
+            const Entity* wheel = world.Find(id);
+            const s32 at = wheel && id != mTeam.mAbeWheel ? Domain::UseNode(nav, *wheel, nullptr) : -1;
+            if (at >= 0 && abeAt >= 0 && nav.Nodes()[at].mLine != nav.Nodes()[abeAt].mLine &&
+                (!lastTheirs || std::abs(wheel->CentreX() - mTeam.mFromX) > std::abs(lastTheirs->CentreX() - mTeam.mFromX)))
+            {
+                lastTheirs = wheel;
+            }
+        }
+        if (lastTheirs && mStage <= 2)
+        {
+            farWheel = lastTheirs;
+        }
+    }
     const s32 farNode = Domain::UseNode(nav, *farWheel, nullptr);
     const s32 cell = NavGraph::GridStep(farWheel->mHalf);
     const s32 away = farWheel->CentreX() >= mTeam.mFromX ? 1 : -1;
@@ -13718,12 +13738,17 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
             for (u32 id : mTeam.mFree)
             {
                 const Entity* wheel = world.Find(id);
-                if (wheel && (wheel->CentreX() - nearWheel->CentreX()) * away < 0)
+                // (not his own where that is off their floor: see above)
+                if (wheel && !(id == mTeam.mAbeWheel && farWheel->mId != mTeam.mAbeWheel) && (wheel->CentreX() - nearWheel->CentreX()) * away < 0)
                 {
                     nearWheel = wheel;
                 }
             }
             mStage = 2;
+            {
+                const s32 to = beyond(Domain::UseNode(nav, *nearWheel, nullptr), -away, 2);
+                bot.Log("to " + std::to_string(nav.Nodes()[to].mX) + "," + std::to_string(nav.Nodes()[to].mY) + ", a little before WorkWheel#" + std::to_string(nearWheel->mId) + ", to lead them along the wheels from");
+            }
             mGo = GoToNode(beyond(Domain::UseNode(nav, *nearWheel, nullptr), -away, 2));
             mGo->SetPullGates(true);
             mGo->SetLeading(true);
