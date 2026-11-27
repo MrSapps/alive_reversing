@@ -14983,8 +14983,10 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
     const World& world = bot.GetWorld();
     const NavGraph& nav = bot.Nav();
     const Entity* target = world.Find(mTarget);
-    const Entity* brew = mBrew ? world.Find(mBrew) : nullptr;
-    if (!target || (mBrew && !brew) || (!brew && mFrom < 0))
+    // (FartBombTask::kFlyFrom for the machine: flown from the cell mFrom with the Brew he has, not left by its target)
+    const bool flyFrom = mBrew == kFlyFrom;
+    const Entity* brew = mBrew && !flyFrom ? world.Find(mBrew) : nullptr;
+    if (!target || (mBrew && !flyFrom && !brew) || (!brew && mFrom < 0))
     {
         return TaskStep::Failed("no such entity");
     }
@@ -15070,7 +15072,7 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
         }
     }
     // (left by a mine and walked away from, not flown: Domain)
-    const bool drop = !brew && (target->mKind == EntityKind::eMine || target->mKind == EntityKind::eSlig);
+    const bool drop = !brew && !flyFrom && (target->mKind == EntityKind::eMine || target->mKind == EntityKind::eSlig);
     const bool gone = target->mGone || (isFlier && world.mFleechKilled.count(mTarget) != 0);
     if (++mFrames > 6000)
     {

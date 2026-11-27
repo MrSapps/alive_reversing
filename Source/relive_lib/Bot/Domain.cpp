@@ -8224,6 +8224,8 @@ void Domain::Builder::BrewMachines()
         {
             machines = machines || (brew.mKind == EntityKind::eBrew && !brew.mGone);
         }
+        // (or the Brew in him now, the machine's last: Zulag 12, the one drunk for the Slig by the last wheel)
+        machines = machines || world.mBrew;
         const std::size_t before = d.mActions.size();
         std::set<u32> zoned;
         // (and at a Slig the same way: Zulag 12, "drink one last brew, but save your fart for later ... Go right
@@ -8245,7 +8247,40 @@ void Domain::Builder::BrewMachines()
                 {
                     continue;
                 }
-                const s32 node = nav.Edges()[s2.mEdge].mTo;
+                s32 node = nav.Edges()[s2.mEdge].mTo;
+                // (at a Slig: from the place of that region nearest it on its floor, no nearer than its blast: a fart
+                // only lasts so long. Zulag 12: from 812,980 the one by the last wheel at 1800 was not got.)
+                // (and at an orb from the place of that region nearest it that is not on an orb's screen, where the
+                // chant that flies the fart is zapped: Zulag 12's fart for the orb at 4005 from 1262,480 was lost)
+                if (regions.count(d.mRegions[node]) == 0)
+                {
+                    s32 nearest = -1;
+                    for (s32 m = 0; m < static_cast<s32>(nav.Nodes().size()); m++)
+                    {
+                        const NavNode& c = nav.Nodes()[m];
+                        if (d.mRegions[m] != d.mRegions[node] || c.mHazard || c.mLow || c.mLiftStop >= 0 || c.mHalf != orb.mHalf || (isSlig && std::abs(c.mY - orb.mY2) > 30) || std::abs(c.mX - to.mX) < 180)
+                        {
+                            continue;
+                        }
+                        bool onOrbScreen = false;
+                        for (const Entity& e : world.mEntities)
+                        {
+                            onOrbScreen = onOrbScreen || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.CentreX(), (e.mY1 + e.mY2) / 2) == nav.CameraOf(c.mX, c.mY - 20));
+                        }
+                        if (onOrbScreen)
+                        {
+                            continue;
+                        }
+                        if (nearest < 0 || std::abs(c.mX - to.mX) < std::abs(nav.Nodes()[nearest].mX - to.mX))
+                        {
+                            nearest = m;
+                        }
+                    }
+                    if (nearest >= 0 && (isSlig || std::abs(nav.Nodes()[nearest].mX - to.mX) + std::abs(nav.Nodes()[nearest].mY - to.mY) < std::abs(nav.Nodes()[node].mX - to.mX) + std::abs(nav.Nodes()[node].mY - to.mY)))
+                    {
+                        node = nearest;
+                    }
+                }
                 const NavNode& n = nav.Nodes()[node];
                 if (n.mHazard || n.mLow || n.mLiftStop >= 0 || regions.count(d.mRegions[node]) != 0 || (std::abs(to.mX - n.mX) < 150 && std::abs(to.mY - n.mY) < 150))
                 {
@@ -8321,6 +8356,8 @@ void Domain::Builder::BrewMachines()
                     {
                         continue;
                     }
+                    // (flown from there, not left under it: FartBombTask::kFlyFrom)
+                    bomb.mOther = 0xFFFFFFFFu;
                     add("Fly a fart from " + std::to_string(n.mX) + "," + std::to_string(n.mY) + " to Slig#" + std::to_string(orb.mId), pre, {{Key::Mud(orb.mId), 2}, {Key::kBrew, 0}}, 500 + length / 3, bomb);
                     // (and, as for one a fart from the machine gets, the ways onto its floor by it need it dead: the
                     // plan then drinks before it goes down, where the machine is out of reach)

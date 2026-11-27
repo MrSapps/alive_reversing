@@ -1850,6 +1850,8 @@ class FartBombTask final : public Task
 {
 public:
     // brew 0: with the Brew he has in him, from the cell "from"
+    // brew kFlyFrom: flown from the cell from with the Brew he has (Domain's fart from anywhere at a Slig)
+    static constexpr u32 kFlyFrom = 0xFFFFFFFFu;
     FartBombTask(u32 target, u32 brew, s32 from = -1)
         : mTarget(target)
         , mBrew(brew)
