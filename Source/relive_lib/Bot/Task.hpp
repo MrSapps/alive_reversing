@@ -1864,6 +1864,7 @@ public:
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
 
 private:
+    s32 mBeamWaits = 0;
     u32 mTarget;
     u32 mBrew;
     s32 mFrom;

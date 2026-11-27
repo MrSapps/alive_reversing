@@ -15318,6 +15318,18 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return TaskStep::Do(Prim::Face(target->CentreX() > bot.Abe().mX));
         }
+        // (not as a motion detector's beam comes over him before the fart and the chant for it are done: in them
+        // he is not kept still, and a Greeter's beam on him has it come and zap him. Zulag 12's at 1637: "go left
+        // very carefully past the Greeter's motion sensors".)
+        if (!bot.GetWorld().BeamClear(bot.Abe().mX, bot.Abe().mY, bot.Abe().mHalfScale, 0, 0, 30) && ++mBeamWaits < 900)
+        {
+            if (mBeamWaits == 1)
+            {
+                bot.Log("a motion detector's beam comes over him before the fart and its chant are done: waiting");
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mBeamWaits = 0;
         mPhase = 1;
         mSinceBlast = 0;
         mFarts++;
