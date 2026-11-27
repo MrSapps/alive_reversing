@@ -15880,6 +15880,18 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             live = &s;
         }
     }
+    // (found off its place: its places to throw from are worked out again for where it is now. Zulag 11: the last
+    // of the three walking 1934..2012, grenades still planned for its place at 1662)
+    if (target && live && std::abs(live->mX - target->mX) > 150 && mStoodAt[mTarget] != live->mX && std::abs(mStoodAt[mTarget] - live->mX) > 60)
+    {
+        mStoodAt[mTarget] = live->mX;
+        mTargetsIn = 0;
+        mShot = 0;
+        mState = 0;
+        mLegFrames = 0;
+        bot.Log("Slig#" + std::to_string(mTarget) + " is off its place, at " + std::to_string(live->mX) + ": thrown at there");
+        return TaskStep::Do(Prim::Wait(1));
+    }
     if (target && mShot >= target->mShots.size())
     {
         mShot = 0;
