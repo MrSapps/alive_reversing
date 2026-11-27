@@ -2565,6 +2565,30 @@ private:
     s32 mFrames = 0;
 };
 
+// To the cell given and chant with the Shrykull's power: he turns into it, it zaps what it can on the screen, and
+// he is himself again
+class ShrykullTask final : public Task
+{
+public:
+    explicit ShrykullTask(s32 node)
+        : mNode(node)
+    {
+    }
+    ~ShrykullTask() override;
+    std::string Name() const override
+    {
+        return "Chant as the Shrykull from cell " + std::to_string(mNode);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    s32 mNode;
+    std::unique_ptr<GoToTask> mGo;
+    bool mChanted = false;
+    s32 mWaits = 0;
+    s32 mTries = 0;
+};
+
 class LeadBelowTask final : public Task
 {
 public:

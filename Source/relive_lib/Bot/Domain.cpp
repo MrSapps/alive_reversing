@@ -4,6 +4,7 @@
 #include "ThrowArc.hpp"
 #include <algorithm>
 #include <cstdlib>
+#include <map>
 #include <set>
 #include <tuple>
 
@@ -3076,6 +3077,7 @@ struct Domain::Builder final
     void DrillsOverMudokons();
     void FollowersBelow();
     void LiftCalls();
+    void ShrykullZaps();
 
     // An action for the planner, and the step it is
     void add(std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step);
@@ -3314,6 +3316,7 @@ Domain Domain::Builder::Run()
     PenGates();
     FollowersBelow();
     LiftCalls();
+    ShrykullZaps();
     // Mudokons led to work wheels together past a Slog that a ring can drop: with it dead, not fed. A bone keeps it
     // a short while, which does for Abe on his own but not for leading a group by. (Zulag 5: the big Slog by the
     // bone sack, fed, was taken as out of the way of the wheels' Mudokons.) Only once no Slogs by a ring are left:
@@ -3426,6 +3429,7 @@ void Domain::Builder::Start()
     d.mStart.Set(world.CarriesMeat() ? Key::kMeat : Key::kRocks, world.mRocks);
     d.mStart.Set(Key::kInvis, world.mInvisEver ? 1 : 0);
     d.mStart.Set(Key::kInvisNow, world.mInvisCharge || world.mInvisible || world.mInvisComing ? 1 : 0);
+    d.mStart.Set(Key::kShrykull, world.mShrykull ? 1 : 0);
 }
 
 // From region to region: the crossings of the nav graph, with what each needs
@@ -8888,6 +8892,81 @@ void Domain::Builder::Zones()
                     break;
                 }
             }
+        }
+    }
+}
+
+// With the Shrykull's power: a chant from a screen zaps what is on it (Shrykull::CanKill: in the current camera).
+// From each region with a cell on a screen where there are UXBs or mines still on, or Sligs, fliers or orbs: its
+// cell nearest them. The final Zulag: "Roll left 2 screens, stand and chant to destroy all that stands in your way.
+// Climb up and turn the wheel marked 'Final Exit'": the hoist at 662,980 comes up on the UXB at 662,920.
+void Domain::Builder::ShrykullZaps()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    if (!world.mShrykull)
+    {
+        return;
+    }
+    std::map<s32, std::vector<const Entity*>> byCamera;
+    for (const Entity& e : world.mEntities)
+    {
+        const bool bomb = (e.mKind == EntityKind::eUxb || e.mKind == EntityKind::eMine) && !e.mGone;
+        const bool foe = (e.mKind == EntityKind::eSlig || e.mKind == EntityKind::eFlier || e.mKind == EntityKind::eSecurityOrb) && !e.mGone;
+        if (bomb || foe)
+        {
+            const s32 x = e.mLive ? e.mLiveX : e.CentreX();
+            const s32 y = e.mLive ? e.mLiveY : e.mY2;
+            byCamera[nav.CameraOf(x, y - 5)].push_back(&e);
+        }
+    }
+    for (const auto& screen : byCamera)
+    {
+        bool bombs = false;
+        s32 sumX = 0;
+        s32 sumY = 0;
+        std::vector<Goap::Fact> gives{{Key::kShrykull, 0}};
+        for (const Entity* e : screen.second)
+        {
+            const bool bomb = e->mKind == EntityKind::eUxb || e->mKind == EntityKind::eMine;
+            bombs = bombs || bomb;
+            sumX += e->mLive ? e->mLiveX : e->CentreX();
+            sumY += e->mLive ? e->mLiveY : e->mY2;
+            gives.push_back({Key::Switch(bomb ? e->mSwitch : World::HazardSwitch(e->mId)), 1});
+        }
+        // (only where there is a bomb to be rid of: a Slig or a flier alone has its own ways, and the power is had once)
+        if (screen.first < 0 || !bombs)
+        {
+            continue;
+        }
+        const s32 n = static_cast<s32>(screen.second.size());
+        const s32 cx = sumX / n;
+        const s32 cy = sumY / n;
+        std::map<s32, s32> best;
+        for (s32 node = 0; node < static_cast<s32>(nav.Nodes().size()); node++)
+        {
+            const NavNode& at = nav.Nodes()[node];
+            if (at.mHazard || at.mLow || at.mLiftStop >= 0 || nav.CameraOf(at.mX, at.mY - 5) != screen.first)
+            {
+                continue;
+            }
+            const s32 region = mD.mRegions[node];
+            const auto found = best.find(region);
+            const auto far = [&](s32 m)
+            {
+                return std::abs(nav.Nodes()[m].mX - cx) + std::abs(nav.Nodes()[m].mY - cy);
+            };
+            if (found == best.end() || far(node) < far(found->second))
+            {
+                best[region] = node;
+            }
+        }
+        for (const auto& from : best)
+        {
+            DomainStep step;
+            step.mKind = StepKind::eShrykull;
+            step.mEdge = from.second;
+            add("Zap the screen of " + std::to_string(cx) + "," + std::to_string(cy) + " as the Shrykull from " + std::to_string(nav.Nodes()[from.second].mX) + "," + std::to_string(nav.Nodes()[from.second].mY), {regionFact(from.second), {Key::kShrykull, 1}}, gives, 300, step);
         }
     }
 }

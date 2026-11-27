@@ -724,6 +724,8 @@ struct World final
     // and the rest take no notice of him: it lasts a few hundred frames); he has had the power in this path
     bool mInvisCharge = false;
     bool mInvisible = false;
+    // He has the Shrykull's power: a chant where he stands turns him into it (Abe::Motion_0_Idle_44EEB0)
+    bool mShrykull = false;
     // The frames of it that are left (0 when he is not): what is left on its timer and the 140 he takes to come
     // back into sight after (measured: the timer out at f=1727, seen again at 1869)
     s32 mInvisLeft = 0;

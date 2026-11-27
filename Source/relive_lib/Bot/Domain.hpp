@@ -54,6 +54,9 @@ inline u32 BrewsUsed(u32 entityId)
 // A Slog that is after him is loose on a floor, with no bone to keep it (one that had no stretch of its own: it
 // slept, or came from elsewhere). Nothing comes down onto that floor while it is.
 static const u32 kSlogLoose = 10;
+// He has the Shrykull's power (rescues at a Shrykull portal give it): a chant turns him into the Shrykull, which
+// zaps what Shrykull::CanKill takes on his screen
+static const u32 kShrykull = 11;
 // A stretch of floor (Domain::ScrabZone) has no loose Scrab on it that could get at Abe there
 inline u32 ScrabClear(s32 zone)
 {
@@ -173,6 +176,8 @@ enum class StepKind : u8
     eGrenadeOrb, // hold a grenade and throw it late from the cell mEdge, to go off in the air by security orb
                  // mEntity (Domain::OrbTargets)
     eZone,      // into the cell mEdge, which is in a zone that sets switch mOther when he is in it
+    eShrykull,  // to the cell mEdge and chant with the Shrykull's power: every UXB, mine, Slig, flying Slig, Slog,
+                // Glukkon and security orb on its screen is zapped
 };
 
 // What a planned action means to the bot

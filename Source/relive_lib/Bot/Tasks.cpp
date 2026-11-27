@@ -22448,6 +22448,60 @@ TaskStep LiftCallTask::Next(Bot& bot, const std::string& lastFailed)
     return ++mFrames < 900 ? TaskStep::Do(Prim::Wait(2)) : TaskStep::Failed("the lift didn't come back");
 }
 
+ShrykullTask::~ShrykullTask() = default;
+
+TaskStep ShrykullTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const AbeState& abe = bot.Abe();
+    const World& world = bot.GetWorld();
+    if (mChanted)
+    {
+        // (until he is himself again: the power is gone with the chant)
+        if (abe.Settled() && !world.mShrykull)
+        {
+            return TaskStep::Done();
+        }
+        if (++mWaits > 150)
+        {
+            return TaskStep::Failed("he didn't turn back from the Shrykull");
+        }
+        return TaskStep::Do(Prim::Wait(4));
+    }
+    if (!world.mShrykull)
+    {
+        return TaskStep::Failed("he hasn't the Shrykull's power");
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        return step;
+    }
+    if (bot.AbeNode() != mNode)
+    {
+        if (++mTries > 3)
+        {
+            return TaskStep::Failed("can't get to where he chants from");
+        }
+        mGo = GoToNode(mNode);
+        return Next(bot, "");
+    }
+    if (abe.mMove == Move::eCrouch)
+    {
+        return TaskStep::Do(Prim::Press(Btn::eUp));
+    }
+    if (!abe.Settled())
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    bot.Log("chanting as the Shrykull");
+    mChanted = true;
+    return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+}
+
 TaskStep LeadBelowTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const NavGraph& nav = bot.Nav();

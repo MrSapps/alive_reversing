@@ -2189,6 +2189,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         }
     }
     world.mInvisCharge = isAe && gAbe && gAbe->mHaveInvisibility != 0;
+    world.mShrykull = isAe && gAbe && gAbe->mRingPulseTimer != 0 && gAbe->mHaveShrykull != 0;
     world.mInvisible = isAe && gAbe && gAbe->GetInvisible();
     {
         const s32 timer = world.mInvisible ? gAbe->InvisibilityTimer() - static_cast<s32>(sGnFrame) : 0;
