@@ -9856,11 +9856,11 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& marked, co
             {
                 crates = crates || (f.mKind == FeatureKind::eZCover && screen((f.mX1 + f.mX2) / 2, (f.mY1 + f.mY2) / 2) == screen(slig.CentreX(), slig.mY1));
             }
-            const auto inCrate = [&in](s32 x, s32 y)
+            const auto inCrate = [&in, &screen](s32 x, s32 y)
             {
                 for (const NavFeature& f : in.mFeatures)
                 {
-                    if (f.mKind == FeatureKind::eZCover && f.mX1 <= x - 30 && x + 30 <= f.mX2 && f.mY1 <= y - 34 && y + 15 <= f.mY2)
+                    if (f.mKind == FeatureKind::eZCover && f.mX1 <= x - 38 && x + 38 <= f.mX2 && f.mY1 <= y - 45 && y + 20 <= f.mY2 && screen(x - 40, y) == screen(x, y) && screen(x + 40, y) == screen(x, y))
                     {
                         return true;
                     }
@@ -9971,8 +9971,11 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& marked, co
         // With a Slig of the background awake on the screen, first the places to wait and throw from that are in
         // front of a crate: it shoots the flying Slig anywhere else on its screen once it faces it, and a Slig
         // that walks turns before a throw is done. Zulag 11: the throw from 1554,1440 for Slig#7000, in the
-        // open, and the one at 1584,1420 turned and shot it. (Its box as measured there: 28 to each side, 30
-        // over its point and 11 under: it is drawn some 20 under where it is going.)
+        // open, and the one at 1584,1420 turned and shot it. (Its box as measured there: up to 31 to each side,
+        // 36 over its point and 13 under: it is drawn some 20 under where it is going. With some 15 to spare for how
+        // it sways about where it is steered to: Zulag 11, at 1890 for Slig#8002, 15 in, it swayed out to 1872. And
+        // not by the edge of a screen: the game's camera goes over to the next a little after it, and the Sligs of
+        // the one it left still see it.)
         // (or crates there in front of which the Sligs of the background do not see: they are there for them, and
         // those of the next screen are not seen yet)
         bool zWatched = false;
@@ -9986,11 +9989,11 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& marked, co
         }
         if (zWatched)
         {
-            const auto covered = [&in](s32 x, s32 y)
+            const auto covered = [&in, &screen](s32 x, s32 y)
             {
                 for (const NavFeature& f : in.mFeatures)
                 {
-                    if (f.mKind == FeatureKind::eZCover && f.mX1 <= x - 30 && x + 30 <= f.mX2 && f.mY1 <= y - 34 && y + 15 <= f.mY2)
+                    if (f.mKind == FeatureKind::eZCover && f.mX1 <= x - 38 && x + 38 <= f.mX2 && f.mY1 <= y - 45 && y + 20 <= f.mY2 && screen(x - 40, y) == screen(x, y) && screen(x + 40, y) == screen(x, y))
                     {
                         return true;
                     }
@@ -10001,7 +10004,10 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& marked, co
             // Sligs of the background, and one of them on its beat between may never let it by. Zulag 11: the
             // throw from 1770 for Slig#7000 is past the one walking 1631..1688, the cover at 1587..1686 is over
             // Slig#7000 itself.)
-            std::stable_sort(target.mShots.begin(), target.mShots.end(), [&covered, &from](const FlierFlight::Shot& a, const FlierFlight::Shot& b)
+            // (first of all, those that come down where it is: Zulag 11, from 1636 to come down at 1520 for Slig#7000,
+            // which walks 1662..1812, seven times)
+            const s32 at = target.mX;
+            std::stable_sort(target.mShots.begin(), target.mShots.end(), [&covered, &from, at](const FlierFlight::Shot& a, const FlierFlight::Shot& b)
                              {
                                  const bool ca = covered(a.mX, a.mY) && covered(a.mWaitX, a.mWaitY);
                                  const bool cb = covered(b.mX, b.mY) && covered(b.mWaitX, b.mWaitY);
@@ -10015,6 +10021,12 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& marked, co
                                  if (!ca)
                                  {
                                      return false;
+                                 }
+                                 const s32 la = std::abs(a.mLandX - at) / 40;
+                                 const s32 lb = std::abs(b.mLandX - at) / 40;
+                                 if (la != lb)
+                                 {
+                                     return la < lb;
                                  }
                                  const s32 na = std::abs(a.mWaitX - from.mX) / 60;
                                  const s32 nb = std::abs(b.mWaitX - from.mX) / 60;
