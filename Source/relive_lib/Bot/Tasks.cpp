@@ -2431,6 +2431,21 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         const Entity* drill = SweepOver(nav, world, cur);
         const bool inside = drill != nullptr;
         const bool ahead = in < path.size() && in < 40;
+        // Clear for him, and leading, for the ones that follow him too: on foot along the same way, as far behind
+        // as they are (a walk of 9 frames a cell). The final Zulag: "Bring the Mudokon with you back to the left.
+        // Run under the drills"; timed for him alone, the one behind him was drilled at 1703,1500.
+        s32 followLag = -1;
+        for (const Entity& e : mLeading ? world.mEntities : std::vector<Entity>{})
+        {
+            if (e.mKind == EntityKind::eMudokon && e.mLive && e.mFollowing && e.mHalf == abe.mHalfScale && std::abs(e.mLiveY - abe.mY) <= 30)
+            {
+                followLag = std::max(followLag, std::abs(e.mLiveX - abe.mX) * 9 / NavGraph::GridStep(abe.mHalfScale) + 6);
+            }
+        }
+        const auto clear = [&](std::size_t edges, bool rolled)
+        {
+            return SweepsClear(nav, world, path, edges, bot.SweepLate(), rolled) && (followLag < 0 || SweepsClear(nav, world, path, edges, bot.SweepLate() + followLag, false));
+        };
         // (cells a drill reaches that stands still as its switch is: a cell at a time, so that it is looked at again
         // when it has been set going. The Executive Office of Bonewerkz: the drills of the last platform are set
         // going by his coming up onto it, a few frames on; the walk to the well under one of them was begun as
@@ -2457,6 +2472,21 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             while (out < path.size() && SweepOver(nav, world, nav.Edges()[path[out]].mTo))
             {
                 out++;
+            }
+            // (leading, drills a cell or two apart are one stretch: stopped between them, the one behind him stops a
+            // cell back, in the reach of the drill he has just come by. The final Zulag's three at 1650..1774,1500:
+            // he waited at 1737, the Mudokon at 1762 under the drill of 1750.)
+            for (std::size_t k = out, gap = 0; followLag >= 0 && k < path.size() && k < 40 && gap <= 2; k++)
+            {
+                if (SweepOver(nav, world, nav.Edges()[path[k]].mTo))
+                {
+                    out = k + 1;
+                    gap = 0;
+                }
+                else
+                {
+                    gap++;
+                }
             }
             drill = drill ? drill : SweepOver(nav, world, nav.Edges()[path[0]].mTo);
             const std::size_t count = std::min(out + 1, path.size());
@@ -2498,7 +2528,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 sweepStop = 1;
             }
-            else if (!SweepsClear(nav, world, path, count, bot.SweepLate()))
+            else if (!clear(count, false))
             {
                 // Where its stroke is too short to walk under at any time, a roll may fit: it is quicker and
                 // lower. Tried once walking has had its chance.
@@ -2543,7 +2573,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     }
                     // (a row of five or more that no moment was found under in 300 frames: by the frame, RollClear)
                     const bool byFrame = count > 6 && mSweepWait >= 300 && lead + 1 >= count && RollClear(nav, world, path, lead);
-                    if (byFrame || SweepsClear(nav, world, path, count, bot.SweepLate(), true))
+                    if (byFrame || clear(count, true))
                     {
                         bot.Log(byFrame ? "rolling through under the row of drills, timed by the frame" : "rolling through under the drill");
                         bot.SweepBegun();
@@ -2566,7 +2596,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             if (sweepRoll > 0 || !world.SweepOf(drill->mId))
             {
             }
-            else if (!SweepsClear(nav, world, path, count, bot.SweepLate()))
+            else if (!clear(count, false))
             {
                 // (where he is may be no better: then on regardless)
                 const SweepAt* here = inside ? world.SweepOf(drill->mId) : nullptr;
