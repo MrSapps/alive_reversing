@@ -11018,7 +11018,9 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
         mSaidHello = true;
         return TaskStep::Do(Prim::Press(bot.SpeakHello(), 6));
     }
-    if (mud->mMood == MudMood::eUpset)
+    // (once: a sad one stays sad, and follows all the same. The final Zulag's at 1562,980, "Say 'Hi' and 'Sorry'
+    // to the Mudokon, then get him to follow you": told sorry over and over for 1200 frames.)
+    if (mud->mMood == MudMood::eUpset && mSorries++ < 1)
     {
         return TaskStep::Do(Prim::Press(bot.SpeakSorry(), 6));
     }

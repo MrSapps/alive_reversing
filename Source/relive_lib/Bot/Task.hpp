@@ -1287,6 +1287,8 @@ private:
     std::unique_ptr<DisarmTask> mDisarm;
     s32 mDisarms = 0;
     bool mSaidHello = false;
+    // "Sorry"s said to an upset one
+    s32 mSorries = 0;
     bool mSaidFollow = false;
     s32 mSinceLine = 0;
     s32 mSlaps = 0;
