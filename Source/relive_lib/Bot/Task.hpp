@@ -1614,6 +1614,8 @@ private:
     bool mLockTried = false;
     u32 mLockId = 0;
     s32 mHereBoys = 0;
+    s32 mHereWalk = 0;
+    s32 mSlogShots = 0;
     u32 mEntity;
     bool mShootIt;
     s32 mShootFrames = 0;

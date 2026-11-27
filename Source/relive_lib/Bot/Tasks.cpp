@@ -11165,6 +11165,33 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return RaidStep(bot, *me);
         }
+        // (the Slogs on its level near it first, while it is up there with them: Zulag 12's woke on the ledge at
+        // 862,880, by the platforms at 859 the two that kept the well out were on, and down by the lock it was
+        // under them)
+        if (mAmbush && !mMine && !mLockTried && mSlogShots < 400)
+        {
+            const SlogAt* near = nullptr;
+            for (const SlogAt& slog : world.mSlogs)
+            {
+                if (!me->mHalf && std::abs(slog.mY - me->mY) <= 45 && std::abs(slog.mX - me->mX) < 600 && (!near || std::abs(slog.mX - me->mX) < std::abs(near->mX - me->mX)))
+                {
+                    near = &slog;
+                }
+            }
+            if (near)
+            {
+                if (mSlogShots == 0)
+                {
+                    bot.Log("Slogs on the Slig's level: shot first");
+                }
+                mSlogShots += 2;
+                if (me->mFacingLeft != (near->mX < me->mX))
+                {
+                    return TaskStep::Do(Prim::Wait(2, near->mX < me->mX ? Btn::eLeft : Btn::eRight));
+                }
+                return TaskStep::Do(Prim::Wait(2, Btn::eThrow));
+            }
+        }
         // (the Slig that woke: to a shut Slig lock near it first, and its code said)
         if (mAmbush && !mMine && !mLockTried)
         {
@@ -11220,6 +11247,39 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
                 }
             }
         }
+        // (Slogs up on their platforms over it, on its screen: "Here boy", and they come down to it, to be shot.
+        // Zulag 12: "kill the Slogs, calling 'Here boy' if they're still on the upper platforms".)
+        // (before what it shoots: a Slig far off along its floor kept it shooting at nothing)
+        bool slogLevel = false;
+        for (const SlogAt& slog : world.mSlogs)
+        {
+            slogLevel = slogLevel || (!me->mHalf && std::abs(slog.mY - me->mY) <= 45 && std::abs(slog.mX - me->mX) < 600);
+        }
+        if (mHereBoys < 24 && mFrames == 0 && !slogLevel)
+        {
+            for (const SlogAt& slog : world.mSlogs)
+            {
+                if (!me->mHalf && std::abs(slog.mX - me->mX) < 600 && std::abs(slog.mY - me->mY) <= 200 && std::abs(slog.mY - me->mY) > 45 && nav.CameraOf(slog.mX, slog.mY - 5) == nav.CameraOf(me->mX, me->mY - 5))
+                {
+                    // (along under them first: "Go left and kill the Slogs")
+                    if (std::abs(slog.mX - me->mX) > 150 && mHereWalk++ < 200)
+                    {
+                        return TaskStep::Do(Prim::Wait(6, slog.mX < me->mX ? Btn::eLeft : Btn::eRight));
+                    }
+                    if (mHereBoys++ == 0)
+                    {
+                        bot.Log("Slogs up over the Slig: \"Here boy\"");
+                    }
+                    mShootFrames = 0;
+                    // (a press, then the wait for it to be heard: held, it is said once)
+                    if (mHereBoys % 2 == 1)
+                    {
+                        return TaskStep::Do(Prim::Wait(3, Btn::eSpeak2));
+                    }
+                    return TaskStep::Do(Prim::Wait(40));
+                }
+            }
+        }
         // Shoot what it can get at on its floor, then chant again and it bursts
         s32 targetX = 0;
         if (mShootFrames < 1200 && Target(world, *me, mShootIt ? entity : nullptr, targetX))
@@ -11232,23 +11292,6 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
             }
             const u32 hold = ShootLevel(world, *me, targetX, 6);
             return TaskStep::Do(Prim::Wait(6, hold));
-        }
-        // (Slogs up on their platforms over it, on its screen: "Here boy", and they come down to it, to be shot.
-        // Zulag 12: "kill the Slogs, calling 'Here boy' if they're still on the upper platforms".)
-        if (mHereBoys < 8 && mFrames == 0)
-        {
-            for (const SlogAt& slog : world.mSlogs)
-            {
-                if (!me->mHalf && std::abs(slog.mX - me->mX) < 600 && std::abs(slog.mY - me->mY) <= 200 && std::abs(slog.mY - me->mY) > 45 && nav.CameraOf(slog.mX, slog.mY - 5) == nav.CameraOf(me->mX, me->mY - 5))
-                {
-                    if (mHereBoys++ == 0)
-                    {
-                        bot.Log("Slogs up over the Slig: \"Here boy\"");
-                    }
-                    mShootFrames = 0;
-                    return TaskStep::Do(Prim::Wait(45, Btn::eSpeak2));
-                }
-            }
         }
         mFrames += 20;
         if (mFrames > 600)
