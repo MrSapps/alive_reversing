@@ -2149,6 +2149,38 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 }
             }
         }
+        // Walked or run onto a plate that turns on a barrier ahead (an electric wall that is off): dear, so that it is
+        // hopped over. Zulag 13: the plate at 1175..1199,1140 turns on the electric wall at 1250 (both switch 117),
+        // run into three times.
+        if (know->mNav.Input().mIsAe && e.mKind == EdgeKind::eWalk && to.mHalf == from.mHalf && std::abs(to.mY - from.mY) <= 2)
+        {
+            const s32 cell = NavGraph::GridStep(to.mHalf);
+            for (const NavFeature& plate : know->mNav.Input().mFeatures)
+            {
+                const s32 px = (plate.mX1 + plate.mX2) / 2;
+                if (plate.mKind != FeatureKind::ePlate || plate.mHalf != to.mHalf || std::abs(plate.mY2 - to.mY) > 30 || std::abs(px - to.mX) > cell / 2 || plate.mSwitch <= 1)
+                {
+                    continue;
+                }
+                const bool onNow = world->Switch(plate.mSwitch) != 0;
+                const bool onAfter = plate.mA == 0 ? true : plate.mA == 1 ? false : !onNow;
+                for (const NavFeature& wall : know->mNav.Input().mFeatures)
+                {
+                    const s32 wx = (wall.mX1 + wall.mX2) / 2;
+                    if (wall.mKind != FeatureKind::eBarrier || wall.mSwitch != plate.mSwitch || wall.mHalf != to.mHalf || std::abs(wall.mY2 - to.mY) > 40 || std::abs(wx - px) > 10 * cell)
+                    {
+                        continue;
+                    }
+                    // (on means shut for one that starts open, open for one that starts shut)
+                    const bool shutAfter = wall.mStartClosed ? !onAfter : onAfter;
+                    const bool shutNow = wall.mStartClosed ? !onNow : onNow;
+                    if (shutAfter && !shutNow && (wx - px) * (to.mX - from.mX) > 0)
+                    {
+                        return e.mCost + 3000;
+                    }
+                }
+            }
+        }
         // Coming down from a fall is heard (Abe::Motion_16_LandSoft: not after letting go of a ledge), and a Fleech
         // asleep close by wakes at it
         if (!world->mInvisible && (e.mKind == EdgeKind::eFall || (e.mKind == EdgeKind::eHop && to.mY > from.mY + 20)))
