@@ -15172,6 +15172,9 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
                     const bool away = s.mFacingLeft ? m.mX > s.mBeatMax : m.mX < s.mBeatMin;
                     const s32 pause = away ? (s.mFacingLeft ? s.mPauseLeft : s.mPauseRight) : 0;
                     soon = soon || s.FramesUntilSees(m.mX, camX1, camX1 + camW) + pause < 130;
+                    // (and only while it is walking there: stood at that end, how much of its stand is left is not known,
+                    // and set off late in it he was caught on its floor coming back)
+                    soon = soon || (away && s.mMotion != 2 && std::abs(s.mX - m.mX) < 450);
                 }
             }
         }
@@ -15224,6 +15227,11 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
         }
         if (brew && at >= 0 && bot.AbeNode() >= 0 && bot.AbeNode() != at && nav.Nodes()[bot.AbeNode()].mLine != nav.Nodes()[at].mLine && (sligOn(at, true) || soon) && mSligWaits < 3000)
         {
+            // (hung from the ledge he went up to, which counts as on it: up onto it to wait, hung he is in their sight)
+            if (bot.Abe().mMove == Move::eHang)
+            {
+                return TaskStep::Do(Prim::Press(Btn::eUp));
+            }
             if (mSligWaits++ == 0)
             {
                 bot.Log("a Slig faces the Brew machine: down to it when it has turned");

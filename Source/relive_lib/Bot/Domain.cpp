@@ -442,7 +442,20 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
                 const bool onDoor = door >= 0 && door != at.mTrapDoor && nav.Input().mFeatures[door].mSwitch > 1 && sw == 0;
                 if (onDoor)
                 {
-                    relax(next, false, nav.Input().mFeatures[door].mSwitch, nav.Input().mFeatures[door].mStartClosed ? 0 : 1);
+                    const NavFeature& trap = nav.Input().mFeatures[door];
+                    relax(next, false, trap.mSwitch, trap.mStartClosed ? 0 : 1);
+                    // (and walked onto open, down through it to the floor under: the way down a voice lock's door. Zulag
+                    // 9's third executive office, the Glukkon by the door of 195 on its way to level 3.)
+                    const NavNode& on = nav.Nodes()[next];
+                    for (s32 down = 40; down <= 420; down += 10)
+                    {
+                        const s32 under = nav.NodeAt(on.mX, on.mY + down * (half ? 1 : 2) / 2, half, 5);
+                        if (under >= 0 && std::abs(nav.Nodes()[under].mX - on.mX) <= step / 2)
+                        {
+                            relax(under, false, trap.mSwitch, trap.mStartClosed ? 1 : 0);
+                            break;
+                        }
+                    }
                 }
                 else
                 {
@@ -3677,7 +3690,7 @@ void Domain::Builder::Crossings()
             {
                 beside = beside || ((h.mHidden || h.mHiddenStill) && h.mLine == to.mLine && std::abs(h.mX - to.mX) <= 2 * NavGraph::GridStep(to.mHalf));
             }
-            for (const Entity& slig : brews && !beside && nav.Input().mIsAe && !to.mHidden && !to.mHiddenStill && to.mY > from.mY + 30 ? world.mEntities : std::vector<Entity>{})
+            for (const Entity& slig : brews && nav.Input().mIsAe && to.mY > from.mY + 30 ? world.mEntities : std::vector<Entity>{})
             {
                 if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || slig.mState == 1 || slig.mHalf != to.mHalf)
                 {
@@ -3686,7 +3699,12 @@ void Domain::Builder::Crossings()
                 const s32 sx = slig.mLive ? slig.mLiveX : slig.CentreX();
                 const s32 sy = slig.mLive ? slig.mLiveY : slig.mY2;
                 const s32 at = nav.NodeAt(sx, sy, slig.mHalf, 30);
-                if (at >= 0 && nav.Nodes()[at].mLine == to.mLine && std::abs(sx - to.mX) <= 75)
+                // (or a fall from just over its floor down past it close by, there being no stop on that floor at the
+                // fall's column: the tunnel down the shaft's left side from 462,1140, past level 4's Slig at 512. Not
+                // one from far up: the first fall down the whole shaft is the guide's way past it.)
+                const bool past = e.mKind == EdgeKind::eFall && sy > from.mY + 30 && sy - from.mY <= 150 && sy < to.mY - 30 && std::abs(sx - from.mX) <= 60;
+                const bool by = !beside && !to.mHidden && !to.mHiddenStill && at >= 0 && nav.Nodes()[at].mLine == to.mLine && std::abs(sx - to.mX) <= 75;
+                if (by || past)
                 {
                     pre.push_back({Key::Mud(slig.mId), 2});
                     if (both)

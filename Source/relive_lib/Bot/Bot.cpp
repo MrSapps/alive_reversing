@@ -3687,6 +3687,7 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
     // (and a Slig got rid of that something else waits on: a lever it guards, a floor not to be come onto while it
     // is about. Zulag 9: "fly your farts up the shaft to destroy all of the Sligs".)
     std::vector<Goap::Fact> deaths;
+    std::set<s32> wayDeaths;
     // (where there are Brews to spend on them: elsewhere a Slig is got by on the way, and the level's other paths are
     // looked to first. FeeCo's lobby, its way out shut: it went for a Slig of its own instead, and stayed.)
     bool brews = false;
@@ -3757,6 +3758,12 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
             {
                 deaths.push_back(f);
             }
+            // (one a way across needs gone, not a thing to use: that before anything, while the Brews are to hand.
+            // Zulag 9: level 4's Slig by the tunnel down the left side, not to be got at with a fart from above)
+            if (slig && slig->mKind == EntityKind::eSlig && domain.mSteps[a.mTag].mKind == StepKind::eCross)
+            {
+                wayDeaths.insert(f.mKey);
+            }
         }
     }
     for (const Goap::Fact& f : deaths)
@@ -3766,7 +3773,7 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
         {
             // (before the switches of the same cost: a Slig gone is what a Brew's farts are for first, the orbs
             // after. Zulag 9: two farts on an orb out of reach, and the Slig of the floor below the top left.)
-            tries.push_back({est / 2, f});
+            tries.push_back({wayDeaths.count(f.mKey) ? est / 4 : est / 2, f});
         }
     }
     for (const Goap::Fact& fact : worth)
@@ -3862,7 +3869,7 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
         {
             orbFact = orbFact || (e.mKind == EntityKind::eSecurityOrb && Key::Switch(World::HazardSwitch(e.mId)) == fact.mKey);
         }
-        const s32 weighed = deathFact ? sub.mCost / 2 : sub.mCost + (orbFact ? 1000 : 0);
+        const s32 weighed = deathFact ? sub.mCost / (wayDeaths.count(fact.mKey) ? 4 : 2) : sub.mCost + (orbFact ? 1000 : 0);
         if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || weighed < bestWeighed))
         {
             bestWeighed = weighed;
