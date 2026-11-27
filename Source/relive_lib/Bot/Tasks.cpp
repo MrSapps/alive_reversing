@@ -2017,6 +2017,32 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                            { return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eLift ? all(e) : -1; }, path)
            && !path.empty();
     }
+    // (no way they can follow him by just now, with them following: waited for a while, not gone off by a door
+    // they don't go through. The final Zulag: the trap door of 16 that the angry Mudokon's lever opens and shuts
+    // on the floor to wheels 17 and 18, "wait for the trapdoor to close"; gone by the background, the Mudokon
+    // after him under the drills of 1650..1774 was drilled.)
+    if (!atGoal && mLeading && !led && mLeadNoWay < 600)
+    {
+        bool following = false;
+        for (const Entity& e : bot.GetWorld().mEntities)
+        {
+            following = following || (e.mKind == EntityKind::eMudokon && e.mLive && e.mFollowing);
+        }
+        if (following)
+        {
+            if (mLeadNoWay == 0)
+            {
+                bot.Log("no way the ones following him can come by just now: waiting");
+            }
+            mLeadNoWay += 10;
+            mSteps--;
+            return TaskStep::Do(Prim::Wait(10));
+        }
+    }
+    if (led)
+    {
+        mLeadNoWay = 0;
+    }
     if (led && nav.Edges()[path[0]].mKind == EdgeKind::eLift)
     {
         // A lift takes whoever stands on it: the ones that follow are waited for until they do
