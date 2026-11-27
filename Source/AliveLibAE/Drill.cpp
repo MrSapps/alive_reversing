@@ -631,6 +631,16 @@ FP Drill::StrokeSpeed() const
     return !mUseId || (!!SwitchStates_Get(mDrillSwitchId) == mStartOff) ? mInitialSpeed : mOffSpeed;
 }
 
+s32 Drill::RestAfter() const
+{
+    if (mToggle)
+    {
+        return 0;
+    }
+    const bool on = !mUseId || (!!SwitchStates_Get(mDrillSwitchId) == mStartOff);
+    return on ? mOnMinPauseTime : mOffMinPauseTime;
+}
+
 s32 Drill::PauseLeft() const
 {
     if (mToggle || Expired(mOffTimer))

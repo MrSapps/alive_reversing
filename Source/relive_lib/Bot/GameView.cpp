@@ -2666,6 +2666,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         sweep.mSpeed = pDrill->StrokeSpeed().fpValue / 256;
         sweep.mPhase = pDrill->GetStroke() == ::Drill::Stroke::eParked ? 0 : (pDrill->GetStroke() == ::Drill::Stroke::eOut ? 1 : 2);
         sweep.mPause = pDrill->PauseLeft();
+        sweep.mRest = pDrill->RestAfter();
         sweep.mWillStart = pDrill->WillStart();
         world.mSweeps.push_back(sweep);
     }

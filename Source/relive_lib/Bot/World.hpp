@@ -334,6 +334,9 @@ struct SweepAt final
     s32 mPhase = 0;
     // Parked: frames before it can start, and whether it will at all as the switches are
     s32 mPause = 0;
+    // And the frames it stays parked at least after each stroke (Drill::VUpdate: its pause time, 23 for the final
+    // Zulag's; taken as none, the drill of 449..625,340 came back twice as often as it does)
+    s32 mRest = 0;
     bool mWillStart = true;
 
     // Where it kills t frames from now, starting as soon as it may. False if it is parked then.
@@ -364,6 +367,7 @@ struct SweepAt final
             {
                 offset += mSpeed;
                 phase = offset >= mTravel ? 0 : 2;
+                pause = phase == 0 ? mRest : pause;
             }
         }
         const s32 shift = mSign * ((offset - mOffset) / 256);

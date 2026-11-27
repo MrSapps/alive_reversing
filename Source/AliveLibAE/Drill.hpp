@@ -64,6 +64,8 @@ public:
     }
     // Frames until a parked one may start
     s32 PauseLeft() const;
+    // The frames it stays parked at least after each stroke from now on, as the switch is now
+    s32 RestAfter() const;
     relive::Path_Drill::DrillDirection Direction() const
     {
         return mDrillDirection;
