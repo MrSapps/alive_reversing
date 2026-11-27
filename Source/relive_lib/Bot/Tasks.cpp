@@ -17897,11 +17897,117 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
             if (perch >= 0)
             {
                 bot.Log("an orb on this screen: to " + std::to_string(nav.Nodes()[perch].mX) + "," + std::to_string(nav.Nodes()[perch].mY) + " along the Slig's floor, to take it over from there when it has come after him");
+                mPerch = perch;
+                // (a ledge on another screen: it only comes after him there if it has seen him go. On its floor at
+                // the edge of its screen nearest the ledge first, till it faces him, then off at a run: a Slig that
+                // has spotted him and lost him off its screen runs after him (Slig::Brain_7_SpottedEnemy, ToChase).
+                // Zulag 14: snuck by, the Slig at 1687..1787 kept to its beat and never came.)
+                const s32 start = Domain::SligNode(nav, *slig);
+                const s32 cam = nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5);
+                if (start >= 0 && nav.CameraOf(nav.Nodes()[perch].mX, nav.Nodes()[perch].mY - 5) != cam)
+                {
+                    const NavNode& floor = nav.Nodes()[start];
+                    for (s32 n = 0; n < static_cast<s32>(nav.Nodes().size()); n++)
+                    {
+                        const NavNode& at = nav.Nodes()[n];
+                        if (at.mLine == floor.mLine && at.mHalf == floor.mHalf && !at.mHazard && nav.CameraOf(at.mX, at.mY - 5) == cam &&
+                            (mShow < 0 || std::abs(at.mX - nav.Nodes()[perch].mX) < std::abs(nav.Nodes()[mShow].mX - nav.Nodes()[perch].mX)))
+                        {
+                            mShow = n;
+                        }
+                    }
+                }
+                if (mShow < 0)
+                {
+                    mLure = std::make_unique<GoToTask>("to where the Slig is taken over from", [perch](s32 n)
+                                                       { return n == perch; });
+                    mLure->SetHurry(true);
+                    mWaits = -900;
+                }
+                else
+                {
+                    bot.Log("first to " + std::to_string(nav.Nodes()[mShow].mX) + "," + std::to_string(nav.Nodes()[mShow].mY) + " on its floor, to be seen there");
+                }
+            }
+        }
+        if (mShow >= 0)
+        {
+            const AbeState& abe = bot.Abe();
+            const s32 cam = nav.CameraOf(abe.mX, abe.mY - 5);
+            // (seen: it says "Freeze!". Facing him is not enough: it was at the end of its beat, turning, and he
+            // went before it had looked)
+            bool seen = false;
+            for (const SligAt& s : world.mSligs)
+            {
+                seen = seen || (!s.mPossessed && !s.mAsleep && s.mHalf == abe.mHalfScale && std::abs(s.mY - abe.mY) <= 45 && nav.CameraOf(s.mX, s.mY - 5) == cam && s.mFacingLeft == (s.mX > abe.mX) && s.mMotion == kSligFreeze);
+            }
+            if (seen || mShowWaits > 900)
+            {
+                bot.Log(seen ? "the Slig has seen him: off to the ledge" : "the Slig never turned to him: off to the ledge");
+                // (off its screen at once, at a run: it shoots 30 frames after it has said "Freeze!", and one
+                // that has shot doesn't come after him. Zulag 14: the way to the ledge first waited 21 frames, then
+                // walked, and he went off its screen as it fired.)
+                mFleeCam = cam;
+                mFleeRight = nav.Nodes()[mPerch].mX > abe.mX;
+                mFleeFrames = 0;
+                mFleeJumped = false;
+                mShow = -1;
+                mAtShow = false;
+                mToShow.reset();
+                const s32 perch = mPerch;
                 mLure = std::make_unique<GoToTask>("to where the Slig is taken over from", [perch](s32 n)
                                                    { return n == perch; });
                 mLure->SetHurry(true);
                 mWaits = -900;
             }
+            else if (bot.AbeNode() != mShow && !mAtShow)
+            {
+                if (!mToShow)
+                {
+                    const s32 show = mShow;
+                    mToShow = std::make_unique<GoToTask>("to where the Slig sees him", [show](s32 n)
+                                                         { return n == show; });
+                }
+                const TaskStep step = mToShow->Next(bot, lastFailed);
+                if (step.mKind == TaskStep::Kind::ePrim || step.mKind == TaskStep::Kind::eFailed)
+                {
+                    return step;
+                }
+                mToShow.reset();
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            else
+            {
+                mAtShow = true;
+                mShowWaits++;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+        if (mFleeCam >= 0)
+        {
+            // (and over a gap ahead on the way at a running jump from the run: the way to the ledge stopped short of
+            // it to take a run up, and the Slig, after him, shot him. Zulag 14: the gap at 2000..2100.)
+            const s32 at = bot.AbeNode();
+            const NavEdge* jump = nullptr;
+            for (const NavEdge& e : nav.Edges())
+            {
+                const s32 ahead = (e.mX - bot.Abe().mX) * (mFleeRight ? 1 : -1);
+                if (!mFleeJumped && at >= 0 && e.mKind == EdgeKind::eRunJump && e.mLeft != mFleeRight && nav.Nodes()[e.mFrom].mLine == nav.Nodes()[at].mLine && ahead >= 0 && ahead <= 250 && (!jump || ahead < (jump->mX - bot.Abe().mX) * (mFleeRight ? 1 : -1)))
+                {
+                    jump = &e;
+                }
+            }
+            if (jump)
+            {
+                mFleeJumped = true;
+                mFleeCam = -1;
+                return TaskStep::Do(Prim::RunJump(jump->mX, jump->mLeft));
+            }
+            if (nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5) == mFleeCam && mFleeFrames++ < 60)
+            {
+                return TaskStep::Do(Prim::Wait(1, static_cast<u32>(mFleeRight ? Btn::eRight : Btn::eLeft) | Btn::eRun));
+            }
+            mFleeCam = -1;
         }
         if (mLure)
         {

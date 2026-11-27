@@ -2189,10 +2189,12 @@ public:
     // On his way along the Slig's floor to where it is taken over from: it is meant to see him and come after
     bool Luring() const
     {
-        return mLure != nullptr;
+        return mLure != nullptr || mAtShow;
     }
     // The game's number for a Slig that walks (Slig.hpp: Motion_2_Walking)
     static const s32 kSligWalking = 2;
+    // And for one that says "Freeze!" as it sees him (Motion_30_SpeakAIFreeze)
+    static const s32 kSligFreeze = 30;
 
 private:
     // Frames it has spent on other Sligs of its floor
@@ -2206,6 +2208,18 @@ private:
     // The way to where it is taken over from, when that is not by the lever (Domain::SligLockPerch)
     std::unique_ptr<GoToTask> mLure;
     bool mLured = false;
+    // With that on another screen: the cell of its floor where it is to see him first, the way there, and whether
+    // he is waiting there to be seen
+    s32 mPerch = -1;
+    s32 mShow = -1;
+    std::unique_ptr<GoToTask> mToShow;
+    bool mAtShow = false;
+    s32 mShowWaits = 0;
+    // Seen there: off its screen at a run first, this way
+    s32 mFleeCam = -1;
+    bool mFleeRight = false;
+    s32 mFleeFrames = 0;
+    bool mFleeJumped = false;
     // 0 the lever, 1 the chant, 2 as the Slig
     s32 mPhase = 0;
     s32 mFrames = 0;
