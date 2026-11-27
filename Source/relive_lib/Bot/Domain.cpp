@@ -7832,7 +7832,9 @@ void Domain::Builder::Fliers()
         const s32 fromY = (spawner.mY1 + spawner.mY2) / 2;
         for (const Entity& lever : world.mEntities)
         {
-            if (lever.mKind != EntityKind::eLever || lever.mGone || lever.mSwitch <= 1 || lever.mHalf != spawner.mHalf || std::abs(lever.CentreX() - fromX) + std::abs(lever.mY2 - fromY) > kFlierReach)
+            // (as far as a Slig it bombs: Zulag 11's at 1962,1200, the way on, "go up after the door marked 'A', kill
+            // the flying Slig and pull the lever", 1,940 from where it is let out)
+            if (lever.mKind != EntityKind::eLever || lever.mGone || lever.mSwitch <= 1 || lever.mHalf != spawner.mHalf || std::abs(lever.CentreX() - fromX) + std::abs(lever.mY2 - fromY) > 2 * kFlierReach)
             {
                 continue;
             }
