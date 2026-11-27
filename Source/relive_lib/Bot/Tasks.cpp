@@ -2007,6 +2007,41 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         mLeadWaits = 0;
     }
 
+    // Leading, one that was following and has stopped, close by on his floor and not at a wheel (where they stop
+    // for good), is told to follow again before he goes on. The final Zulag: the Mudokon taken down on the lift at
+    // 1962,980 lost him on the way (state 422, then 202) and was left at the top of the lifts' screen.
+    if (mLeading)
+    {
+        const World& world = bot.GetWorld();
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eMudokon && e.mLive && e.mFollowing && std::find(mFollowers.begin(), mFollowers.end(), e.mId) == mFollowers.end())
+            {
+                mFollowers.push_back(e.mId);
+            }
+        }
+        for (const u32 id : abe.Settled() && mRegains < 3 ? mFollowers : std::vector<u32>{})
+        {
+            const Entity* mud = world.Find(id);
+            if (!mud || !mud->mLive || mud->mFollowing || mud->mHalf != abe.mHalfScale || std::abs(mud->mLiveY - abe.mY) > 30 || std::abs(mud->mLiveX - abe.mX) > 200)
+            {
+                continue;
+            }
+            bool atWheel = false;
+            for (const Entity& w : world.mEntities)
+            {
+                atWheel = atWheel || (w.mKind == EntityKind::eWorkWheel && std::abs(w.CentreX() - mud->mLiveX) <= 25 && std::abs(w.mY2 - mud->mLiveY) <= 30);
+            }
+            if (!atWheel)
+            {
+                mRegains++;
+                bot.Log("Mudokon#" + std::to_string(id) + " stopped following him: telling it to again");
+                mStop = std::make_unique<RecruitTask>(id);
+                return Next(bot, "");
+            }
+        }
+    }
+
     std::vector<s32> path;
     const bool atGoal = mIsGoal(cur);
     bool led = false;

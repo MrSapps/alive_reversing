@@ -1143,6 +1143,9 @@ private:
     bool mTrapTried = false;
     s32 mRetreats = 0;
     bool mLeading = false;
+    // Leading: the ones seen following him, and how often one was told to again
+    std::vector<u32> mFollowers;
+    s32 mRegains = 0;
     // Crouched before a drill, to roll through under it
     bool mSweepDuck = false;
     // A roll timed through drills that goes on past a drop: the cell it goes on to, and how many steps it has
