@@ -15558,7 +15558,20 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
     // a lot to look for)
     if (mTargetsIn <= 0 || mKilled != world.mFleechKilled.size() || mState == 4)
     {
-        mTargets = Domain::FlierTargets(nav.Input(), world, *spawner);
+        // (a Slig a grenade has missed where it stood still, away from where the map puts it: where it stood. Zulag
+        // 11's at 1762, thrown at at 1660 where it starts.)
+        World here = world;
+        for (Entity& e : here.mEntities)
+        {
+            const auto shift = mStoodAt.find(e.mId);
+            if (shift != mStoodAt.end())
+            {
+                const s32 dx = shift->second - e.CentreX();
+                e.mX1 += dx;
+                e.mX2 += dx;
+            }
+        }
+        mTargets = Domain::FlierTargets(nav.Input(), here, *spawner);
         mTargetsIn = 30;
         mKilled = world.mFleechKilled.size();
     }
@@ -16268,7 +16281,17 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         if (++mSince > fuse + 25 && (live || mSince > fuse + 150))
         {
             bot.Log("the grenade from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY) + " did not get Slig#" + std::to_string(mTarget) + (live ? " (it is at " + std::to_string(live->mX) + "," + std::to_string(live->mY) + ", motion " + std::to_string(live->mMotion) + ")" : " (it is not to be seen)") + ": from somewhere else");
-            mShot++;
+            if (live && live->mMotion == 0 && target && std::abs(live->mX - target->mX) > 30 && mStoodAt.count(mTarget) == 0)
+            {
+                mStoodAt[mTarget] = live->mX;
+                mTargetsIn = 0;
+                mShot = 0;
+                bot.Log("Slig#" + std::to_string(mTarget) + " stands at " + std::to_string(live->mX) + ": thrown at there from now on");
+            }
+            else
+            {
+                mShot++;
+            }
             mState = 0;
             mLegFrames = 0;
         }
@@ -16371,7 +16394,16 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                     }
                     // (one stood still a while somewhere else: over to where it stands, the grenade thrown as from the
                     // place planned. Zulag 11's at 1762, stood there as the grenade came down at 1660.)
-                    if (live->mMotion == 0 && mAimWaits % 90 == 0 && std::abs(mAimShift + live->mX - landX) <= 160)
+                    // (not into the sight of another Slig level with it: there, the one on the ledge at 1688,1420. With
+                    // none, the grenade is thrown where planned, and a miss has it thrown at where its Slig stood.)
+                    bool watched = false;
+                    const s32 newX = bx + live->mX - landX;
+                    for (const SligAt& sl : world.mSligs)
+                    {
+                        watched = watched || (&sl != live && !sl.mPossessed && !sl.mAsleep && sl.mHalf == flown.mHalf && by <= sl.mY + FlierFlight::kLevelUnder + 20 && by >= sl.mY - FlierFlight::kLevelOver - 20 &&
+                                              std::abs(sl.mX - newX) < 375);
+                    }
+                    if (!watched && live->mMotion == 0 && mAimWaits % 90 == 0 && std::abs(mAimShift + live->mX - landX) <= 160)
                     {
                         mAimShift += live->mX - landX;
                         bot.Log("Slig#" + std::to_string(mTarget) + " stands at " + std::to_string(live->mX) + ": the throw moved by " + std::to_string(mAimShift));

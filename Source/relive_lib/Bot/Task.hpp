@@ -2076,6 +2076,8 @@ private:
     // The Sligs to get (Domain::FlierTargets), the frames until they are looked for again, and how many things
     // were known dead when they last were
     std::vector<Domain::FlierTarget> mTargets;
+    // (Sligs a grenade missed where they stood still, and where: thrown at there from then on)
+    std::map<u32, s32> mStoodAt;
     s32 mTargetsIn = 0;
     std::size_t mKilled = 0;
     // The frames the flying Slig has been off his screen while he chants
