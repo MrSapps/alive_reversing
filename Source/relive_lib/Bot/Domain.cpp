@@ -9846,7 +9846,43 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& marked, co
         target.mFloorY = floorY;
         target.mMine = mine;
         bool needsKnown = false;
-        for (const FlierFlight::Shot& shot : FlierFlight::Shots(target.mX, floorY, floorX1, floorX2))
+        // (where there are crates on its screen, for the Sligs of the background: also from in front of one of them
+        // for where it walks to along its floor, to be thrown when it is there. Zulag 11: none in front of a crate
+        // for Slig#8002 where it stands at 1989, and waited for in the open at 1875 it was seen.)
+        std::vector<FlierFlight::Shot> tries = FlierFlight::Shots(target.mX, floorY, floorX1, floorX2);
+        {
+            bool crates = false;
+            for (const NavFeature& f : in.mFeatures)
+            {
+                crates = crates || (f.mKind == FeatureKind::eZCover && screen((f.mX1 + f.mX2) / 2, (f.mY1 + f.mY2) / 2) == screen(slig.CentreX(), slig.mY1));
+            }
+            const auto inCrate = [&in](s32 x, s32 y)
+            {
+                for (const NavFeature& f : in.mFeatures)
+                {
+                    if (f.mKind == FeatureKind::eZCover && f.mX1 <= x - 30 && x + 30 <= f.mX2 && f.mY1 <= y - 34 && y + 15 <= f.mY2)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            for (s32 x = target.mX - 160; crates && x <= target.mX + 160; x += 20)
+            {
+                if (x == target.mX || x < floorX1 || x > floorX2 || screen(x, floorY - 5) != screen(slig.CentreX(), slig.mY1))
+                {
+                    continue;
+                }
+                for (const FlierFlight::Shot& other : FlierFlight::Shots(x, floorY, floorX1, floorX2))
+                {
+                    if (inCrate(other.mX, other.mY) && inCrate(other.mWaitX, other.mWaitY))
+                    {
+                        tries.push_back(other);
+                    }
+                }
+            }
+        }
+        for (const FlierFlight::Shot& shot : tries)
         {
             // Nothing of the path in the grenade's way until it comes down, nor in the flying Slig's way there.
             // What is shut and a switch opens (a trap door the grenade would be thrown up under, an electric
