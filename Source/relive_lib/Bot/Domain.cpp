@@ -8627,7 +8627,8 @@ void Domain::Builder::FootSwitchGates()
         bool gate = false;
         for (const NavFeature& f : nav.Input().mFeatures)
         {
-            gate = gate || (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch == plate.mSwitch);
+            // (an electric wall too: Zulag 13's at 1375, off by the plate at 1300..1324 that toggles switch 118)
+            gate = gate || (f.mKind == FeatureKind::eBarrier && (f.mSolid || f.mBeam) && f.mSwitch == plate.mSwitch);
         }
         const s32 on = nav.NodeAt(plate.CentreX(), plate.mY2, plate.mHalf, 30);
         if (!gate || on < 0)
