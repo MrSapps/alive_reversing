@@ -1147,6 +1147,12 @@ private:
     // A roll timed through drills that goes on past a drop: the cell it goes on to, and how many steps it has
     s32 mRollTo = -1;
     s32 mRollOn = 0;
+    // Lift stops seen without their lift while he was at this, when each lift last came to its stop, and the frames
+    // waited for them all to have just come (WalkStep)
+    std::set<s32> mLiftAway;
+    std::map<s32, s32> mLiftCame;
+    s32 mLiftWaits = 0;
+    s32 mLiftWatch = 0;
     // That, from standing: at a run
     bool mRunOn = false;
     // Flying mines: frames spent watching them and waiting for them, and crouched where one goes over his head

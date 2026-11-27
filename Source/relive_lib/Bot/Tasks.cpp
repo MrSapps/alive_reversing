@@ -4133,6 +4133,88 @@ TaskStep GoToTask::WalkStep(Bot& bot, const std::string& lastFailed, const Way& 
         jump.mX3 = chain.mX3;
         return TaskStep::Do(jump);
     }
+    // Lifts ahead on this walk that come and go by themselves (seen away from their stops while he was at this):
+    // waited for until all of them have just come, then crossed at a run in one go, the led ones with him. The
+    // final Zulag: "run across the lifts when they're even", 2037 and 2112 of 1120 that its timer moves 60
+    // frames on from each time they are even; walked, he went off the end of the second one into its shaft.
+    {
+        const World& world = bot.GetWorld();
+        const s32 here = nav.Nodes()[cur].mLiftStop;
+        std::size_t lastStop = 0;
+        bool any = false;
+        bool moved = false;
+        bool allHere = true;
+        bool movered = false;
+        for (std::size_t k = 0; k <= last && k < path.size(); k++)
+        {
+            const NavNode& to = nav.Nodes()[nav.Edges()[path[k]].mTo];
+            if (to.mLiftStop < 0 || to.mLiftStop == here)
+            {
+                continue;
+            }
+            const NavFeature& stop = nav.Input().mFeatures[to.mLiftStop];
+            any = true;
+            lastStop = k;
+            if (!world.LiftAtStop(stop.mX1, stop.mX2, to.mY, stop.mA != 0))
+            {
+                mLiftAway.insert(to.mLiftStop);
+                mLiftCame.erase(to.mLiftStop);
+                allHere = false;
+            }
+            else if (mLiftCame.count(to.mLiftStop) == 0)
+            {
+                mLiftCame[to.mLiftStop] = abe.mFrame;
+            }
+            moved = moved || mLiftAway.count(to.mLiftStop) != 0;
+            // (a mover's switch is on the stop it brings the lift to: any stop of the column)
+            for (const NavFeature& other : nav.Input().mFeatures)
+            {
+                movered = movered || (other.mKind == stop.mKind && std::abs(other.mX1 - stop.mX1) <= 2 && other.mSwitch > 1);
+            }
+        }
+        // (ones a mover works are watched a while first, to see whether they come and go)
+        if (any && movered && !moved && mLiftWatch < 130)
+        {
+            if (mLiftWatch++ == 0)
+            {
+                bot.Log("lifts a mover works ahead: watching whether they come and go");
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (any && moved)
+        {
+            bool fresh = allHere;
+            for (std::size_t k = 0; fresh && k <= lastStop; k++)
+            {
+                const NavNode& to = nav.Nodes()[nav.Edges()[path[k]].mTo];
+                fresh = to.mLiftStop < 0 || to.mLiftStop == here || mLiftAway.count(to.mLiftStop) == 0 || abe.mFrame - mLiftCame[to.mLiftStop] <= 12;
+            }
+            if (!fresh && mLiftWaits < 1200)
+            {
+                if (mLiftWaits++ == 0)
+                {
+                    bot.Log("lifts ahead come and go: waiting for them all to have just come");
+                }
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            mLiftWaits = 0;
+            const std::size_t to = std::min(run, lastStop + 1);
+            // (where they end in a drop off the last of them the same way, off it at a run with no stop: stopped on
+            // it, he rode it away. The final Zulag: off the end of 2075..2151 onto the lift that waits at 1240.)
+            if (run == lastStop && run + 1 < path.size() && nav.Edges()[path[run + 1]].mKind == EdgeKind::eFall && nav.Edges()[path[run + 1]].mLeft == first.mLeft)
+            {
+                bot.Log("the lifts ahead have come: across at a run and off the end of the last");
+                mLastEdge = path[run + 1];
+                Prim off = Prim::WalkOff(first.mLeft);
+                off.mRunOff = 1;
+                return TaskStep::Do(off);
+            }
+            bot.Log("the lifts ahead have come: across at a run to " + std::to_string(nav.Nodes()[nav.Edges()[path[to]].mTo].mX));
+            Prim go = Prim::MoveTo(nav.Nodes()[nav.Edges()[path[to]].mTo].mX, Gait::eRun);
+            go.mKeen = true;
+            return TaskStep::Do(go);
+        }
+    }
     if (led)
     {
         last = std::min<std::size_t>(last, 3);

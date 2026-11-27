@@ -1489,7 +1489,9 @@ void NavGraph::Build(const NavInput& input)
                     // on its platform, where that is no fall to die of. (Terminal 5: the lift at 1975..2051 waits
                     // at 720, and its top stop at 619 is how the walkthrough gets to "the lower pair of blind
                     // Mudokons": off the floor at 620.)
-                    if (mNodes[to].mLiftStop >= 0 && n.mLiftStop < 0 && !roll)
+                    // (or off another lift's platform: the final Zulag's lift of 2075..2151, from which the walkthrough
+                    // goes on down "the last lift on the right", waiting at 1240 under its stop at 1120)
+                    if (mNodes[to].mLiftStop >= 0 && n.mLiftStop != mNodes[to].mLiftStop && (n.mLiftStop < 0 || std::abs(mInput.mFeatures[n.mLiftStop].mX1 - mInput.mFeatures[mNodes[to].mLiftStop].mX1) > 2) && !roll)
                     {
                         s32 under = -1;
                         for (std::size_t k = 0; k < mNodes.size(); k++)

@@ -1841,11 +1841,21 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         }
         // (a ride needs no such check: he is only ever on the platform where the lift is, and a way that rides
         // it twice has it somewhere else by the second time)
-        const NavNode* stop = to.mLiftStop >= 0 && from.mLiftStop < 0 ? &to : nullptr;
+        // (or from another lift's platform: the final Zulag's of 2075..2151, beside the stop at 1120 of the lift
+        // that waits at 1240)
+        const bool otherColumn = from.mLiftStop < 0 || (to.mLiftStop >= 0 && std::abs(know->mNav.Input().mFeatures[from.mLiftStop].mX1 - know->mNav.Input().mFeatures[to.mLiftStop].mX1) > 2);
+        const NavNode* stop = to.mLiftStop >= 0 && otherColumn ? &to : nullptr;
         if (stop)
         {
             const NavFeature& at = know->mNav.Input().mFeatures[stop->mLiftStop];
-            if (!world->LiftAtStop(at.mX1, at.mX2, stop->mY, at.mA != 0))
+            // (not one a mover sends to and fro by itself, from another lift: it comes back, and the walk onto it is
+            // timed for that, GoToTask::WalkStep. The final Zulag's two between 1962 and 2187 at 1120.)
+            bool comesBack = false;
+            for (const NavFeature& other : from.mLiftStop >= 0 ? know->mNav.Input().mFeatures : std::vector<NavFeature>{})
+            {
+                comesBack = comesBack || (other.mKind == at.mKind && std::abs(other.mX1 - at.mX1) <= 2 && other.mSwitch > 1);
+            }
+            if (!comesBack && !world->LiftAtStop(at.mX1, at.mX2, stop->mY, at.mA != 0))
             {
                 *refused = __LINE__;
                 return -1;
