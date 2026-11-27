@@ -2030,6 +2030,7 @@ private:
     s32 mCoverPlanSligs = -1;
     bool mZGoing = false;
     s32 mZRetries = 0;
+    bool mRetarget = false;
     std::vector<std::pair<s32, s32>> mZStretch;
     FlownAt mBoxSeen;
     s32 mZGoX = 0;

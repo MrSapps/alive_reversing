@@ -15817,14 +15817,31 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
     }
     else if (!target)
     {
-        if (mTarget != 0)
+        if (mTarget != 0 && !mRetarget)
         {
             bot.Log("the grenade got Slig#" + std::to_string(mTarget));
         }
-        // The nearest next
+        mRetarget = false;
+        // The nearest next; last one whose place is on the screen with no Slig there to be seen: it has gone off on
+        // its beat, and one nearer its place is another's. (Zulag 11: once the one at 1712 was got, Slig#7000 of
+        // 1662 was off by 1937, and grenades went down at 1662 for it.)
+        const auto score = [&](const Domain::FlierTarget& t)
+        {
+            s32 d = std::abs(t.mX - bx) + std::abs(t.mFloorY - by);
+            if (!t.mMine && nav.CameraOf(t.mX, t.mFloorY - 5) == nav.CameraOf(bx, by))
+            {
+                bool there = false;
+                for (const SligAt& sl : world.mSligs)
+                {
+                    there = there || (sl.mSeen && !sl.mPossessed && sl.mHalf == flown.mHalf && std::abs(sl.mY - t.mFloorY) <= 25 && std::abs(sl.mX - t.mX) <= 150);
+                }
+                d += there ? 0 : 100000;
+            }
+            return d;
+        };
         for (const Domain::FlierTarget& t : targets)
         {
-            if (!target || std::abs(t.mX - bx) + std::abs(t.mFloorY - by) < std::abs(target->mX - bx) + std::abs(target->mFloorY - by))
+            if (!target || score(t) < score(*target))
             {
                 target = &t;
             }
@@ -15841,6 +15858,24 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
     for (const SligAt& s : world.mSligs)
     {
         if (target && s.mSeen && !s.mPossessed && s.mHalf == flown.mHalf && std::abs(s.mY - target->mFloorY) <= 25 && std::abs(s.mX - target->mX) <= 150 && (!live || std::abs(s.mX - target->mX) < std::abs(live->mX - target->mX)))
+        {
+            live = &s;
+        }
+    }
+    // (none there: one of its floor further off that is no nearer another of the Sligs still to get, gone off
+    // there on its beat. Zulag 11: Slig#7000 of 1662 walks to 1937 once the one by it is got.)
+    for (const SligAt& s : world.mSligs)
+    {
+        if (!target || live == &s || !s.mSeen || s.mPossessed || s.mHalf != flown.mHalf || std::abs(s.mY - target->mFloorY) > 25 || std::abs(s.mX - target->mX) <= 150 || (live && std::abs(live->mX - target->mX) <= 150))
+        {
+            continue;
+        }
+        bool other = false;
+        for (const Domain::FlierTarget& t : mTargets)
+        {
+            other = other || (t.mSlig != target->mSlig && !t.mMine && std::abs(t.mFloorY - target->mFloorY) <= 25 && std::abs(s.mX - t.mX) < std::abs(s.mX - target->mX));
+        }
+        if (!other && (!live || std::abs(s.mX - target->mX) < std::abs(live->mX - target->mX)))
         {
             live = &s;
         }
@@ -16295,7 +16330,14 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         if (++mSince > fuse + 25 && (live || mSince > fuse + 150))
         {
             bot.Log("the grenade from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY) + " did not get Slig#" + std::to_string(mTarget) + (live ? " (it is at " + std::to_string(live->mX) + "," + std::to_string(live->mY) + ", motion " + std::to_string(live->mMotion) + ")" : " (it is not to be seen)") + ": from somewhere else");
-            if (live && target && coveredThrow && zHere && mZRetries < 6)
+            if (!live && target && nav.CameraOf(target->mX, target->mFloorY - 5) == nav.CameraOf(bx, by))
+            {
+                // (not there to be seen: gone off on its beat. Another first, and this one found again later)
+                bot.Log("Slig#" + std::to_string(mTarget) + " is not where it was: another first");
+                mTarget = 0;
+                mRetarget = true;
+            }
+            else if (live && target && coveredThrow && zHere && mZRetries < 6)
             {
                 mZRetries++;
                 bot.Log("from the same place in front of the crate again, for when it is back under it");
@@ -16450,6 +16492,8 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                     {
                         watched = watched || (&sl != live && !sl.mPossessed && !sl.mAsleep && sl.mHalf == flown.mHalf && by <= sl.mY + FlierFlight::kLevelUnder + 20 && by >= sl.mY - FlierFlight::kLevelOver - 20 &&
                                               std::abs(sl.mX - newX) < 375);
+                        // (nor out from in front of its crate with a Slig of the background on the screen)
+                        watched = watched || (!sl.mPossessed && !sl.mAsleep && sl.mZShoot && nav.CameraOf(sl.mX, sl.mY - 5) == nav.CameraOf(bx, by));
                     }
                     if (!watched && live->mMotion == 0 && mAimWaits % 90 == 0 && std::abs(mAimShift + live->mX - landX) <= 160)
                     {
