@@ -16120,7 +16120,9 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
     // along and 6 up, a pixel a frame more down each frame), no nearer than its blast leaves it alone.
     // (and on the way to a lever: the Barracks' path 14, where the one over the lever of 214 bombed it as it hung
     // by that lever)
-    if (lock || lever)
+    // (and on the way to Sligs to bomb: Zulag 11, "blow up the other flying Slig", whose round down the shaft at
+    // 1195..1400 bombed the one taken over each time it came by)
+    if (lock || lever || !targets.empty())
     {
         const s32 myCam = nav.CameraOf(bx, by - 20);
         const FlierAt* foe = nullptr;
@@ -16299,7 +16301,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
     {
         // Up (or down) to where it throws from, and thrown the moment it is there
         // (when it can: not in the frames it ends its climb in, when the game takes no notice of the button)
-        const s32 fromX = shot.mX + (shot.mFaceLeft ? -mNearer : mNearer);
+        const s32 fromX = shot.mX + (shot.mFaceLeft ? -mNearer : mNearer) + mAimShift;
         if (lock)
         {
             // In its box and at rest: it says "Hi", and then the code back to it
@@ -16345,8 +16347,42 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             // facing it)
             return steerTo(fromX, shot.mY, shot.mFaceLeft ? Btn::eRight : Btn::eLeft);
         }
+        // (and only as the Slig will be where it comes down: one that walks a beat is waited for. Zulag 11's at 1662,
+        // thrown at as soon as he was there, was never under the grenade.)
+        if (std::abs(fromX - bx) <= 4 && std::abs(shot.mY - by) <= 3 && flown.mFacingLeft == shot.mFaceLeft && flown.mCanThrow && mAimWaits < 600)
+        {
+            const s32 landX = shot.mLandX + bx - shot.mX;
+            const SligAt* live = nullptr;
+            for (const SligAt& sl : world.mSligs)
+            {
+                if (!sl.mPossessed && std::abs(sl.mY - target->mFloorY) <= 30 && std::abs(sl.mX - target->mX) <= 250 && (!live || std::abs(sl.mX - landX) < std::abs(live->mX - landX)))
+                {
+                    live = &sl;
+                }
+            }
+            if (live)
+            {
+                const s32 ahead = live->mX + (live->mMotion == 2 ? (live->mFacingLeft ? -1 : 1) * fuse * 12 / 5 : 0);
+                if (std::abs(ahead - landX) > 15)
+                {
+                    if (mAimWaits++ == 0)
+                    {
+                        bot.Log("at " + std::to_string(bx) + "," + std::to_string(by) + ": waiting for Slig#" + std::to_string(mTarget) + " to come under " + std::to_string(landX));
+                    }
+                    // (one stood still a while somewhere else: over to where it stands, the grenade thrown as from the
+                    // place planned. Zulag 11's at 1762, stood there as the grenade came down at 1660.)
+                    if (live->mMotion == 0 && mAimWaits % 90 == 0 && std::abs(mAimShift + live->mX - landX) <= 160)
+                    {
+                        mAimShift += live->mX - landX;
+                        bot.Log("Slig#" + std::to_string(mTarget) + " stands at " + std::to_string(live->mX) + ": the throw moved by " + std::to_string(mAimShift));
+                    }
+                    return steerTo(fromX, shot.mY);
+                }
+            }
+        }
         if (std::abs(fromX - bx) <= 4 && std::abs(shot.mY - by) <= 3 && flown.mFacingLeft == shot.mFaceLeft && flown.mCanThrow)
         {
+            mAimWaits = 0;
             bot.Log("at " + std::to_string(bx) + "," + std::to_string(by) + ": a grenade for Slig#" + std::to_string(mTarget) + ", to come down at " + std::to_string(shot.mLandX + bx - shot.mX) + " in " + std::to_string(fuse) + " frames");
             mState = 4;
             mSince = 0;

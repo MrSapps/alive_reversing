@@ -2008,6 +2008,8 @@ public:
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
 
 private:
+    s32 mAimWaits = 0;
+    s32 mAimShift = 0;
     // A Slig on a level the way goes through was seen to face this way (its back since is all ahead), and the
     // frames waited for one that only showed its back
     bool mSawFace = false;
