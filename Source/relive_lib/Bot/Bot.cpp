@@ -312,6 +312,15 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<SendToWheelTask>(step.mEntity, step.mOther);
         case StepKind::eMudLever:
             return std::make_unique<MudLeverTask>(step.mEntity, step.mOther);
+        case StepKind::eBurstSlig:
+        {
+            // (to the cell, then the chant there: ClearSligTask's ambush takes over the Slig of the screen,
+            // shoots what else is on its floor and bursts it)
+            const s32 at = step.mEdge;
+            return std::make_unique<SequenceTask>(action.mName, std::make_unique<GoToTask>(action.mName, [at](s32 n)
+                                                                                           { return n == at; }),
+                                                  ClearSligTask::Ambush());
+        }
         case StepKind::eExit:
             return std::make_unique<ExitTask>(step.mEdge);
         case StepKind::eTogether:
@@ -1424,7 +1433,27 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             break;
         }
     }
-    const auto base = [refused, know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge, dangerLet, abeX, cycling, keepLiftAt](const NavEdge& e) -> s32
+    // (the Sligs whose beat never leaves his screen, with its ends: Zulag 9's landings onto such a beat)
+    std::vector<std::array<s32, 4>> stayers;
+    for (const SligAt& slig : mWorld.mSligs)
+    {
+        s32 lo = 0;
+        s32 hi = 0;
+        if (!slig.mAsleep && !slig.mPossessed && mKnow && BeatStaysOnScreen(slig) && BeatOf(slig, lo, hi))
+        {
+            stayers.push_back({lo, hi, slig.mY, slig.mHalf ? 1 : 0});
+        }
+    }
+    // (and by the map's bounds for them: a short beat is not told from watching. Zulag 9's first screen, 512..576.)
+    for (const Entity& ent : mKnow ? mWorld.mEntities : std::vector<Entity>{})
+    {
+        if (ent.mKind == EntityKind::eSlig && !ent.mGone && ent.mSwitch <= 1 && ent.mState != 1 && ent.mBeatMax > ent.mBeatMin &&
+            mKnow->mNav.CameraOf(ent.mBeatMin, ent.mY2 - 5) == mKnow->mNav.CameraOf(ent.mBeatMax, ent.mY2 - 5))
+        {
+            stayers.push_back({ent.mBeatMin, ent.mBeatMax, ent.mY2, ent.mHalf ? 1 : 0});
+        }
+    }
+    const auto base = [refused, know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge, dangerLet, abeX, cycling, keepLiftAt, stayers](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
         if (know->mBannedEdges.count(idx))
@@ -1927,7 +1956,8 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         // 96 frames in the Mines' path 10, where the way on is such a landing and a run to a well: Bot::MakeFlee.)
         // (unseen it is no matter)
         // (hung from the end of its floor he is not seen: GoToTask::Sentry)
-        if (!pastFacing && !unseenNow && !to.mHidden && !e.mHung && std::abs(to.mY - from.mY) * (to.mHalf ? 2 : 1) > 30 && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eWell))
+        // (hidden stood still where he lands is enough: he stands. Zulag 9, out of the well at 412,460.)
+        if (!pastFacing && !unseenNow && !to.mHidden && !to.mHiddenStill && !e.mHung && std::abs(to.mY - from.mY) * (to.mHalf ? 2 : 1) > 30 && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eWell))
         {
             const s32 scale = to.mHalf ? 2 : 1;
             // (one not seen yet, its screen not loaded, is where and how the map starts it)
@@ -1977,6 +2007,71 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 }
             }
         }
+        // A fall or a hop down is heard by every Slig on the screen it lands on, which turns to it (AE: a noise is
+        // heard on its screen, Events.cpp); letting go of a ledge is not (Abe::Motion_16_LandSoft). Dear onto the
+        // floor of one awake there, where a hoist down is to be had. (Zulag 9's sixth level: "Lower yourself over
+        // the edge when the Slig is facing right"; walked off the ledge behind its back, it turned at the thud.)
+        // (only where a hoist down from the same cell comes onto that floor: the quiet way is there to be had)
+        bool quiet = false;
+        for (s32 k = 0; k < from.mEdgeCount; k++)
+        {
+            const NavEdge& h = know->mNav.Edges()[from.mFirstEdge + k];
+            quiet = quiet || (h.mKind == EdgeKind::eHoistDown && know->mNav.Nodes()[h.mTo].mLine == to.mLine);
+        }
+        if (quiet && know->mNav.Input().mIsAe && !unseenNow && !e.mHung && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop) && to.mY > from.mY + 30)
+        {
+            for (const SligAt& slig : world->mSligs)
+            {
+                if (!slig.mPossessed && !slig.mAsleep && slig.mHalf == to.mHalf && std::abs(slig.mY - to.mY) <= 30 && know->mNav.CameraOf(slig.mX, slig.mY - 5) == know->mNav.CameraOf(to.mX, to.mY - 5))
+                {
+                    return e.mCost + 400;
+                }
+            }
+        }
+        // Down onto the beat of a Slig awake that never leaves his screen, in the open, whichever way it looks
+        // now: it turns at the end of its beat and he is on it (or two cells past it: shot at 587 by one whose beat ends at 576). Dear, where a hidden cell of that floor is to be had.
+        // (Zulag 9's first screen: "hop off the edge of your platform to land in the shadows while the Slig's back
+        // is turned"; climbed down onto its beat behind it, he was shot as it turned.)
+        // (let down beside a shadow it is not: GoToTask::HoistDownStep times that, and he steps into it)
+        bool besideShade = false;
+        for (s32 k = 0; e.mKind == EdgeKind::eHoistDown && k < to.mEdgeCount; k++)
+        {
+            const NavEdge& on = know->mNav.Edges()[to.mFirstEdge + k];
+            besideShade = besideShade || (on.mKind == EdgeKind::eWalk && (know->mNav.Nodes()[on.mTo].mHidden || know->mNav.Nodes()[on.mTo].mHiddenStill));
+        }
+        if (!unseenNow && !to.mHidden && !besideShade && std::abs(to.mY - from.mY) * (to.mHalf ? 2 : 1) > 30 && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown))
+        {
+            // (and where the same cell has another way down onto that floor that lands hidden: dear against that
+            // one only. FeeCo's path 7, the one way down at 637 made dear, he went back and forth above.)
+            bool hiddenWay = false;
+            for (s32 k = 0; k < from.mEdgeCount; k++)
+            {
+                const NavEdge& o = know->mNav.Edges()[from.mFirstEdge + k];
+                const NavNode& t = know->mNav.Nodes()[o.mTo];
+                // (or a hoist down beside a shadow, which HoistDownStep steps him into: Zulag 9's sixth level, 512)
+                bool beside = false;
+                for (s32 j = 0; o.mKind == EdgeKind::eHoistDown && j < t.mEdgeCount; j++)
+                {
+                    const NavEdge& w = know->mNav.Edges()[t.mFirstEdge + j];
+                    beside = beside || (w.mKind == EdgeKind::eWalk && (know->mNav.Nodes()[w.mTo].mHidden || know->mNav.Nodes()[w.mTo].mHiddenStill));
+                }
+                hiddenWay = hiddenWay || (&o != &e && t.mLine == to.mLine && (t.mHidden || t.mHiddenStill || beside) && (o.mKind == EdgeKind::eFall || o.mKind == EdgeKind::eHop || o.mKind == EdgeKind::eHoistDown));
+            }
+            // (under a security orb only: elsewhere the Slig can be chanted over, or got by in other ways)
+            bool orbOver = false;
+            for (const Entity& o : world->mEntities)
+            {
+                orbOver = orbOver || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && know->mNav.CameraOf(o.mX1, o.mY1) == know->mNav.CameraOf(to.mX, to.mY - 5));
+            }
+            for (const std::array<s32, 4>& beat : orbOver && hiddenWay ? stayers : std::vector<std::array<s32, 4>>{})
+            {
+                if ((beat[3] != 0) == to.mHalf && std::abs(beat[2] - to.mY) * (to.mHalf ? 2 : 1) <= 30 && to.mX >= beat[0] - 50 && to.mX <= beat[1] + 50)
+                {
+                    // (dearer than a far hop into the shadow, NavGraph::kFarHop)
+                    return e.mCost + NavGraph::kFarHop + 2000;
+                }
+            }
+        }
         // Up a hoist with a Fleech awake on the screen: it is up after him in 25 frames and has him as he hangs.
         // A well or a door on the same screen is the way to be rid of it. (A running jump up a hoist is a climb
         // like the other: with only the one made dear, Necrum's path 1 turned back from the hoist to its well.)
@@ -1990,8 +2085,9 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 }
             }
         }
-        // (a far hop down, NavGraph::kFarHop, never onto a floor a Slig walks)
-        if (e.mKind == EdgeKind::eHop && e.mCost >= NavGraph::kFarHop && Domain::SligBeat(know->mNav, *world, e.mTo) >= 0)
+        // (a far hop down, NavGraph::kFarHop, never onto a floor a Slig walks: unless into the shadow, where it does
+        // not see him. Zulag 9's first screen, "hop off the edge of your platform to land in the shadows".)
+        if (e.mKind == EdgeKind::eHop && e.mCost >= NavGraph::kFarHop && !to.mHidden && Domain::SligBeat(know->mNav, *world, e.mTo) >= 0)
         {
             *refused = __LINE__;
             return -1;
@@ -2139,12 +2235,10 @@ s32 Bot::QuietFrames(s32 x, s32 y, bool half) const
     return World::QuietFrames(mWorld.mSligs, mBeats, x, y, half, x1 - 25, x2 + 25);
 }
 
-bool Bot::BeatStaysOnScreen(const SligAt& slig) const
+bool Bot::BeatOf(const SligAt& slig, s32& lo, s32& hi) const
 {
-    const NavGraph& nav = mKnow->mNav;
-    const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
-    s32 lo = slig.mBeatMin;
-    s32 hi = slig.mBeatMax;
+    lo = slig.mBeatMin;
+    hi = slig.mBeatMax;
     if (hi <= lo)
     {
         for (const SligBeat& beat : mBeats)
@@ -2156,6 +2250,16 @@ bool Bot::BeatStaysOnScreen(const SligAt& slig) const
             }
         }
     }
+    return hi > lo;
+}
+
+bool Bot::BeatStaysOnScreen(const SligAt& slig) const
+{
+    const NavGraph& nav = mKnow->mNav;
+    const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
+    s32 lo = 0;
+    s32 hi = 0;
+    BeatOf(slig, lo, hi);
     return hi > lo && nav.CameraOf(lo, slig.mY - 5) == cam && nav.CameraOf(hi, slig.mY - 5) == cam && nav.CameraOf(slig.mX, slig.mY - 5) == cam;
 }
 
@@ -3674,7 +3778,15 @@ s32 Bot::NoWayOut(const Domain& domain, const std::vector<Goap::Action>& actions
                 {
                     cells += r + 1 == region ? 1 : 0;
                 }
-                if (cells <= 2)
+                // (unless something is done there besides crossing it: Zulag 9's sixth level, the two cells by the
+                // Brew machine beyond the trap door)
+                bool something = false;
+                for (const Goap::Action& a : domain.mActions)
+                {
+                    const DomainStep& st = domain.mSteps[a.mTag];
+                    something = something || (st.mKind != StepKind::eCross && std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::kRegion, region}) != a.mPre.end());
+                }
+                if (cells <= 2 && !something)
                 {
                     continue;
                 }
@@ -4534,6 +4646,44 @@ std::unique_ptr<Task> Bot::MakeFlee()
                     continue;
                 }
             }
+            // (a shadow a cell or two from him on his floor, short of the Slig: into it, and he stands still there.
+            // Zulag 9's sixth level: "drop and immediately sneak one step forward to the shadow"; sent back up the
+            // hoist instead, in its sight, he was shot.)
+            // (under a security orb, and one whose beat never leaves the screen, close by: no chanting it over, no
+            // waiting it out, and no getting off its floor before it is on him. FeeCo's path 7, 187 off: his plan's
+            // way down was the better.)
+            bool orbHere = false;
+            for (const Entity& o : mWorld.mEntities)
+            {
+                orbHere = orbHere || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == nav.CameraOf(mAbe.mX, mAbe.mY - 5));
+            }
+            // (and stood still in one already: he stays. Run for the hoist from the shadow by the Brew machine, Zulag
+            // 9's sixth level, he went past the Slig and was shot.)
+            if (mIsAe && orbHere && BeatStaysOnScreen(slig) && (nav.Nodes()[node].mHidden || nav.Nodes()[node].mHiddenStill) && mAbe.mMove == Move::eIdle)
+            {
+                continue;
+            }
+            if (mIsAe && orbHere && std::abs(slig.mX - mAbe.mX) <= 125 && BeatStaysOnScreen(slig) && !nav.Nodes()[node].mHidden && !nav.Nodes()[node].mHiddenStill)
+            {
+                const s32 cellW = NavGraph::GridStep(mAbe.mHalfScale);
+                s32 shade = -1;
+                for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+                {
+                    const NavNode& h = nav.Nodes()[n];
+                    if ((h.mHidden || h.mHiddenStill) && h.mLine == nav.Nodes()[node].mLine && std::abs(h.mX - mAbe.mX) <= 2 * cellW && std::abs(h.mX - slig.mX) >= 50 &&
+                        (shade < 0 || std::abs(h.mX - mAbe.mX) < std::abs(nav.Nodes()[shade].mX - mAbe.mX)))
+                    {
+                        shade = static_cast<s32>(n);
+                    }
+                }
+                if (shade >= 0)
+                {
+                    mAmbushes++;
+                    Log("a Slig is awake next to Abe at " + std::to_string(slig.mX) + "," + std::to_string(slig.mY) + ": into the shadow at " + std::to_string(nav.Nodes()[shade].mX) + " and still");
+                    return std::make_unique<GoToTask>("into the shadow by the Slig", [shade](s32 n)
+                                                      { return n == shade; });
+                }
+            }
             const NavGraph* graph = &nav;
             const s32 floorY = mAbe.mY;
             const auto away = [graph, floorY](s32 n)
@@ -4585,7 +4735,18 @@ std::unique_ptr<Task> Bot::MakeFlee()
             };
             // (cells are half as long at half scale)
             const std::size_t most = mAbe.mHalfScale ? 24 : 12;
-            const bool found = nav.FindPath(node, away, quickOnly, way);
+            bool found = nav.FindPath(node, away, quickOnly, way);
+            // (not one along its floor past it, under an orb: that is into its arms. Zulag 9's sixth level, from the
+            // Brew machine at 687 to the hoist at 512 with the Slig at 542 between.)
+            for (s32 idx : found && mIsAe && orbHere ? way : std::vector<s32>{})
+            {
+                const NavNode& a = nav.Nodes()[nav.Edges()[idx].mFrom];
+                const NavNode& b = nav.Nodes()[nav.Edges()[idx].mTo];
+                if (std::abs(a.mY - slig.mY) <= 45 && std::abs(b.mY - slig.mY) <= 45 && (a.mX - slig.mX) * (b.mX - slig.mX) <= 0)
+                {
+                    found = false;
+                }
+            }
             if (!found || way.size() > most)
             {
                 if (mFleeWhy++ == 0)
@@ -5075,6 +5236,11 @@ void Bot::Think(BaseMap& map)
                 {
                     // Another way, or the same again if it was a fluke: twice and the action is given up
                     Log("action_failed: " + mTask->Name() + ": " + step.mWhy);
+                    // (a switch tried for the sake of it under the eye of a Slig that never goes: tried, no more)
+                    if (mExploring >= 1000 && mExploring < 1256 && step.mWhy.find("never leaves its screen") != std::string::npos)
+                    {
+                        mExplored.insert({mAbe.mLevel * 1000 + mAbe.mPath, mExploring});
+                    }
                     mFailedActions[mTaskAction]++;
                     mFailedTotal[mTaskAction]++;
                     // (what will be no different from anywhere else or at any other time: for good, at once)

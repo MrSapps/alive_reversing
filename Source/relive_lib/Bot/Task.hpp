@@ -1100,6 +1100,10 @@ private:
     std::vector<s32> mLeapAge;
     // Frames waited at an electric wall that an angry Mudokon's lever turns on and off
     s32 mFenceWaits = 0;
+    // The shadow cell to step into once let down beside it (HoistDownStep), where he lands, and steps so far
+    s32 mShadeAfterDrop = -1;
+    s32 mShadeFrom = -1;
+    s32 mShadeSteps = 0;
     // Frames waited for a lift that is on its way to the stop he would walk onto, and where it was last
     // Pulling the lever that sends a lift to the stop the way goes onto
     // (also a lever pulled for a gate on the way, leading: mGateCalls)
@@ -1392,7 +1396,41 @@ private:
 };
 
 // A blind Mudokon is called from the wheel's side of it, walks until the wheel stops it, and is told to work
-// A Mudokon that stands a cell from a lever: hello and work, said from its screen, and it pulls it
+// One task and then another: the first to its end, then the second (a failure of either is the whole's)
+class SequenceTask final : public Task
+{
+public:
+    SequenceTask(std::string name, std::unique_ptr<Task> first, std::unique_ptr<Task> second)
+        : mName(std::move(name))
+        , mFirst(std::move(first))
+        , mSecond(std::move(second))
+    {
+    }
+    std::string Name() const override
+    {
+        return mName;
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override
+    {
+        if (mFirst)
+        {
+            const TaskStep step = mFirst->Next(bot, lastFailed);
+            if (step.mKind != TaskStep::Kind::eDone)
+            {
+                return step;
+            }
+            mFirst.reset();
+        }
+        return mSecond->Next(bot, lastFailed);
+    }
+
+private:
+    std::string mName;
+    std::unique_ptr<Task> mFirst;
+    std::unique_ptr<Task> mSecond;
+};
+
+// A Mudokon that stands a cell from a lever: hello and work, said from within two cells of it, and it pulls it
 // (Mudokon.cpp, Brain_4_ListeningToAbe: on work it pulls a lever a grid to either side of it)
 class MudLeverTask final : public Task
 {
@@ -1415,6 +1453,7 @@ private:
     s32 mStart = -1;
     s32 mFrames = 0;
     s32 mWorkSaid = 0;
+    s32 mHelloAt = -1000;
 };
 
 class SendToWheelTask final : public Task
@@ -1799,6 +1838,7 @@ public:
 private:
     u32 mBrew;
     s32 mDrinks = 0;
+    s32 mOutWaits = 0;
     std::unique_ptr<GoToTask> mGo;
 };
 
@@ -1840,6 +1880,9 @@ private:
     s32 mAfter = 0;
     std::vector<std::pair<s32, s32>> mWay;
     std::size_t mCorner = 0;
+    s32 mFlownLog = 0;
+    s32 mCornerBest = 100000;
+    s32 mCornerStall = 0;
     std::unique_ptr<GoToTask> mGo;
 };
 

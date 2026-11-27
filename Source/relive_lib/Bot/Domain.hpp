@@ -90,7 +90,8 @@ enum class StepKind : u8
     eBlow,      // throw rocks at mine mEntity until it goes off
     eDisarm,    // turn UXB mEntity off with a slap, crouched in the cell mEdge beside it
     eSend,      // call blind Mudokon mEntity so that it walks to wheel mOther, and tell it to work
-    eMudLever,  // say hello and work to Mudokon mEntity, which stands a cell from Lever mOther, from its screen
+    eMudLever,  // say hello and work to Mudokon mEntity, which stands a cell from Lever mOther, from two cells of it
+    eBurstSlig, // go to cell mEdge, off the floor of Slig mEntity on its screen, take it over by chanting and burst it
     eRide,      // get into mine car mEntity, drive it to the cell mEdge and get out
     eScrabRampage, // take over a Scrab of the floor Scrab mEntity is on from the cell mEdge, kill every other Scrab
                 // and Fleech of that floor with it, walk it into the trap its foot switches make and let it go

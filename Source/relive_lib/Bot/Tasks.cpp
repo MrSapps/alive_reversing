@@ -1879,6 +1879,21 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     }
     mOffGraph = 0;
 
+    // Let down beside a shadow on a Slig's floor (HoistDownStep): into it before anything else, sneaking. Stood
+    // where he landed, hurt and waiting for his health, he was shot there: Zulag 9's sixth level.
+    if (mShadeAfterDrop >= 0)
+    {
+        if (cur == mShadeFrom && mShadeSteps++ < 120)
+        {
+            return TaskStep::Do(Prim::MoveTo(nav.Nodes()[mShadeAfterDrop].mX, Gait::eSneak));
+        }
+        if (cur != mShadeFrom && !(nav.Nodes()[cur].mY < nav.Nodes()[mShadeFrom].mY - 20 && mShadeSteps < 300))
+        {
+            // (in it, or somewhere else: done with it. Still up on the ledge: on with the way down.)
+            mShadeAfterDrop = -1;
+        }
+    }
+
     // What the last edge really did (not after a reflex has moved him: where he is now is its doing)
     if (bot.Reflexes() != mReflexes)
     {
@@ -3128,7 +3143,40 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     // that floor on the screen walks away from him, the nearest forty off or more. (FeeCo's Executive Offices, the
     // screen of the gate: from the shadow of 1853..1963 to the hoist at 1962 and up onto the small platform. Gone
     // up as they stood at 1912, 75 off, he was shot off the hoist.)
-    if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && nav.Nodes()[cur].mHidden && mShadowWaits < 2000 &&
+    // Along such a floor from out in the open: to the next shadow on the way and no further, to be timed out of
+    // it again as above. (Zulag 9's sixth level: drunk at the Brew machine at 687, then on left past the shadow at
+    // 662 into the Slig's sight.)
+    if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && !nav.Nodes()[cur].mHidden && !nav.Nodes()[cur].mHiddenStill && first.mKind == EdgeKind::eWalk && mShadowWaits < 2000)
+    {
+        const NavNode& here = nav.Nodes()[cur];
+        const s32 cam = nav.CameraOf(here.mX, here.mY - 5);
+        bool orb = false;
+        for (const Entity& o : bot.GetWorld().mEntities)
+        {
+            orb = orb || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == cam);
+        }
+        bool slig = false;
+        for (const SligAt& s : bot.GetWorld().mSligs)
+        {
+            slig = slig || (!s.mAsleep && !s.mPossessed && s.mHalf == here.mHalf && std::abs(s.mY - here.mY) <= 10 && nav.CameraOf(s.mX, s.mY - 5) == cam);
+        }
+        for (std::size_t k = 0; orb && slig && k + 1 < path.size(); k++)
+        {
+            const NavEdge& in = nav.Edges()[path[k]];
+            const NavNode& stop = nav.Nodes()[in.mTo];
+            const NavNode& after = nav.Nodes()[nav.Edges()[path[k + 1]].mTo];
+            if (in.mKind != EdgeKind::eWalk || stop.mLine != here.mLine)
+            {
+                break;
+            }
+            if ((stop.mHidden || stop.mHiddenStill) && !after.mHidden && !after.mHiddenStill)
+            {
+                return TaskStep::Do(Prim::MoveTo(stop.mX, Gait::eSneak));
+            }
+        }
+    }
+    // (hidden stood still is a shadow too: Zulag 9's sixth level, 513..565)
+    if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && (nav.Nodes()[cur].mHidden || nav.Nodes()[cur].mHiddenStill) && mShadowWaits < 2000 &&
         // (the step out to a hoist he then goes up: the walk behind a Slig from shadow to shadow, the hoist in a
         // shadow and the sortie from one have their own timing)
         first.mKind == EdgeKind::eWalk && !nav.Nodes()[first.mTo].mHidden)
@@ -3153,7 +3201,27 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // out behind one that stands with its back to him)
             const bool back = slig.mMotion != 5 && slig.mFacingLeft == (slig.mX < here.mX);
             const bool away = slig.mMotion == 2 && back && std::abs(slig.mX - here.mX) >= 40;
-            wait = wait || (toHoist ? !away : !back);
+            // (and not one on the side he goes out to: it turns at the end of its beat with him in front of it.
+            // Zulag 9's sixth level, out of the shadow at 537 behind the Slig walking right to its turn at 612.
+            // Unless it walks away beyond the next shadow along the way: there he is first, and stands still.)
+            bool ahead = (slig.mX - here.mX) * (nav.Nodes()[first.mTo].mX - here.mX) > 0;
+            if (ahead && slig.mMotion == 2 && back)
+            {
+                for (s32 idx : path)
+                {
+                    const NavNode& stop = nav.Nodes()[nav.Edges()[idx].mTo];
+                    if (stop.mLine != here.mLine)
+                    {
+                        break;
+                    }
+                    if (stop.mHidden || stop.mHiddenStill)
+                    {
+                        ahead = std::abs(stop.mX - here.mX) + 25 >= std::abs(slig.mX - here.mX);
+                        break;
+                    }
+                }
+            }
+            wait = wait || (toHoist ? !away : !back || ahead);
         }
         if (wait)
         {
@@ -3720,9 +3788,13 @@ TaskStep GoToTask::RollStep(Bot& bot, const std::string& lastFailed, const Way& 
         std::size_t shade = path.size();
         for (std::size_t k = 0; k < last && watched; k++)
         {
-            if (nav.Nodes()[nav.Edges()[path[k]].mTo].mHidden && !nav.Nodes()[nav.Edges()[path[k + 1]].mTo].mHidden)
+            // (a cell hidden stood still is a stop as well: he stands there)
+            const NavNode& in = nav.Nodes()[nav.Edges()[path[k]].mTo];
+            const NavNode& out = nav.Nodes()[nav.Edges()[path[k + 1]].mTo];
+            if ((in.mHidden || in.mHiddenStill) && !out.mHidden && !out.mHiddenStill)
             {
                 shade = k;
+                break;
             }
         }
         if (shade < last)
@@ -4828,6 +4900,53 @@ TaskStep GoToTask::FallStep(Bot& bot, const std::string& lastFailed, const Way& 
     {
         bot.Log("the Sligs are all beyond the gate and walking away: down now");
     }
+    // (one whose beat never leaves that screen: down only as it turns its back at the end of its beat nearest where
+    // he lands, as HoistDownStep does. Zulag 9's sixth level: down as it neared its far end, it turned and shot.)
+    // (stood at the edge, with a shadow to step into by where he lands: Bonewerkz' path 1 is not this, where a
+    // fall gone wrong left him at 1173,920 by the Slig, and held there he was shot)
+    bool shadeBy = false;
+    {
+        const NavNode& to = nav.Nodes()[first.mTo];
+        for (const NavNode& h : nav.Nodes())
+        {
+            shadeBy = shadeBy || ((h.mHidden || h.mHiddenStill) && h.mLine == to.mLine && std::abs(h.mX - to.mX) <= 2 * NavGraph::GridStep(to.mHalf));
+        }
+    }
+    if (shadeBy && std::abs(abe.mX - nav.Nodes()[cur].mX) <= 3 && !behindGate && nav.Input().mIsAe && !bot.GetWorld().mInvisible && !nav.Nodes()[first.mTo].mHidden && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && mFallWaits < 3000)
+    {
+        const NavNode& to = nav.Nodes()[first.mTo];
+        for (const SligAt& slig : bot.GetWorld().mSligs)
+        {
+            // (any awake on that floor and screen: settled first and its beat watched, not straight on down as he
+            // comes there, before its beat is known. Zulag 9's sixth level on the first time there.)
+            if (slig.mAsleep || slig.mPossessed || slig.mHalf != to.mHalf || std::abs(slig.mY - to.mY) > 30 || nav.CameraOf(slig.mX, slig.mY - 5) != nav.CameraOf(to.mX, to.mY - 5))
+            {
+                continue;
+            }
+            if (!abe.Settled() || abe.mMove != Move::eIdle || (!bot.BeatStaysOnScreen(slig) && mFallWaits < 600))
+            {
+                mFallWaits++;
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (!bot.BeatStaysOnScreen(slig))
+            {
+                continue;
+            }
+            const bool away = slig.mFacingLeft == (slig.mX < to.mX);
+            // (just turned: within a cell of where he lands. Further on, a short beat has it at its far end and back
+            // before he is down and in the shadow: Zulag 9, 100 long)
+            if (!away || std::abs(slig.mX - to.mX) > 25 || slig.mMotion == 0)
+            {
+                if (mFallWaits++ == 0)
+                {
+                    bot.Log("a Slig that never leaves walks the floor under " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY) + ": down as it turns its back at the near end of its beat");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+    }
     if (!behindGate && nav.Input().mIsAe && !bot.GetWorld().mInvisible && !nav.Nodes()[first.mTo].mHidden && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && mFallWaits < 700 && (hears || SligComes(bot, nav, nav.Nodes()[first.mTo], true) < 135))
     {
         if (mFallWaits++ == 0)
@@ -5224,10 +5343,17 @@ TaskStep GoToTask::HoistDownStep(Bot& bot, const std::string& lastFailed, const 
     // him instead: FeeCo's Executive Offices, "lower yourself down when the bottom Slig is facing right",
     // the hoist at 1612 two pixels short of the shadow of 1589..1662.)
     bool beside = false;
+    s32 shadeCell = -1;
     for (s32 k = 0; k < land.mEdgeCount; k++)
     {
         const NavEdge& on = nav.Edges()[land.mFirstEdge + k];
-        beside = beside || (on.mKind == EdgeKind::eWalk && nav.Nodes()[on.mTo].mHidden);
+        // (hidden stood still is enough: he stands in it. Zulag 9's sixth level, the shadow of 513..565 a cell
+        // from the hoist at 512.)
+        if (on.mKind == EdgeKind::eWalk && (nav.Nodes()[on.mTo].mHidden || nav.Nodes()[on.mTo].mHiddenStill))
+        {
+            beside = true;
+            shadeCell = on.mTo;
+        }
     }
     if (nav.Input().mIsAe && (land.mHidden || beside) && mDropWait < 1500)
     {
@@ -5239,7 +5365,9 @@ TaskStep GoToTask::HoistDownStep(Bot& bot, const std::string& lastFailed, const 
             }
             const bool away = s.mFacingLeft == (s.mX < land.mX);
             const s32 landCam = nav.CameraOf(land.mX, land.mY - 5);
-            const bool stays = s.mBeatMax > s.mBeatMin && nav.CameraOf(s.mBeatMin, s.mY - 5) == landCam && nav.CameraOf(s.mBeatMax, s.mY - 5) == landCam;
+            // (or by its beat as watched, where the map's bounds for it are not known: Zulag 9's sixth level)
+            const bool stays = (s.mBeatMax > s.mBeatMin && nav.CameraOf(s.mBeatMin, s.mY - 5) == landCam && nav.CameraOf(s.mBeatMax, s.mY - 5) == landCam) ||
+                               (nav.CameraOf(s.mX, s.mY - 5) == landCam && bot.BeatStaysOnScreen(s));
             // (the way down is 48 frames and the step into the shadow some 20 more: for as long as that it is
             // not to look his way again. Measured: let down with it 130 off and walking away, it was at
             // its beat's end and back to face him as he landed.)
@@ -5247,7 +5375,16 @@ TaskStep GoToTask::HoistDownStep(Bot& bot, const std::string& lastFailed, const 
             // (or as it turns its back at the end of its beat nearest him, wherever that turns out to be: a
             // door shut across its beat makes it shorter than its bounds say. Measured there: 1662 to 1762,
             // 78 frames from its turn at 1662 to its turn back at 1762.)
-            const bool room = stays ? (s.FramesUntilSees(land.mX, camX, camX + nav.Input().mCamW) >= 70 || (std::abs(s.mX - land.mX) <= 60 && s.mMotion != 0)) : nav.CameraOf(s.mX, s.mY - 5) != landCam;
+            bool room = stays ? (s.FramesUntilSees(land.mX, camX, camX + nav.Input().mCamW) >= 70 || (std::abs(s.mX - land.mX) <= 60 && s.mMotion != 0)) : nav.CameraOf(s.mX, s.mY - 5) != landCam;
+            // (one that never leaves, with a shadow beside where he lands: only as it turns its back at the near end
+            // of its beat, within a cell of him. The way down and the step into the shadow are some 40 frames, and a
+            // short beat has it at the far end and back sooner than that from further on. "Lower yourself over the
+            // edge when the Slig is facing right, drop and immediately sneak one step forward to the shadow." Let
+            // down with it 60 on, it turned as he stepped into the shadow: Zulag 9, a beat of 100.)
+            if (stays && beside && !land.mHidden)
+            {
+                room = std::abs(s.mX - land.mX) <= 25 && s.mMotion != 0;
+            }
             if (!away || !room)
             {
                 mDropWait += 2;
@@ -5267,6 +5404,10 @@ TaskStep GoToTask::HoistDownStep(Bot& bot, const std::string& lastFailed, const 
     }
     mDropWait = 0;
     mLastEdge = path[0];
+    // (and once down, the step into the shadow beside before anything else: next)
+    mShadeAfterDrop = !land.mHidden && beside ? shadeCell : -1;
+    mShadeFrom = first.mTo;
+    mShadeSteps = 0;
     return TaskStep::Do(Prim::Press(Btn::eDown));
 }
 
@@ -11207,7 +11348,14 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
             // chants, so a Slig that faces him on his screen and floor shoots, panicking or not. It panics at
             // the chant, runs off the screen and shoots on its way back, about 2 frames before the 90 + 30
             // frames of chanting with it on screen are up.
-            // Not taken over, then: out to the thing while the Slig is off the screen, from right by it
+            // Not taken over, then: out to the thing while the Slig is off the screen, from right by it. Not where
+            // its beat is all on that screen: it is never off it. (Zulag 9's first screen, the lever of 174 on the
+            // floor a Slig walks between 512 and 576 for good: waited for 6000 frames, then pulled, and shot.)
+            const s32 thingCam = nav.CameraOf(x, y - 5);
+            if (mSortie == 0 && slig->mBeatMax > slig->mBeatMin && nav.CameraOf(slig->mBeatMin, slig->mY - 5) == thingCam && nav.CameraOf(slig->mBeatMax, slig->mY - 5) == thingCam)
+            {
+                return TaskStep::Failed("a Slig that can't be taken over watches " + mInner->Name() + " and never leaves its screen");
+            }
             const s32 use = bot.IsAe() && mSortie == 0 ? Domain::UseNode(nav, *entity, nullptr) : -1;
             // (by the map, with the gates as they will be once the thing is used: what else makes a move dear
             // or barred is for when it is made)
@@ -12372,16 +12520,18 @@ TaskStep MudLeverTask::Next(Bot& bot, const std::string& lastFailed)
         bot.Log("Mudokon#" + std::to_string(mMud) + " has pulled Lever#" + std::to_string(mLever));
         return TaskStep::Done();
     }
-    // (from its screen: it hears him anywhere on it)
-    const s32 cam = nav.CameraOf(mud->CentreX(), mud->mY2 - 5);
+    // (within two cells of it: listening, it does what it is told only with him that near, Domain::MudLevers)
     const AbeState& abe = bot.Abe();
-    if (nav.CameraOf(abe.mX, abe.mY - 5) != cam)
+    const s32 cell = NavGraph::GridStep(mud->mHalf);
+    const s32 mx = mud->CentreX();
+    const s32 my = mud->mY2;
+    if (std::abs(abe.mX - mx) > 2 * cell || std::abs(abe.mY - my) > 70)
     {
         if (!mGo)
         {
             const NavGraph* g = &nav;
-            mGo = std::make_unique<GoToTask>("to the screen of the Mudokon at the lever", [g, cam](s32 n)
-                                             { return g->CameraOf(g->Nodes()[n].mX, g->Nodes()[n].mY - 5) == cam; });
+            mGo = std::make_unique<GoToTask>("to the Mudokon at the lever", [g, mx, my, cell](s32 n)
+                                             { return std::abs(g->Nodes()[n].mX - mx) <= 2 * cell && std::abs(g->Nodes()[n].mY - my) <= 70; });
         }
         const TaskStep step = mGo->Next(bot, lastFailed);
         if (step.mKind != TaskStep::Kind::eDone)
@@ -12398,19 +12548,42 @@ TaskStep MudLeverTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Do(Prim::Wait(1));
     }
-    // (listening: work; else hello, now and then)
+    // (facing it, as RecruitTask does)
+    const s32 mudX = mud->mLive ? mud->mLiveX : mud->CentreX();
+    if (abe.mFacingLeft != (mudX < abe.mX))
+    {
+        return TaskStep::Do(Prim::Face(mudX < abe.mX));
+    }
+    // (listening: work; else hello, now and then, and at its work only between strokes: Brain_1_Chisle)
     if (mud->mState / 100 == 4)
     {
         if (mWorkSaid++ % 90 == 0)
         {
             bot.Log("work, said to Mudokon#" + std::to_string(mMud) + " by Lever#" + std::to_string(mLever));
-            return TaskStep::Do(Prim::Wait(2, bot.SpeakWork()));
+            return TaskStep::Do(Prim::Press(bot.SpeakWork(), 6));
         }
         return TaskStep::Do(Prim::Wait(1));
     }
-    if (mFrames % 60 == 1)
+    if (mud->mState / 100 == 1 && mud->mState % 100 > 2)
     {
-        return TaskStep::Do(Prim::Wait(2, bot.SpeakHello()));
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    // (one scrubbing on its knees hears it only in the short break between scrubs: Brain_2_CrouchScrub's
+    // SmallBreak_1. Said while it scrubbed, Zulag 9's on the sixth level never stood up.)
+    if (mud->mState / 100 == 2)
+    {
+        if (mud->mState % 100 == 1 && mFrames - mHelloAt > 40)
+        {
+            mHelloAt = mFrames;
+            bot.Log("hello, said to Mudokon#" + std::to_string(mMud) + " in a break from scrubbing");
+            return TaskStep::Do(Prim::Press(bot.SpeakHello(), 6));
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (mFrames % 120 == 1 || mFrames < 3)
+    {
+        bot.Log("hello, said to Mudokon#" + std::to_string(mMud) + " state " + std::to_string(mud->mState));
+        return TaskStep::Do(Prim::Press(bot.SpeakHello(), 6));
     }
     return TaskStep::Do(Prim::Wait(1));
 }
@@ -14984,9 +15157,16 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
         }
         return TaskStep::Do(Prim::Wait(1, Btn::eChant));
     }
-    if (!last && dx <= 10 && dy <= 10)
+    // (or as near as it gets, stalled there: a corner against a wall it is too wide to get to. Zulag 9, from
+    // 437,1920 up the shaft: the first corner at 437,1890, the fart held off it at 449 by the wall until it went off.)
+    const s32 near = dx + dy;
+    mCornerStall = near < mCornerBest ? 0 : mCornerStall + 1;
+    mCornerBest = std::min(mCornerBest, near);
+    if (!last && ((dx <= 10 && dy <= 10) || (mCornerStall >= 20 && dx <= 20 && dy <= 20)))
     {
         mCorner++;
+        mCornerBest = 100000;
+        mCornerStall = 0;
         return TaskStep::Do(Prim::Wait(1));
     }
     // There, or as good as (a Slig walks on), or out of time: let go and set it off once it stands
@@ -15004,6 +15184,10 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
             return TaskStep::Do(Prim::Wait(1, Btn::eChant));
         }
         return TaskStep::Do(Prim::Wait(1));
+    }
+    if (mFlownLog++ % 120 == 0)
+    {
+        bot.Log("the fart is at " + std::to_string(body.mX) + "," + std::to_string(body.mY) + " on its way to " + std::to_string(tx) + "," + std::to_string(ty) + " (leg " + std::to_string(mCorner + 1) + " of " + std::to_string(mWay.size()) + "), " + std::to_string(fart.mFramesLeft) + " frames left");
     }
     return TaskStep::Do(Prim::Wait(1, FartFlight::Steer(fart.mX100, fart.mY100, fart.mVelX100, fart.mVelY100, tx, ty + FartFlight::kBody)));
 }
@@ -16106,6 +16290,36 @@ TaskStep DrinkTask::Next(Bot& bot, const std::string& lastFailed)
         return bot.Abe().Settled() ? TaskStep::Done() : TaskStep::Do(Prim::Wait(1));
     }
     const s32 at = Domain::UseNode(bot.Nav(), *brew, nullptr);
+    // Out of a shadow beside it onto a floor a Slig walks: the drink takes some 56 frames and the step back into the
+    // shadow some 12 more, so only as every Slig of that floor walks away with 60 or more to go to the end of its
+    // beat (and its pause there). (Zulag 9's sixth level: "drink a Brew after he starts walking left"; out as it
+    // stood at the end of its beat, it turned to him as he drank.)
+    const NavGraph& nav = bot.Nav();
+    const s32 cur = bot.AbeNode();
+    if (cur >= 0 && at >= 0 && cur != at && (nav.Nodes()[cur].mHidden || nav.Nodes()[cur].mHiddenStill) && !nav.Nodes()[at].mHidden && std::abs(nav.Nodes()[cur].mX - nav.Nodes()[at].mX) <= 2 * NavGraph::GridStep(nav.Nodes()[at].mHalf) && mOutWaits < 3000)
+    {
+        const NavNode& use = nav.Nodes()[at];
+        for (const SligAt& slig : world.mSligs)
+        {
+            if (slig.mAsleep || slig.mPossessed || slig.mHalf != use.mHalf || std::abs(slig.mY - use.mY) > 30 || nav.CameraOf(slig.mX, slig.mY - 5) != nav.CameraOf(use.mX, use.mY - 5))
+            {
+                continue;
+            }
+            s32 lo = 0;
+            s32 hi = 0;
+            const bool known = bot.BeatOf(slig, lo, hi);
+            const bool away = slig.mMotion == 2 && slig.mFacingLeft == (slig.mX < use.mX);
+            const s32 toGo = !known ? 0 : slig.mFacingLeft ? slig.mX - lo : hi - slig.mX;
+            if (!away || toGo < 60)
+            {
+                if (mOutWaits++ == 0)
+                {
+                    bot.Log("in the shadow by the Brew machine: out to it as the Slig walks away with time to spare");
+                }
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+    }
     if (bot.AbeNode() != at)
     {
         TaskStep step;

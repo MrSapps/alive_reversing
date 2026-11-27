@@ -689,6 +689,8 @@ public:
     // Its beat has been watched from one end to the other (or far enough to count on)
     // A Slig whose whole beat is on the screen Abe is on: it is never off it, so there is never quiet there
     bool BeatStaysOnScreen(const SligAt& slig) const;
+    // The ends of a Slig's beat, by the map or as watched (false: not known)
+    bool BeatOf(const SligAt& slig, s32& lo, s32& hi) const;
     bool KnowsBeat(const SligAt& slig) const
     {
         for (const SligBeat& beat : mBeats)

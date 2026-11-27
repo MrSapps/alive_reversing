@@ -2865,6 +2865,8 @@ struct Domain::Builder final
     void SlogPens();
     void PenGates();
     void MudLevers();
+    void GuardedLevers();
+    void SligBursts();
     void GlukkonCalls();
     void DrillSlogs();
     void Orbs();
@@ -3108,6 +3110,8 @@ Domain Domain::Builder::Run()
     Scrabs();
     DrillsOverMudokons();
     MudLevers();
+    SligBursts();
+    GuardedLevers();
     PenGates();
     // Mudokons led to work wheels together past a Slog that a ring can drop: with it dead, not fed. A bone keeps it
     // a short while, which does for Abe on his own but not for leading a group by. (Zulag 5: the big Slog by the
@@ -6945,7 +6949,9 @@ void Domain::Builder::MudLevers()
             for (std::size_t n = 0; n < nav.Nodes().size(); n++)
             {
                 const NavNode& node = nav.Nodes()[n];
-                if (nav.CameraOf(node.mX, node.mY - 5) == cam && node.mHalf == mud.mHalf && !node.mHazard && regions.insert(d.mRegions[n]).second)
+                // (within two cells of it: a Mudokon that listens does as it is told only with him that near, else it
+                // comes over to him. Mudokon.cpp, Brain_4_ListeningToAbe: VIsObjNearby(two grid sizes))
+                if (nav.CameraOf(node.mX, node.mY - 5) == cam && node.mHalf == mud.mHalf && !node.mHazard && std::abs(node.mX - mx) <= 2 * cell && std::abs(node.mY - mud.mY2) <= 70 && regions.insert(d.mRegions[n]).second)
                 {
                     DomainStep step;
                     step.mKind = StepKind::eMudLever;
@@ -6955,6 +6961,114 @@ void Domain::Builder::MudLevers()
                         {regionFact(static_cast<s32>(n)), {Key::Mud(mud.mId), 0}, {Key::Switch(lever.mSwitch), 0}}, {{Key::Switch(lever.mSwitch), 1}}, 100, step);
                 }
             }
+        }
+    }
+}
+
+// A lever an awake Slig stands guard over for good: its beat all on the lever's screen, by the lever's floor, with a
+// security orb there (no chanting it over: the orb zaps him as he chants). Pulled, he is shot: not while it is about.
+// (Zulag 9's first screen: lever 174 by the Slig of 512..576 under the orb at 565,374. Tried for want of anything
+// else, he was shot there each time.)
+void Domain::Builder::GuardedLevers()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    std::map<u32, std::vector<u32>> guarded;
+    for (const Entity& lever : world.mEntities)
+    {
+        if (lever.mKind != EntityKind::eLever || lever.mGone)
+        {
+            continue;
+        }
+        const s32 cam = nav.CameraOf(lever.CentreX(), lever.mY2 - 5);
+        bool orb = false;
+        for (const Entity& e : world.mEntities)
+        {
+            orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
+        }
+        if (!orb)
+        {
+            continue;
+        }
+        for (const Entity& slig : world.mEntities)
+        {
+            // (the lever on its beat itself: one beside the beat is pulled as it walks off, ClearSligTask's sortie)
+            if (slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch <= 1 && slig.mState != 1 && slig.mHalf == lever.mHalf && std::abs(slig.mY2 - lever.mY2) <= 40 && slig.mBeatMax > slig.mBeatMin &&
+                nav.CameraOf(slig.mBeatMin, slig.mY2 - 5) == cam && nav.CameraOf(slig.mBeatMax, slig.mY2 - 5) == cam && lever.mX2 >= slig.mBeatMin && lever.mX1 <= slig.mBeatMax)
+            {
+                guarded[lever.mId].push_back(slig.mId);
+            }
+        }
+    }
+    if (guarded.empty())
+    {
+        return;
+    }
+    // (once that Slig is no more it is a lever like any other: a fart flown to it, say. Zulag 9's sixth level, the
+    // lever of 175 by the well: "Possess the Slig and explode him. ... Pull the lever by the well".)
+    for (Goap::Action& a : d.mActions)
+    {
+        const DomainStep& step = d.mSteps[a.mTag];
+        const auto it = step.mKind == StepKind::eUse ? guarded.find(step.mEntity) : guarded.end();
+        for (u32 slig : it != guarded.end() ? it->second : std::vector<u32>{})
+        {
+            a.mPre.push_back({Key::Mud(slig), 2});
+        }
+    }
+}
+
+// A Slig taken over and burst: from a cell of its screen off its floor (it neither sees nor shoots him there, and
+// the chant gives away one hidden on its own floor), with every orb of that screen gone, and no other Slig of its
+// size there for the chant to take instead. (Zulag 9's sixth level: "Possess the Slig and explode him", once the
+// Chant Protector is gone.)
+void Domain::Builder::SligBursts()
+{
+    const NavGraph& nav = mNav;
+    const World& world = mWorld;
+    Domain& d = mD;
+    for (const Entity& slig : world.mEntities)
+    {
+        if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || d.mStart.Has({Key::Mud(slig.mId), 2}))
+        {
+            continue;
+        }
+        const s32 sx = slig.mLive ? slig.mLiveX : slig.CentreX();
+        const s32 sy = slig.mLive ? slig.mLiveY : slig.mY2;
+        const s32 cam = nav.CameraOf(sx, sy - 5);
+        bool alone = true;
+        for (const Entity& other : world.mEntities)
+        {
+            alone = alone && !(other.mId != slig.mId && other.mKind == EntityKind::eSlig && !other.mGone && other.mSwitch <= 1 && other.mHalf == slig.mHalf &&
+                               nav.CameraOf(other.mLive ? other.mLiveX : other.CentreX(), (other.mLive ? other.mLiveY : other.mY2) - 5) == cam);
+        }
+        if (!alone)
+        {
+            continue;
+        }
+        std::vector<Goap::Fact> orbs;
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam)
+            {
+                orbs.push_back({Key::Switch(World::HazardSwitch(e.mId)), 1});
+            }
+        }
+        std::set<s32> regions;
+        for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+        {
+            const NavNode& node = nav.Nodes()[n];
+            if (node.mHalf != slig.mHalf || node.mHazard || node.mLow || nav.CameraOf(node.mX, node.mY - 5) != cam || std::abs(node.mY - sy) <= 40 || !regions.insert(d.mRegions[n]).second)
+            {
+                continue;
+            }
+            std::vector<Goap::Fact> pre{regionFact(static_cast<s32>(n)), {Key::Mud(slig.mId), 0}};
+            pre.insert(pre.end(), orbs.begin(), orbs.end());
+            DomainStep step;
+            step.mKind = StepKind::eBurstSlig;
+            step.mEntity = slig.mId;
+            step.mEdge = static_cast<s32>(n);
+            add("Take over Slig#" + std::to_string(slig.mId) + " and burst it from " + std::to_string(node.mX) + "," + std::to_string(node.mY), pre, {{Key::Mud(slig.mId), 2}}, 600, step);
         }
     }
 }
