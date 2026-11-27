@@ -16192,6 +16192,20 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                 foe = &f;
             }
         }
+        // (one on its round by the lever that faces it: kept out of its height, under it, until it has its back to
+        // it; then on to the lever, which it is left alone for. Zulag 11: waited for at its height, the one on its
+        // round over the lever at 1962,1200 shot it.)
+        if (foe && lever && std::abs(foe->mY - lever->mY2) < 90 && foe->mFacingLeft == (bx < foe->mX))
+        {
+            if (mFoeSaid != 5)
+            {
+                mFoeSaid = 5;
+                bot.Log("another flying Slig at " + std::to_string(foe->mX) + "," + std::to_string(foe->mY) + " on its round by the lever faces it: under its height until it turns");
+            }
+            mState = 0;
+            mLegFrames = 0;
+            return steerTo(bx, std::max(by, foe->mY + 70));
+        }
         if (foe)
         {
             if (flown.mCanThrow && flown.mFacingLeft == (foe->mX < bx))
