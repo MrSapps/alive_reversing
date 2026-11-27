@@ -10963,7 +10963,8 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
 
     // Sorry is said with a pat on the back, from the cell next to it. Anything else from a cell or two away.
     // (and so is a slap)
-    const bool close = mud->mLive && ((mud->mMood == MudMood::eUpset && mSaidHello) || (mud->mMood == MudMood::eWired && mCalm));
+    // (for the sorry that is still to be said: once said, a sad one stays sad, and is talked to as any other)
+    const bool close = mud->mLive && ((mud->mMood == MudMood::eUpset && mSaidHello && mSorries < 3) || (mud->mMood == MudMood::eWired && mCalm));
     s32 minHalf = close ? 1 : 3;
     const s32 maxHalf = close ? 3 : 5;
     // (from the next cell where no cell a cell or two away on its floor can be got to: Zulag 5's Mudokon at
@@ -11095,14 +11096,14 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Do(Prim::Wait(40));
     }
     bot.Log("talk to Mudokon#" + std::to_string(mMud) + " at " + std::to_string(mud->mLiveX) + " mood " + std::to_string(static_cast<s32>(mud->mMood)) + (mud->mFollowing ? " following" : "") + " state " + std::to_string(mud->mState));
-    if (!mSaidHello && !mud->mFollowing)
+    // (hello until it listens: a sorry is heard only then. The final Zulag's at 1562,980, "Say 'Hi' and 'Sorry' to
+    // the Mudokon, then get him to follow you": told sorry as it scrubbed, for 1200 frames.)
+    if (!listening && !mud->mFollowing)
     {
         mSaidHello = true;
         return TaskStep::Do(Prim::Press(bot.SpeakHello(), 6));
     }
-    // (once: a sad one stays sad, and follows all the same. The final Zulag's at 1562,980, "Say 'Hi' and 'Sorry'
-    // to the Mudokon, then get him to follow you": told sorry over and over for 1200 frames.)
-    if (mud->mMood == MudMood::eUpset && mSorries++ < 1)
+    if (mud->mMood == MudMood::eUpset && mSorries++ < 3)
     {
         return TaskStep::Do(Prim::Press(bot.SpeakSorry(), 6));
     }
