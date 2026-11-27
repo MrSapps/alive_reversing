@@ -2930,9 +2930,22 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
                     // (a drill its switch turns on and off: Drill.cpp, one that starts on runs while that is off)
                     if (drill.mKind == EntityKind::eDrill && drill.mX1 == f->mX1 && drill.mY1 == f->mY1 && drill.mSwitch > 1 && drill.mInputs[0] == 1)
                     {
-                        danger = true;
-                        condSwitch = drill.mSwitch;
-                        condValue = drill.mInputs[1] ? 1 : 0;
+                        // (only where something here sets its switch that way: a lever either way, a wheel or what
+                        // works together to on. Else it is timed, as Abe is: the final Zulag's at 1750,1380 of 3, which
+                        // the hand stone at the start set for good, "Bring the Mudokon with you back to the left. Run
+                        // under the drills.")
+                        const s32 stopValue = drill.mInputs[1] ? 1 : 0;
+                        bool settable = world.Switch(drill.mSwitch) == stopValue;
+                        for (const Entity& by : world.mEntities)
+                        {
+                            settable = settable || (by.mSwitch == drill.mSwitch && (by.mKind == EntityKind::eLever || (stopValue == 1 && (by.mKind == EntityKind::eWorkWheel || by.mKind == EntityKind::eSwitchLogic))));
+                        }
+                        if (settable)
+                        {
+                            danger = true;
+                            condSwitch = drill.mSwitch;
+                            condValue = stopValue;
+                        }
                     }
                 }
             }
