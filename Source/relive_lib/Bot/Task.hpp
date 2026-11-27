@@ -971,6 +971,8 @@ private:
     // Steps spent waiting for a Slurg to get out of the way
     s32 mSlurgWaits = 0;
     s32 mHopWaits = 0;
+    // Frames waited before an electric wall for the Mudokons following to be clear of the plates that work it
+    s32 mWallWaits = 0;
     // Frames waited in a shadow for the Sligs of its floor to walk away
     s32 mShadowWaits = 0;
     // Over what a switch that keeps turning over shuts (see Next): waits for it, and whether he is on it now

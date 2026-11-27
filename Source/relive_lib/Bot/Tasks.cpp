@@ -3984,10 +3984,76 @@ TaskStep GoToTask::WalkStep(Bot& bot, const std::string& lastFailed, const Way& 
     const std::size_t sweepRoll = way.mSweepRoll;
     const NavEdge& first = way.mFirst;
     // As far as the walk goes the same way
-    std::size_t last = 0;
-    while (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eWalk && nav.Edges()[path[last + 1]].mLeft == first.mLeft)
+    // (and not on through an electric wall that others can turn on while he walks to it: he stops before it and
+    // looks again. Zulag 13: the Mudokons under him go over the plates of its walls' switches behind him.)
+    const auto othersSet = [&](s32 edge)
     {
-        last++;
+        const s32 feature = nav.Edges()[edge].mFeature;
+        if (feature < 0 || nav.Input().mFeatures[feature].mKind != FeatureKind::eBarrier || !nav.Input().mFeatures[feature].mBeam)
+        {
+            return false;
+        }
+        for (const Entity& plate : bot.GetWorld().mEntities)
+        {
+            if (plate.mKind == EntityKind::eFootSwitch && !plate.mGone && plate.mInputs[0] == 1 && plate.mSwitch == nav.Input().mFeatures[feature].mSwitch)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    std::size_t run = 0;
+    while (run + 1 < path.size() && nav.Edges()[path[run + 1]].mKind == EdgeKind::eWalk && nav.Edges()[path[run + 1]].mLeft == first.mLeft)
+    {
+        run++;
+    }
+    std::size_t wall = 0;
+    while (wall <= run && !othersSet(path[wall]))
+    {
+        wall++;
+    }
+    // (one of those he stops two cells short of, and goes from there through the whole of it and a cell on in one
+    // go: the cell next to it is in its reach, and a cell in it one to die in. Zulag 13: at 1362 by the wall at
+    // 1375, and at 2012 in the one at 2000, as the Mudokons under him turned them on.)
+    // Not while a Mudokon that follows him is near a plate that works it, about to go over it.
+    if (wall <= run && wall <= 1 && mWallWaits < 150)
+    {
+        const s32 sw = nav.Input().mFeatures[nav.Edges()[path[wall]].mFeature].mSwitch;
+        bool near = false;
+        for (const Entity& mud : bot.GetWorld().mEntities)
+        {
+            if (mud.mKind != EntityKind::eMudokon || mud.mGone || !mud.mLive || !mud.mFollowing)
+            {
+                continue;
+            }
+            for (const Entity& plate : bot.GetWorld().mEntities)
+            {
+                near = near || (plate.mKind == EntityKind::eFootSwitch && !plate.mGone && plate.mInputs[0] == 1 && plate.mSwitch == sw && std::abs(mud.mLiveY - plate.mY2) <= 30 && std::abs(mud.mLiveX - plate.CentreX()) < 75);
+            }
+        }
+        if (near)
+        {
+            if (mWallWaits++ == 0)
+            {
+                bot.Log("a Mudokon following him is by a plate that works the electric wall ahead: waits");
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+    }
+    mWallWaits = 0;
+    std::size_t last = run;
+    if (wall <= run && wall <= 1)
+    {
+        last = wall;
+        while (last + 1 <= run && nav.Edges()[path[last + 1]].mFeature == nav.Edges()[path[wall]].mFeature)
+        {
+            last++;
+        }
+        last = std::min(run, last + 1);
+    }
+    else if (wall <= run)
+    {
+        last = wall - 2;
     }
     // (running jumps with no stop between, which are only there with a flying Slig about: straight into
     // them from the run, without the stop at the cell the run-up would begin at)
