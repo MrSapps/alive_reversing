@@ -9388,7 +9388,12 @@ SideTrip Domain::WeighSideTrip(const NavGraph& nav, const World& world, s32 entr
 
 std::string Domain::Text() const
 {
-    std::string out;
+    std::string out = "start";
+    for (const Goap::Fact& f : mStart.Facts())
+    {
+        out += " " + std::to_string(f.mKey) + "=" + std::to_string(f.mValue);
+    }
+    out += "\n";
     for (const Goap::Action& a : mActions)
     {
         out += a.mName + " cost " + std::to_string(a.mCost) + " needs";
