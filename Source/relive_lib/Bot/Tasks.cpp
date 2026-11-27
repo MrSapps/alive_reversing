@@ -2358,6 +2358,43 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     std::size_t sweepRoll = 0;
     const bool wasDucked = mSweepDuck;
     mSweepDuck = false;
+    // (on at a roll through the cells on foot that the roll that was timed went on into, past what came between:
+    // looked at again from where he has landed, they were never clear to walk, and he stood in the drill's way.
+    // The final Zulag: "run as soon as you hit the ground", down from 575,380 under the drill of 477..675,417.)
+    bool rollingOn = false;
+    if (mRollTo >= 0)
+    {
+        // (where on the way it is, within the next few edges)
+        std::size_t at = path.size();
+        for (std::size_t k = 0; k < path.size() && k < 12 && at == path.size(); k++)
+        {
+            at = nav.Edges()[path[k]].mTo == mRollTo ? k : at;
+        }
+        if (at == path.size() || mRollOn++ > 6)
+        {
+            mRollTo = -1;
+        }
+        else
+        {
+            rollingOn = true;
+            // (the cells on foot to it from here at a roll; what comes first that isn't is done as it is)
+            std::size_t k = 0;
+            while (k <= at && (nav.Edges()[path[k]].mKind == EdgeKind::eWalk || nav.Edges()[path[k]].mKind == EdgeKind::eRoll))
+            {
+                k++;
+            }
+            if (k > at)
+            {
+                // (at a run from where he stands: down into a crouch for the roll is 9 frames, and the drill by the
+                // final Zulag's door had set off by then. "run as soon as you hit the ground")
+                mRunOn = abe.mMove != Move::eCrouch;
+                bot.Log(std::string(mRunOn ? "on at a run" : "on at a roll") + " to " + std::to_string(nav.Nodes()[mRollTo].mX) + ", as timed");
+                sweepRoll = k;
+                mRollTo = -1;
+            }
+        }
+    }
+    if (!rollingOn)
     {
         const World& world = bot.GetWorld();
         std::size_t in = 0;
@@ -2450,11 +2487,28 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     }
                     lead++;
                 }
-                const bool walked = lead >= 1 && lead + 1 >= std::min(count, path.size());
+                // (or the cells of it on foot that come first, rolled behind the drill, with the rest of the way
+                // on as it goes: the final Zulag, "Follow the middle drill to the right and run as soon as you hit
+                // the ground", the floor of 350..575,380 swept by the drill of 449..625 and off its end to 460.
+                // Walked, he is never down before it comes back.)
+                const bool walked = lead >= 1 && (lead + 1 >= std::min(count, path.size()) || mSweepWait >= 140);
                 const bool mustRoll = nav.Edges()[path[0]].mKind == EdgeKind::eRoll && lead > 1;
                 if (walked && !inside && (wasDucked || mustRoll || mSweepWait >= 70))
                 {
                     mSweepDuck = true;
+                    // (turned the way of the roll first, standing: turned crouched it takes 12 frames the timing has
+                    // no room for, and he came to the drill's floor at the final Zulag's door that much late)
+                    const bool rollLeft = nav.Edges()[path[0]].mLeft;
+                    if (abe.mFacingLeft != rollLeft)
+                    {
+                        mSweepWait += 2;
+                        mSteps--;
+                        if (abe.mMove == Move::eCrouch)
+                        {
+                            return TaskStep::Do(Prim::Press(Btn::eUp));
+                        }
+                        return abe.Settled() ? TaskStep::Do(Prim::Face(rollLeft)) : TaskStep::Do(Prim::Wait(1));
+                    }
                     if (abe.mMove != Move::eCrouch)
                     {
                         mSweepWait += 2;
@@ -2469,6 +2523,17 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                         bot.SweepBegun();
                         mSweepWait = 0;
                         sweepRoll = lead;
+                        // (and on through the cells on foot after what comes between, as the timing had it)
+                        mRollTo = -1;
+                        mRollOn = 0;
+                        for (std::size_t k = lead; k < std::min(count, path.size()); k++)
+                        {
+                            const EdgeKind kind = nav.Edges()[path[k]].mKind;
+                            if (k > lead && (kind == EdgeKind::eWalk || kind == EdgeKind::eRoll))
+                            {
+                                mRollTo = nav.Edges()[path[k]].mTo;
+                            }
+                        }
                     }
                 }
             }
@@ -2985,7 +3050,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     }
     if (sweepRoll > 0)
     {
-        return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[sweepRoll - 1]].mTo].mX, Gait::eRoll));
+        const bool run = mRunOn;
+        mRunOn = false;
+        return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[sweepRoll - 1]].mTo].mX, run ? Gait::eRun : Gait::eRoll));
     }
     // AO: nothing is begun that takes him under a thing that is on its way down from the ceiling, or set off and
     // about to be (Rupture Farms' meat, path 16: the switch box he is in sets it off again each time he comes
@@ -5113,6 +5180,21 @@ TaskStep GoToTask::FallStep(Bot& bot, const std::string& lastFailed, const Way& 
         fall.mRunOff = 1;
     }
     fall.mAfter = LandingBits(bot, nav, path);
+    // (a roll timed through drills that goes on past this: on as he lands, the landing skipped. At a run where
+    // that is far enough for one, else walking: the final Zulag's door is three cells on, under the drill of
+    // 477..677,417 that sets off as he lands, "run as soon as you hit the ground")
+    if (mRollTo >= 0 && path.size() >= 2)
+    {
+        std::size_t cells = 0;
+        for (std::size_t i = 1; i < path.size() && (nav.Edges()[path[i]].mKind == EdgeKind::eWalk || nav.Edges()[path[i]].mKind == EdgeKind::eRoll); i++)
+        {
+            cells++;
+        }
+        if (cells > 0)
+        {
+            fall.mAfter = static_cast<u32>(nav.Edges()[path[1]].mLeft ? Btn::eLeft : Btn::eRight) | (cells >= 5 ? static_cast<u32>(Btn::eRun) : 0u);
+        }
+    }
     return TaskStep::Do(fall);
 }
 

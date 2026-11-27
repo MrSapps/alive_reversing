@@ -1144,6 +1144,11 @@ private:
     bool mLeading = false;
     // Crouched before a drill, to roll through under it
     bool mSweepDuck = false;
+    // A roll timed through drills that goes on past a drop: the cell it goes on to, and how many steps it has
+    s32 mRollTo = -1;
+    s32 mRollOn = 0;
+    // That, from standing: at a run
+    bool mRunOn = false;
     // Flying mines: frames spent watching them and waiting for them, and crouched where one goes over his head
     s32 mBombWatch = 0;
     s32 mBombWait = 0;
