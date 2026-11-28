@@ -4456,7 +4456,10 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
                 for (const NavFeature& f : nav.Input().mFeatures)
                 {
                     const s32 gx = (f.mX1 + f.mX2) / 2;
-                    if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == at.mHalf && std::abs(f.mY2 - at.mY) * (at.mHalf ? 2 : 1) <= 30 && gx > std::min(px, at.mX) && gx < std::max(px, at.mX) &&
+                    // (one in the gateway counts as beyond it: the gate comes down between)
+                    const s32 slack = NavGraph::GridStep(at.mHalf) / 2;
+                    if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == at.mHalf && std::abs(f.mY2 - at.mY) * (at.mHalf ? 2 : 1) <= 30 && (gx - at.mX) * (px - at.mX) > 0 &&
+                        std::abs(gx - at.mX) < std::abs(px - at.mX) + slack &&
                         (!gate || std::abs(gx - at.mX) < std::abs((gate->mX1 + gate->mX2) / 2 - at.mX)))
                     {
                         gate = &f;
