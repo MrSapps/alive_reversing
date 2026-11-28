@@ -8688,12 +8688,27 @@ void Domain::Builder::BrewMachines()
                     }
                 }
             }
+            // (a mine's blast at it sets off the other mines it reaches too: the fart's own blast, 60 to each side.
+            // A mine's going off sets off no other, Mine::VTakeDamage. FeeCo's Terminal 2: the four by its door at
+            // 1275..1350,440, "blow up the mines preventing you from reaching the door" with one Brew, were planned
+            // a Brew each, and the machine's three were not enough.)
+            std::vector<Goap::Fact> gives{done};
+            for (const Entity& other : mine ? world.mEntities : std::vector<Entity>{})
+            {
+                if (other.mKind == EntityKind::eMine && !other.mGone && other.mId != target.mId && other.mHalf == target.mHalf && other.mSwitch > 1 && std::abs(other.mY2 - target.mY2) <= 20 &&
+                    std::abs(other.CentreX() - target.CentreX()) <= FartFlight::kBlastX)
+                {
+                    gives.push_back({Key::Switch(other.mSwitch), 1});
+                }
+            }
             // (it drinks there: one of the machine's Brews)
             for (s32 k = 0; k < std::min(brew.mState, 8); k++)
             {
                 std::vector<Goap::Fact> preK = pre;
                 preK.push_back({Key::BrewsUsed(brew.mId), k});
-                add("Fly a fart from " + std::string(EntityKindName(brew.mKind)) + "#" + std::to_string(brew.mId) + " to " + EntityKindName(target.mKind) + "#" + std::to_string(target.mId), preK, {done, {Key::BrewsUsed(brew.mId), k + 1}}, 400 + length / 3, bomb);
+                std::vector<Goap::Fact> givesK = gives;
+                givesK.push_back({Key::BrewsUsed(brew.mId), k + 1});
+                add("Fly a fart from " + std::string(EntityKindName(brew.mKind)) + "#" + std::to_string(brew.mId) + " to " + EntityKindName(target.mKind) + "#" + std::to_string(target.mId), preK, givesK, 400 + length / 3, bomb);
             }
         }
     }
