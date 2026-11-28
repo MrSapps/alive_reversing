@@ -485,7 +485,62 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<SlogRingTask>(step.mEntity, step.mEdge, step.mOther == 1);
         case StepKind::eStepOn:
         {
-            return std::make_unique<StepOnTask>(step.mEntity, step.mEdge, step.mOther != 0 ? static_cast<s32>(step.mOther) - 1 : -1);
+            auto stepOn = std::make_unique<StepOnTask>(step.mEntity, step.mEdge, step.mOther != 0 ? static_cast<s32>(step.mOther) - 1 : -1);
+            // Out over a plate that opens gates with Paramites waiting outside them, two or more, one on the way
+            // on: that one taken off to the far end of its floor first (ParamiteAsideTask), from in here where they
+            // can't get at him, with the chant free for it
+            const Entity* plate = mWorld.Find(step.mEntity);
+            s32 dir = 0;
+            for (std::size_t i = 1; plate && dir == 0 && i < mKeptPlan.size(); i++)
+            {
+                for (const Goap::Action& other : domain.mActions)
+                {
+                    const DomainStep& st = domain.mSteps[other.mTag];
+                    if (other.mName == mKeptPlan[i] && st.mKind == StepKind::eCross && st.mEdge >= 0)
+                    {
+                        dir = mKnow->mNav.Edges()[st.mEdge].mLeft ? -1 : 1;
+                        break;
+                    }
+                }
+            }
+            if (plate && dir != 0 && mIsAe && !mWorld.mInvisCharge && !mWorld.mInvisible && !mWorld.mShrykull && step.mEdge >= 0)
+            {
+                const NavGraph& nav = mKnow->mNav;
+                const NavNode& on = nav.Nodes()[step.mEdge];
+                s32 out = 0;
+                bool ahead = false;
+                // (only a step that opens them: the one in, that shuts them, is no matter)
+                bool opens = false;
+                for (const ParamiteAt& p : mWorld.mParamites)
+                {
+                    const s32 at = p.mPossessed || p.Hidden() || p.mHalf != on.mHalf ? -1 : nav.NodeAt(p.mX, p.mY, p.mHalf, 30);
+                    if (at < 0 || nav.Nodes()[at].mLine != on.mLine || std::abs(p.mX - on.mX) > 10 * NavGraph::GridStep(on.mHalf))
+                    {
+                        continue;
+                    }
+                    bool gated = false;
+                    for (const NavFeature& g : nav.Input().mFeatures)
+                    {
+                        const s32 gx = (g.mX1 + g.mX2) / 2;
+                        gated = gated || (g.mKind == FeatureKind::eBarrier && g.mSolid && g.mSwitch == plate->mSwitch && gx > std::min(p.mX, on.mX) && gx < std::max(p.mX, on.mX));
+                    }
+                    if (gated)
+                    {
+                        out++;
+                        ahead = ahead || (p.mX - on.mX) * dir > 0;
+                    }
+                }
+                for (const NavFeature& g : nav.Input().mFeatures)
+                {
+                    opens = opens || (g.mKind == FeatureKind::eBarrier && g.mSolid && g.mSwitch == plate->mSwitch && step.mOther != 0 && static_cast<s32>(step.mOther) - 1 == (g.mStartClosed ? 1 : 0));
+                }
+                if (out >= 2 && ahead && opens)
+                {
+                    Log("Paramites wait at the gates the plate opens, one on the way on: that one off to the end of its floor first");
+                    return std::make_unique<SequenceTask>(action.mName, std::make_unique<ParamiteAsideTask>(dir), std::move(stepOn));
+                }
+            }
+            return stepOn;
         }
         case StepKind::eZone:
             return std::make_unique<SwitchZoneTask>(static_cast<s32>(step.mOther), step.mEdge);

@@ -22651,6 +22651,77 @@ TaskStep LiftCallTask::Next(Bot& bot, const std::string& lastFailed)
 
 ShrykullTask::~ShrykullTask() = default;
 
+ParamiteAsideTask::~ParamiteAsideTask() = default;
+
+TaskStep ParamiteAsideTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    (void)lastFailed;
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const ParamiteAt* me = nullptr;
+    for (const ParamiteAt& p : world.mParamites)
+    {
+        me = p.mPossessed ? &p : me;
+    }
+    // (given up on, it is let go first: never left in it)
+    if (++mFrames > 900 && mPhase != 2)
+    {
+        if (!me)
+        {
+            return TaskStep::Failed("the Paramite was not taken off");
+        }
+        mPhase = 2;
+    }
+    switch (mPhase)
+    {
+        case 0:
+            // (taken over by the chant: the nearest, the one waiting at the gate on the way)
+            if (me)
+            {
+                mPhase = 1;
+                return TaskStep::Do(Prim::Wait(4));
+            }
+            if (mFrames > 300)
+            {
+                return TaskStep::Failed("no Paramite was taken over");
+            }
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        case 1:
+        {
+            if (!me)
+            {
+                return TaskStep::Failed("lost the Paramite");
+            }
+            // To the end of its floor that way, at a run
+            const s32 cell = NavGraph::GridStep(me->mHalf);
+            s32 end = me->mX;
+            for (s32 x = me->mX + mDir * cell; Domain::ParamiteFloor(nav, world, x, me->mY, me->mHalf) >= 0 && std::abs(x - me->mX) < 40 * cell; x += mDir * cell)
+            {
+                end = x;
+            }
+            if ((end - me->mX) * mDir > cell)
+            {
+                return TaskStep::Do(Prim::Wait(2, (mDir < 0 ? Btn::eLeft : Btn::eRight) | Btn::eRun));
+            }
+            bot.Log("the Paramite is off at the end of its floor at " + std::to_string(me->mX) + ": let go");
+            mPhase = 2;
+            return TaskStep::Do(Prim::Wait(12));
+        }
+        case 2:
+            // Let go (the chant, standing)
+            if (!me)
+            {
+                return TaskStep::Done();
+            }
+            if (me->mMotion != 0 && mFrames < 1200)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+    }
+    return TaskStep::Failed("lost its place");
+}
+
 TaskStep ShrykullTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const AbeState& abe = bot.Abe();

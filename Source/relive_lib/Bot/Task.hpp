@@ -2615,6 +2615,30 @@ private:
     s32 mTries = 0;
 };
 
+// A Paramite that waits just outside the gates of where he is shut in, on the way he goes on by: taken over from in
+// there, run to the far end of its floor that way and let go there, so that it is behind him, or out of reach, as he
+// goes on at a run. (The second Mudomo vault: shut in with the last lock, one at each gate, they had him as he came
+// out; with the one ahead taken off to the end past the well, he was down the well before either got to him.)
+class ParamiteAsideTask final : public Task
+{
+public:
+    explicit ParamiteAsideTask(s32 dir)
+        : mDir(dir)
+    {
+    }
+    ~ParamiteAsideTask() override;
+    std::string Name() const override
+    {
+        return std::string("Paramite off to the end of its floor ") + (mDir < 0 ? "left" : "right");
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    s32 mDir;
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+};
+
 class LeadBelowTask final : public Task
 {
 public:
