@@ -4999,18 +4999,22 @@ TaskStep GoToTask::WalkStep(Bot& bot, const std::string& lastFailed, const Way& 
             along = k;
         }
         s32 nearest = 100000;
+        s32 farthest = 0;
         for (const ParamiteAt& p : bot.GetWorld().mParamites)
         {
             const s32 ahead = (p.mX - here.mX) * way;
             if (!p.mPossessed && !p.Hidden() && p.mHalf == here.mHalf && std::abs(p.mY - here.mY) <= 30 && ahead > 0 && !Domain::GateBetween(nav, bot.GetWorld(), p.mX, here.mX, here.mY, here.mHalf))
             {
                 nearest = std::min(nearest, ahead);
+                farthest = std::max(farthest, ahead);
             }
         }
         // (only a walk that takes him to them or past them: one that stops short leaves them be)
         const s32 reach = path.empty() ? 0 : (nav.Nodes()[nav.Edges()[path.back()].mTo].mX - here.mX) * way;
         const bool toThem = nearest < 100000 && reach >= nearest - cell;
-        if (toThem && along >= 6 && nearest >= cell * 3 / 2 && nearest <= cell * 5)
+        // (all of them inside the jump's first three and a half cells: it comes down past them. Jumped at from five
+        // cells off, he came down on them.)
+        if (toThem && along >= 6 && nearest >= cell && farthest <= cell * 7 / 2)
         {
             const s32 takeoff = here.mX + way * cell;
             bot.Log("Paramites " + std::to_string(nearest) + " on along this floor: over them at a running jump from " + std::to_string(takeoff));
@@ -5018,9 +5022,9 @@ TaskStep GoToTask::WalkStep(Bot& bot, const std::string& lastFailed, const Way& 
             return TaskStep::Do(Prim::RunJump(takeoff, first.mLeft));
         }
         // (further off: on until they are that near, and looked at again there; a move further runs him into them)
-        if (toThem && along >= 6 && nearest > cell * 5)
+        if (toThem && along >= 6 && nearest > cell * 3)
         {
-            const s32 to = here.mX + way * std::max(cell, nearest - cell * 4);
+            const s32 to = here.mX + way * std::max(cell, nearest - cell * 3);
             return TaskStep::Do(Prim::MoveTo(to, Gait::eWalk));
         }
     }
