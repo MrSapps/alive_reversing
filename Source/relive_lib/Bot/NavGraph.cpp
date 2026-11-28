@@ -793,14 +793,21 @@ s32 NavGraph::WellOut(s32 featureIdx, s32 when, s32 depth, s32 knownSwitch, s32 
             const s32 line = FloorBelow(centre + 2 * GridStep(f.mHalf), f.mY1 - 20, f.mHalf, &fy);
             return line >= 0 ? NodeOnLine(line, centre + 2 * GridStep(f.mHalf)) : -1;
         }
-        // (thrown up to a point a little under a floor, he goes on up past it and comes down on that floor.
-        // Measured in Zulag 12: the well at 450,640 throws him to 479,533, and he lands on the floor at 480 by the
-        // open trap door, not back down on the ledge at 660 the well is on)
+        // (thrown up to a point a little under a trap door's floor, he goes on up through it, open, and comes down on
+        // that floor. Measured in Zulag 12: the well at 450,640 throws him to 479,533, and he lands on the floor at
+        // 480 by the open trap door, not back down on the ledge at 660 the well is on. Under a floor with no door
+        // there he is stopped by it: the Mudanchee vaults' wells, taken up onto the floors over them, had him
+        // stuck.)
         if (y < f.mY1 - 40)
         {
             s32 fy = 0;
             const s32 line = FloorBelow(x, y - 80, f.mHalf, &fy);
-            if (line >= 0 && fy < y && y - fy <= 80)
+            bool door = false;
+            for (const NavFeature& t : mInput.mFeatures)
+            {
+                door = door || (t.mKind == FeatureKind::eTrapDoor && t.mHalf == f.mHalf && x >= t.mX1 - GridStep(f.mHalf) && x <= t.mX2 + GridStep(f.mHalf) && std::abs(t.mY1 - fy) <= 30);
+            }
+            if (line >= 0 && door && fy < y && y - fy <= 80)
             {
                 const s32 on = NodeOnLine(line, x);
                 if (on >= 0)
