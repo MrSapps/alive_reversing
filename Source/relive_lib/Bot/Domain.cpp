@@ -3868,6 +3868,10 @@ void Domain::Builder::Crossings()
         // Down onto a floor right by a Slig awake on it, out of the shadows, where there are Brews to fart it with:
         // with it dead. It turns to the landing and shoots. (Zulag 9: "fly your farts up the shaft to destroy all of
         // the Sligs"; let down at 487,1239 by the one of level 4 at 512, he was shot.)
+        // (or unseen: it doesn't see him land. The Mudanchee trial: down at 1787,460 into the short beat of the Slig
+        // at 1762, the way to the teleporter the ghost locks turn on, "turn invisible ... go down and use the
+        // teleporter"; wanted dead as well as unseen, there was no way out.)
+        std::vector<Goap::Fact> landGuards;
         {
             const NavNode& from = nav.Nodes()[e.mFrom];
             const NavNode& to = nav.Nodes()[e.mTo];
@@ -3903,13 +3907,9 @@ void Domain::Builder::Crossings()
                 // one from far up: the first fall down the whole shaft is the guide's way past it.)
                 const bool past = e.mKind == EdgeKind::eFall && sy > from.mY + 30 && sy - from.mY <= 150 && sy < to.mY - 30 && std::abs(sx - from.mX) <= 60;
                 const bool by = !beside && !to.mHidden && !to.mHiddenStill && at >= 0 && nav.Nodes()[at].mLine == to.mLine && std::abs(sx - to.mX) <= 75;
-                if (by || past)
+                if ((by || past) && std::find(landGuards.begin(), landGuards.end(), Goap::Fact{Key::Mud(slig.mId), 2}) == landGuards.end())
                 {
-                    pre.push_back({Key::Mud(slig.mId), 2});
-                    if (both)
-                    {
-                        other.push_back({Key::Mud(slig.mId), 2});
-                    }
+                    landGuards.push_back({Key::Mud(slig.mId), 2});
                 }
             }
         }
@@ -3928,13 +3928,33 @@ void Domain::Builder::Crossings()
                 if (!anon && !watchers.empty())
                 {
                     std::vector<Goap::Fact> dead = pre;
+                    for (const Goap::Fact& f : landGuards)
+                    {
+                        dead.push_back(f);
+                    }
                     for (u32 id : watchers)
                     {
-                        dead.push_back({Key::Mud(id), 2});
+                        if (std::find(dead.begin(), dead.end(), Goap::Fact{Key::Mud(id), 2}) == dead.end())
+                        {
+                            dead.push_back({Key::Mud(id), 2});
+                        }
                     }
                     add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(from.mX) + "," + std::to_string(from.mY) + "->" + std::to_string(to.mX) + "," + std::to_string(to.mY), dead, {regionFact(e.mTo)}, 100 + e.mCost, step);
                 }
                 pre.push_back({Key::kInvisNow, 1});
+            }
+        }
+        // (seen there, with the Sligs it lands by dead; or unseen, past them)
+        if (!landGuards.empty() && !sligFloor)
+        {
+            std::vector<Goap::Fact> unseenPre = pre;
+            unseenPre.push_back({Key::kInvisNow, 1});
+            add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY),
+                unseenPre, {regionFact(e.mTo)}, 100 + e.mCost + unseen(unseenPre), step);
+            pre.insert(pre.end(), landGuards.begin(), landGuards.end());
+            if (both)
+            {
+                other.insert(other.end(), landGuards.begin(), landGuards.end());
             }
         }
         if (both)
