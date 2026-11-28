@@ -5312,6 +5312,7 @@ TEST(BotVault, AToggleFootSwitchOfAGatesSwitchIsSteppedOnAndTheShutGateWantsTheN
     const Domain d = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
     s32 steps = 0;
     s32 gateCrossings = 0;
+    s32 nearCrossings = 0;
     for (const Goap::Action& a : d.mActions)
     {
         if (a.mName.compare(0, 18, "Step on FootSwitch") == 0)
@@ -5324,11 +5325,17 @@ TEST(BotVault, AToggleFootSwitchOfAGatesSwitchIsSteppedOnAndTheShutGateWantsTheN
             continue;
         }
         gateCrossings++;
-        EXPECT_NE(std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::kPlate, 3}), a.mPre.end()) << a.mName;
+        // (from the side of the near one only: from the far side it is behind the gate, and from the gate's own cell
+        // there is no side. The far one is too far off the gate to be its plate.)
+        const s32 fromX = g.Nodes()[g.Edges()[step.mEdge].mFrom].mX;
+        const bool wantsNear = std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::kPlate, 3}) != a.mPre.end();
+        EXPECT_EQ(wantsNear, fromX < 212 - 6) << a.mName;
+        nearCrossings += wantsNear ? 1 : 0;
         EXPECT_EQ(std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::kPlate, 4}), a.mPre.end()) << a.mName;
     }
     EXPECT_EQ(steps, 2);
     EXPECT_GT(gateCrossings, 0);
+    EXPECT_GT(nearCrossings, 0);
     // A plate that sets rather than turns over (mOp 0) is no such step, and the crossing wants none
     World sets = world;
     sets.mEntities[0].mOp = 0;
