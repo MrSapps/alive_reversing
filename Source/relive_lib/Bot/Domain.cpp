@@ -3182,11 +3182,16 @@ void Domain::Builder::add(std::string name, std::vector<Goap::Fact> pre, std::ve
         {
             for (const std::pair<s32, s32>& f : follows)
             {
-                // (a timer trigger toggles its outputs when its input changes, TimerTrigger.cpp: one that is on
-                // already goes off. Bonewerkz' first annex: the Mudokon's rescue switch toggles the two levers'
-                // switches, which are on by then.)
-                const bool on = stateOf(f.second) != 0 && stateOf(f.first) == 0 && effects[i].mValue == 1;
-                const Goap::Fact with{Key::Switch(f.second), on ? 0 : effects[i].mValue};
+                // (a timer trigger toggles its outputs when its input changes, TimerTrigger.cpp: as the switches are
+                // now, the output turned over if the input ends otherwise than it is now. One that is on already goes
+                // off: Bonewerkz' first annex, the Mudokon's rescue switch toggles the two levers' switches, which are
+                // on by then. And one that came on with its lever goes off with it: the Mudanchee vault's path 4,
+                // the lever of 166 and the slam doors of 167 and 168, planned as off for both ways of the lever, the
+                // lever was pulled to and fro for ever.)
+                const s32 inNow = world.Switch(f.first) != 0 ? 1 : 0;
+                const s32 outNow = world.Switch(f.second) != 0 ? 1 : 0;
+                const s32 inAfter = effects[i].mValue != 0 ? 1 : 0;
+                const Goap::Fact with{Key::Switch(f.second), inAfter != inNow ? 1 - outNow : outNow};
                 bool have = false;
                 for (const Goap::Fact& e : effects)
                 {
