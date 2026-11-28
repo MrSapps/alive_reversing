@@ -202,10 +202,14 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             // through the wall at 900, over the doors of 925..1026 and down through them, stopped at 912 between
             // wall and doors, he was got as the wall came on.)
             const bool noStop = NoStopAt(to);
-            if ((TimedRunOn() || mWorld.mFleeing || noStop) && step.mOther == 0 && !mKeptPlan.empty() && mKeptPlan[0] == action.mName && (mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eWalk || mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eRoll))
+            // (and once chased in this path by what hunts him on its floor, a pack of Paramites: in one run, a stop at
+            // each is where they get him. The second Mudomo vault: from the well at 1687,480 to the plate by the lock
+            // at 1312, walked a cell at a time past the two Paramites there, twelve deaths.)
+            const bool hunted = RecentlyChased();
+            if ((TimedRunOn() || mWorld.mFleeing || noStop || hunted) && step.mOther == 0 && !mKeptPlan.empty() && mKeptPlan[0] == action.mName && (mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eWalk || mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eRoll))
             {
                 std::size_t i = 1;
-                for (; i < mKeptPlan.size() && mKeptPlan[i].rfind("Cross ", 0) == 0 && (TimedRunOn() || mWorld.mFleeing || NoStopAt(to)); i++)
+                for (; i < mKeptPlan.size() && mKeptPlan[i].rfind("Cross ", 0) == 0 && (TimedRunOn() || mWorld.mFleeing || hunted || NoStopAt(to)); i++)
                 {
                     const DomainStep* next = nullptr;
                     for (const Goap::Action& other : domain.mActions)
@@ -226,6 +230,32 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
                 // the same way: one run, not two short walks. Zulag 7's first pen: from where the second bone was
                 // thrown out through the gate to its ring, four cells and four, walked, and the Slog had eaten.)
                 const s32 dir = mKnow->mNav.Edges()[step.mEdge].mLeft ? -1 : 1;
+                // (hunted, on onto the plate that is stepped on next, where that is along the same floor the same way:
+                // "stop on the first pressure plate beside the Ghost Lock to trap them outside")
+                if (hunted && i < mKeptPlan.size() && mKeptPlan[i].rfind("Step on ", 0) == 0)
+                {
+                    for (const Goap::Action& other : domain.mActions)
+                    {
+                        const DomainStep& onIt = domain.mSteps[other.mTag];
+                        if (other.mName != mKeptPlan[i] || onIt.mKind != StepKind::eStepOn || onIt.mEdge < 0)
+                        {
+                            continue;
+                        }
+                        const NavNode& end = mKnow->mNav.Nodes()[to];
+                        const NavNode& plateAt = mKnow->mNav.Nodes()[onIt.mEdge];
+                        std::vector<s32> way;
+                        bool flat = plateAt.mHalf == end.mHalf && std::abs(plateAt.mY - end.mY) <= 10 && (plateAt.mX - end.mX) * dir > 0 && mKnow->mNav.FindPath(to, onIt.mEdge, EdgeCostFn(), way);
+                        for (const s32 e : way)
+                        {
+                            flat = flat && mKnow->mNav.Edges()[e].mKind == EdgeKind::eWalk && mKnow->mNav.Edges()[e].mLeft == (dir < 0);
+                        }
+                        if (flat)
+                        {
+                            to = onIt.mEdge;
+                        }
+                        break;
+                    }
+                }
                 if (BoneRunOn() && i < mKeptPlan.size() && mKeptPlan[i].rfind("Use ", 0) == 0)
                 {
                     for (const Goap::Action& other : domain.mActions)
