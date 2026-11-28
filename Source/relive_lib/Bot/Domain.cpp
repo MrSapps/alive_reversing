@@ -1500,6 +1500,28 @@ bool Domain::AtSligLock(const NavGraph& nav, const Entity& lock, s32 node)
     return at.mHalf == lock.mHalf && at.mX >= lock.mX1 + 4 && at.mX <= lock.mX2 - 4 && at.mY >= lock.mY1 && at.mY <= lock.mY2;
 }
 
+// The naked Sligs and the armed ones on the floor a Slig taken over walks it shoots: the floor by a locker for
+// guns that its way goes along is clear after, and that floor is no gate on its way, it is what clears it. The
+// Barracks' Slig Bunks (path 7): "if ever you need another one, pull the lever on the upper left" for the Slig
+// that walks to the lever of the electric wall past the locker at 1075, where a crawler has put on pants.
+static void LockersCleared(const NavGraph& nav, const World& world, const std::vector<s32>& way, std::vector<Goap::Fact>& pre, std::vector<Goap::Fact>& gives)
+{
+    for (const Entity& locker : world.mEntities)
+    {
+        bool along = false;
+        for (s32 edge : way)
+        {
+            const NavNode& n = nav.Nodes()[nav.Edges()[edge].mTo];
+            along = along || (n.mHalf == locker.mHalf && std::abs(n.mY - locker.mY2) <= 30 && std::abs(n.mX - locker.CentreX()) <= World::kLockerReach);
+        }
+        if (locker.mKind == EntityKind::ePantsLocker && along)
+        {
+            gives.push_back({Key::Switch(locker.mSwitch), 1});
+            pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(locker.mSwitch), 1}), pre.end());
+        }
+    }
+}
+
 std::vector<u32> Domain::SligsMet(const NavGraph& nav, const World& world, s32 from, const std::vector<s32>& way, u32 self)
 {
     const std::vector<NavNode>& nodes = nav.Nodes();
@@ -8360,23 +8382,7 @@ void Domain::Builder::SligLocks()
                 pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(lock.mSwitch), 1}), pre.end());
                 pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(lever.mSwitch), 1}), pre.end());
                 std::vector<Goap::Fact> gives{{Key::Switch(lock.mSwitch), 1}};
-                // (the naked Sligs and the armed ones on the floor it walks it shoots: the floor by a locker
-                // for guns that its way goes along is clear after)
-                for (const Entity& locker : world.mEntities)
-                {
-                    bool along = false;
-                    for (s32 edge : way)
-                    {
-                        const NavNode& n = nav.Nodes()[nav.Edges()[edge].mTo];
-                        along = along || (n.mHalf == locker.mHalf && std::abs(n.mY - locker.mY2) <= 30 && std::abs(n.mX - locker.CentreX()) <= World::kLockerReach);
-                    }
-                    if (locker.mKind == EntityKind::ePantsLocker && along)
-                    {
-                        gives.push_back({Key::Switch(locker.mSwitch), 1});
-                        // (and that floor is no gate on its way: it is what clears it)
-                        pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(locker.mSwitch), 1}), pre.end());
-                    }
-                }
+                LockersCleared(nav, world, way, pre, gives);
                 for (u32 met : SligsMet(nav, world, start, way, slig.mId))
                 {
                     gives.push_back({Key::Mud(met), 2});
@@ -8497,6 +8503,7 @@ void Domain::Builder::SligLocks()
             }
             pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(lock.mSwitch), 1}), pre.end());
             std::vector<Goap::Fact> gives{{Key::Switch(lock.mSwitch), 1}};
+            LockersCleared(nav, world, way, pre, gives);
             for (u32 met : SligsMet(nav, world, start, way, slig.mId))
             {
                 gives.push_back({Key::Mud(met), 2});
@@ -8572,6 +8579,7 @@ void Domain::Builder::SligLocks()
                 pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(target.mSwitch), 1}), pre.end());
                 pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(lever.mSwitch), 1}), pre.end());
                 std::vector<Goap::Fact> gives{{Key::Switch(target.mSwitch), 1}};
+                LockersCleared(nav, world, way, pre, gives);
                 for (u32 met : SligsMet(nav, world, start, way, slig.mId))
                 {
                     gives.push_back({Key::Mud(met), 2});
