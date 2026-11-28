@@ -829,6 +829,25 @@ static void SligBeat(BinaryPath& path, s32 boundId, s32& beatMin, s32& beatMax)
     }
 }
 
+// The switches a Glukkon's call for help sets go on through timers (TimerTrigger) to what they set: the spawners of
+// those come at the call as well. FeeCo's Executive Offices: Aslik's help switch 18 goes to 27 and 28, the two
+// spawners over the floor of the lever of 17, "Call "Help" to get a Slig, then put him next to the lever".
+static void MarkGlukkonHelp(World& world)
+{
+    for (std::size_t done = 0; done < world.mGlukkonHelp.size(); done++)
+    {
+        const s32 help = world.mGlukkonHelp[done];
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eSwitchLogic && e.mHoldOnly && e.mInputs[0] == help && e.mSwitch > 1 &&
+                std::find(world.mGlukkonHelp.begin(), world.mGlukkonHelp.end(), e.mSwitch) == world.mGlukkonHelp.end())
+            {
+                world.mGlukkonHelp.push_back(e.mSwitch);
+            }
+        }
+    }
+}
+
 static void BuildEntities(BinaryPath& path, World& world)
 {
     world.mEntities.clear();
@@ -1378,6 +1397,7 @@ static void BuildEntities(BinaryPath& path, World& world)
             }
         }
     }
+    MarkGlukkonHelp(world);
 }
 
 // Which flying Sligs are to be got rid of before their stretch is gone into (FeatureKind::eDanger with mA 1)
