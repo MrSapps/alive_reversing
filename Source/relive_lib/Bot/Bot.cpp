@@ -1073,6 +1073,29 @@ bool Bot::Replan(BaseMap& map)
             }
         }
     }
+    // Crossings that only take him to where wheels are worked together from: straight on to that. Its task goes
+    // to the Mudokons wherever they are and leads them there by the same way, so the crossings first are a walk
+    // there and back. (The final Zulag: from the last UXB at 1637,980, beside the Mudokon at 1562, over the drill
+    // to the wheel at 1812 and back for him, under it a third time with him; and through the gate of 1212,1500
+    // and back to the two at 1262 and 1287.)
+    if (mTask && doing == &first && domain.mSteps[first.mTag].mKind == StepKind::eCross && domain.mSteps[first.mTag].mOther == 0)
+    {
+        for (std::size_t i = 1; i < best.mSteps.size(); i++)
+        {
+            const DomainStep& next = domain.mSteps[actions[best.mSteps[i]].mTag];
+            if (next.mKind == StepKind::eLogic || (next.mKind == StepKind::eCross && next.mOther == 0))
+            {
+                continue;
+            }
+            if (next.mKind == StepKind::eTogether)
+            {
+                doing = &actions[best.mSteps[i]];
+                Log("the crossings are on the way to the wheels: straight on to " + doing->mName);
+                mTask = MakeTask(domain, *doing);
+            }
+            break;
+        }
+    }
     mTaskAction = doing->mName;
     mTaskOptional = domain.mSteps[doing->mTag].mKind == StepKind::eRescue || domain.mSteps[doing->mTag].mKind == StepKind::eKill;
     if (!mTask)
