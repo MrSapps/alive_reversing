@@ -1536,7 +1536,11 @@ static bool OutToHoist(const NavGraph& nav, const std::vector<s32>& path)
 // A drop or a hop that comes down beside the lever of an open gate across a floor Sligs walk: 0 when there is no such
 // gate by where it lands, 1 when every Slig of that floor on its screen is on the gate's far side and walking away
 // from it (the time to go: the lever shuts it on them), 2 when not yet
-static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode, std::vector<s32>* moved = nullptr)
+// relaxed: after a long wait for that, enough that each faces away and is at most 30 short of the gate as he lands
+// (walking on, it is through before the gate is down). FeeCo's Executive Offices: the two Sligs of the floor under
+// the lever of 17 walk out of step and turn at 1962 facing back, and both were never far enough at once: he waited
+// 18,000 frames. Mistimed, it is tried again from a checkpoint.
+static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode, std::vector<s32>* moved = nullptr, bool relaxed = false)
 {
     // (looking ahead, the moment is found by trying it: the Sligs' pauses at the ends of their beat are random, and
     // what was worked out from where they were went wrong as often as not)
@@ -1601,8 +1605,9 @@ static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode, std::ve
             }
             const s32 pause = way < 0 ? slig.mPauseLeft : slig.mPauseRight;
             const bool justStood = moved && slig.mMotion == 0 && slig.mFacingLeft == (way < 0) && (slig.mX - gateX) * way >= 15 && pause - (now - (*moved)[idx]) >= 40;
-            all = all && ((walksAway && (then - gateX) * way >= 15 && room) || justStood);
-            walking = walking || walksAway;
+            const bool backTurned = (slig.mMotion == 2 || slig.mMotion == 0) && slig.mFacingLeft == (way < 0);
+            all = all && ((walksAway && (then - gateX) * way >= 15 && room) || justStood || (relaxed && backTurned && (then - gateX) * way >= -30));
+            walking = walking || walksAway || relaxed;
         }
         state = any ? (all && walking ? 1 : 2) : state;
     }
@@ -5639,7 +5644,7 @@ TaskStep GoToTask::HopStep(Bot& bot, const std::string& lastFailed, const Way& w
     // (not at a run from Slogs: there is no waiting then, and its back is what there is. The Executive Office
     // of Bonewerkz: "jump over him and keep going".)
     // (down beside the lever of an open gate: as the Sligs are all beyond it, see the drop)
-    if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && GateShutsOut(bot, nav, first.mTo, &mSligMoved) == 2 && mHopWaits < 12000)
+    if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && GateShutsOut(bot, nav, first.mTo, &mSligMoved, mHopWaits > 3000) == 2 && mHopWaits < 12000)
     {
         mHopWaits++;
         mSteps--;
