@@ -4318,12 +4318,20 @@ TaskStep GoToTask::WalkStep(Bot& bot, const std::string& lastFailed, const Way& 
             moved = moved || mLiftAway.count(to.mLiftStop) != 0;
             // (a mover's switch is on the stop it brings the lift to: any stop of the column)
             s32 switches = 0;
+            // (a mover takes its lift to its stop when its switch goes on and back when it goes off, and no more: one
+            // whose switches haven't changed in a while stays where it is until something turns them over. The bot
+            // sees every switch, on whatever screen. The final Zulag: the lift of 1150, its mover's switch set by the
+            // wheels of 8011 250 frames before, watched 130 frames more with the Mudokons he was leading to it.)
+            bool quiet = true;
             for (const NavFeature& other : nav.Input().mFeatures)
             {
                 if (other.mKind == stop.mKind && std::abs(other.mX1 - stop.mX1) <= 2 && other.mSwitch > 1)
                 {
                     movered = true;
                     switches = switches * 31 + other.mSwitch * 2 + (world.Switch(other.mSwitch) ? 1 : 0);
+                    s32 since = 0;
+                    bot.SwitchCycles(other.mSwitch, &since);
+                    quiet = quiet && since >= 300;
                 }
             }
             // (only one there to be seen: one off the screens there are is where it was last seen, and watching that
@@ -4338,7 +4346,7 @@ TaskStep GoToTask::WalkStep(Bot& bot, const std::string& lastFailed, const Way& 
             {
                 stops.push_back({to.mLiftStop, switches});
             }
-            watched = watched && (!live || bot.LiftSeenStill(to.mLiftStop, switches));
+            watched = watched && (!live || quiet || bot.LiftSeenStill(to.mLiftStop, switches));
         }
         // (ones a mover works are watched a while first, to see whether they come and go; once, as the switches are.
         // On the way to them meanwhile, short of the first: stood still to watch, the final Zulag's two Mudokons
