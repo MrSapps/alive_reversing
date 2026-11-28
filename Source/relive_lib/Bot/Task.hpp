@@ -2444,6 +2444,8 @@ private:
     // A Fleech it could not eat where it stood (its x), left alone for that many turns, and the bites tried
     s32 mSkipPreyX = -100000;
     s32 mSkipPreyFor = 0;
+    // (where the ones it could not get at were: left for good, not gone back to)
+    std::vector<s32> mUneatable;
     s32 mEatTries = 0;
     s32 mHuntLastX = -100000;
     s32 mHuntStill = 0;

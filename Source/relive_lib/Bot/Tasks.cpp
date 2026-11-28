@@ -19541,6 +19541,15 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                     {
                         continue;
                     }
+                    bool uneatable = false;
+                    for (const s32 x : mUneatable)
+                    {
+                        uneatable = uneatable || std::abs(f.mX - x) <= 30;
+                    }
+                    if (uneatable)
+                    {
+                        continue;
+                    }
                     // (floor all the way to it)
                     bool floor = true;
                     for (s32 x = std::min(me->mX, f.mX); floor && x <= std::max(me->mX, f.mX); x += cell)
@@ -19578,6 +19587,7 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                             mHuntStill = 0;
                             mSkipPreyX = prey->mX;
                             mSkipPreyFor = 900;
+                            mUneatable.push_back(prey->mX);
                             bot.Log("the Paramite gets no nearer the Fleech at " + std::to_string(prey->mX) + ": the others first");
                             return TaskStep::Do(Prim::Wait(1));
                         }
@@ -19646,6 +19656,7 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                                     mEatTries = 0;
                                     mSkipPreyX = prey->mX;
                                     mSkipPreyFor = 900;
+                                    mUneatable.push_back(prey->mX);
                                     return TaskStep::Do(Prim::Wait(1));
                                 }
                                 return TaskStep::Do(Prim::Wait(12, Btn::eDown));
@@ -19936,7 +19947,14 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                         {
                             for (const RockAt& f : *list)
                             {
-                                if (f.mHalf == me->mHalf && std::abs(f.mY - me->mY) <= 20 && !Domain::WallBetween(nav, me->mX, f.mX, me->mY, me->mHalf) && (!left || std::abs(f.mX - me->mX) < std::abs(left->mX - me->mX)))
+                                // (not one it could not get at: gone back to against the end of the floor at 412, it was
+                                // eaten there, the four by the locks never got to)
+                                bool uneatable = false;
+                                for (const s32 x : mUneatable)
+                                {
+                                    uneatable = uneatable || std::abs(f.mX - x) <= 30;
+                                }
+                                if (!uneatable && f.mHalf == me->mHalf && std::abs(f.mY - me->mY) <= 20 && !Domain::WallBetween(nav, me->mX, f.mX, me->mY, me->mHalf) && (!left || std::abs(f.mX - me->mX) < std::abs(left->mX - me->mX)))
                                 {
                                     left = &f;
                                 }
