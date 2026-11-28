@@ -2597,6 +2597,40 @@ private:
 
 // To the cell given and chant with the Shrykull's power: he turns into it, it zaps what it can on the screen, and
 // he is himself again
+// A lever on the beat of a Slig, pulled from a shadow beside it behind the Slig's back (Domain: eBackPull): into
+// the shadow, there until the Slig walks away past the lever, out to the lever and back into the shadow
+class BackPullTask final : public Task
+{
+public:
+    BackPullTask(u32 lever, s32 want, u32 slig, s32 shade)
+        : mLever(lever)
+        , mWant(want)
+        , mSlig(slig)
+        , mShade(shade)
+    {
+    }
+    ~BackPullTask() override;
+    std::string Name() const override
+    {
+        return "Use #" + std::to_string(mLever) + " behind Slig#" + std::to_string(mSlig) + "'s back";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mLever;
+    s32 mWant;
+    u32 mSlig;
+    s32 mShade;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<UseTask> mUse;
+    // 0 to the shadow, 1 waiting there, 2 at the lever, 3 back
+    s32 mPhase = 0;
+    // (the Slig was seen facing the shadow's way: one that turns its back then is just turned)
+    bool mToward = false;
+    s32 mWaits = 0;
+    s32 mTries = 0;
+};
+
 // A ghost trap that has given its power gives it again once its screen is left and come back to (SlapLock: made
 // anew from the map, it gives the power to him on its screen while he hasn't it): off the screen of the cell mNode,
 // back to that cell, and there until he has it

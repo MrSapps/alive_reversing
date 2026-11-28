@@ -7538,6 +7538,9 @@ void Domain::Builder::GuardedLevers()
     const World& world = mWorld;
     Domain& d = mD;
     std::map<u32, std::vector<u32>> guarded;
+    // (and of those, the lever on the beat of one Slig with a shadow beside it: pulled from there behind its back,
+    // BackPullTask)
+    std::map<u32, std::pair<u32, s32>> behind;
     for (const Entity& lever : world.mEntities)
     {
         if (lever.mKind != EntityKind::eLever || lever.mGone)
@@ -7582,6 +7585,24 @@ void Domain::Builder::GuardedLevers()
                 (byIt || (slig.mBeatMax > slig.mBeatMin && nav.CameraOf(slig.mBeatMin, slig.mY2 - 5) == cam && nav.CameraOf(slig.mBeatMax, slig.mY2 - 5) == cam && lever.mX2 >= slig.mBeatMin && lever.mX1 <= slig.mBeatMax)))
             {
                 guarded[lever.mId].push_back(slig.mId);
+                // (a shadow a cell or two from where it is pulled, on its floor, with the beat going on past the lever
+                // away from it: FeeCo's Executive Offices, the lever of 14 on the beat at 1725..1800 of the Slig above
+                // the teleporter, "When the top Slig turns away, sneak ahead one step, pull the lever, turn and sneak
+                // back one step, all before he turns back around")
+                const s32 use = UseNode(nav, lever, nullptr);
+                const s32 cell = NavGraph::GridStep(lever.mHalf);
+                for (std::size_t n = 0; !byIt && use >= 0 && n < nav.Nodes().size(); n++)
+                {
+                    const NavNode& shade = nav.Nodes()[n];
+                    const NavNode& at = nav.Nodes()[use];
+                    const s32 off = shade.mX - at.mX;
+                    const s32 beyond = off < 0 ? slig.mBeatMax - at.mX : at.mX - slig.mBeatMin;
+                    if (static_cast<s32>(n) != use && shade.mLine == at.mLine && (shade.mHidden || shade.mHiddenStill) && !shade.mHazard && std::abs(off) <= 2 * cell && beyond >= 2 * cell &&
+                        (behind.count(lever.mId) == 0 || std::abs(off) < std::abs(nav.Nodes()[behind[lever.mId].second].mX - at.mX)))
+                    {
+                        behind[lever.mId] = {slig.mId, static_cast<s32>(n)};
+                    }
+                }
             }
         }
     }
@@ -7591,13 +7612,29 @@ void Domain::Builder::GuardedLevers()
     }
     // (once that Slig is no more it is a lever like any other: a fart flown to it, say. Zulag 9's sixth level, the
     // lever of 175 by the well: "Possess the Slig and explode him. ... Pull the lever by the well".)
-    for (Goap::Action& a : d.mActions)
+    const std::size_t count = d.mActions.size();
+    for (std::size_t ai = 0; ai < count; ai++)
     {
-        const DomainStep& step = d.mSteps[a.mTag];
+        const DomainStep step = d.mSteps[d.mActions[ai].mTag];
         const auto it = step.mKind == StepKind::eUse ? guarded.find(step.mEntity) : guarded.end();
-        for (u32 slig : it != guarded.end() ? it->second : std::vector<u32>{})
+        if (it == guarded.end())
         {
-            a.mPre.push_back({Key::Mud(slig), 2});
+            continue;
+        }
+        // (the one Slig of it gone or not: from the shadow behind its back)
+        const auto back = behind.find(step.mEntity);
+        if (back != behind.end() && it->second.size() == 1 && step.mOther == 0)
+        {
+            Goap::Action a = d.mActions[ai];
+            DomainStep pull = step;
+            pull.mKind = StepKind::eBackPull;
+            pull.mOther = back->second.first;
+            pull.mEdge = back->second.second;
+            add(a.mName + " from the shadow at " + std::to_string(mNav.Nodes()[pull.mEdge].mX) + " behind Slig#" + std::to_string(pull.mOther) + "'s back", a.mPre, a.mEffects, a.mCost + 200, pull);
+        }
+        for (u32 slig : it->second)
+        {
+            d.mActions[ai].mPre.push_back({Key::Mud(slig), 2});
         }
     }
 }

@@ -178,6 +178,7 @@ enum class StepKind : u8
     eZone,      // into the cell mEdge, which is in a zone that sets switch mOther when he is in it
     eShrykull,  // to the cell mEdge and chant with the Shrykull's power: every UXB, mine, Slig, flying Slig, Slog,
                 // Glukkon and security orb on its screen is zapped
+    eBackPull,  // lever mEntity on the beat of Slig mOther pulled from the shadow at cell mEdge as it walks away
     eInvisAgain, // off the screen of ghost trap mEntity, its power given already, and back to the cell mEdge on it:
                  // the game makes it anew when its screen comes back, and it gives the power again
 };

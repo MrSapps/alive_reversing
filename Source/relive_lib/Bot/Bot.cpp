@@ -593,6 +593,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<LiftCallTask>(step.mEntity, step.mEdge);
         case StepKind::eShrykull:
             return std::make_unique<ShrykullTask>(step.mEdge);
+        case StepKind::eBackPull:
+            return std::make_unique<BackPullTask>(step.mEntity, action.mEffects[0].mValue, step.mOther, step.mEdge);
         case StepKind::eInvisAgain:
             return std::make_unique<InvisAgainTask>(step.mEdge);
         case StepKind::eScrabPen:

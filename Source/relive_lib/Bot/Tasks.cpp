@@ -22663,6 +22663,105 @@ TaskStep LiftCallTask::Next(Bot& bot, const std::string& lastFailed)
     return ++mFrames < 900 ? TaskStep::Do(Prim::Wait(2)) : TaskStep::Failed("the lift didn't come back");
 }
 
+BackPullTask::~BackPullTask() = default;
+
+TaskStep BackPullTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const AbeState& abe = bot.Abe();
+    const Entity* lever = world.Find(mLever);
+    if (!lever)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    TaskStep step;
+    if (mUse)
+    {
+        step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim || step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        mUse.reset();
+        mPhase = 3;
+    }
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        return step;
+    }
+    const NavNode& shade = nav.Nodes()[mShade];
+    if (mPhase == 3)
+    {
+        if (bot.AbeNode() == mShade || world.Switch(lever->mSwitch) != mWant)
+        {
+            return world.Switch(lever->mSwitch) == mWant ? TaskStep::Done() : TaskStep::Failed("the lever did not take");
+        }
+        if (++mTries > 4)
+        {
+            return TaskStep::Done();
+        }
+        return TaskStep::Do(Prim::MoveTo(shade.mX, Gait::eSneak));
+    }
+    if (mPhase == 0)
+    {
+        if (bot.AbeNode() != mShade)
+        {
+            if (++mTries > 6)
+            {
+                return TaskStep::Failed("can't get to the shadow by the lever");
+            }
+            mGo = GoToNode(mShade);
+            return Next(bot, "");
+        }
+        mPhase = 1;
+        mTries = 0;
+        bot.Log("in the shadow at " + std::to_string(shade.mX) + " by #" + std::to_string(mLever) + ": out to it as Slig#" + std::to_string(mSlig) + " walks away past it");
+    }
+    if (abe.mMove == Move::eCrouch)
+    {
+        return TaskStep::Do(Prim::Press(Btn::eUp));
+    }
+    // Out as it walks away from the shadow's side and is past the lever: all of the time it walks on, stands at
+    // the end of its beat and turns is his
+    const SligAt* slig = nullptr;
+    for (const SligAt& s : world.mSligs)
+    {
+        if (!s.mAsleep && !s.mPossessed && s.mHalf == lever->mHalf && std::abs(s.mY - lever->mY2) <= 45 && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(lever->CentreX(), lever->mY2 - 5))
+        {
+            slig = &s;
+        }
+    }
+    // (past the cell it is pulled from: a lever's box is wider than that, and the beat may end short of its far side)
+    const s32 use = Domain::UseNode(nav, *lever, nullptr);
+    const s32 useX = use >= 0 ? nav.Nodes()[use].mX : lever->CentreX();
+    const bool right = useX > shade.mX;
+    // (walking away, or standing there and just turned its back: one kept to a spot turns this way and that.
+    // FeeCo's Executive Offices, the Slig at 1787 by the lever of 14, about 60 frames each way.)
+    const bool past = slig && (right ? slig->mX > useX : slig->mX < useX);
+    const bool back = slig && slig->mFacingLeft != right;
+    const bool turned = back && mToward;
+    mToward = slig && !back;
+    const bool away = !slig || (past && back && (slig->mMotion == 2 || turned));
+    if (!away)
+    {
+        if (++mWaits > 3000)
+        {
+            return TaskStep::Failed("the Slig never walked away past the lever");
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    bot.Log("Slig#" + std::to_string(mSlig) + " walks away past #" + std::to_string(mLever) + ": out of the shadow to it");
+    mPhase = 2;
+    mUse = std::make_unique<UseTask>(mLever, mWant);
+    mUse->FixSide(right ? -1 : 1);
+    return Next(bot, "");
+}
+
 InvisAgainTask::~InvisAgainTask() = default;
 
 TaskStep InvisAgainTask::Next(Bot& bot, const std::string& lastFailed)
