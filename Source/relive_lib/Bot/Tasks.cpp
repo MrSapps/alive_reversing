@@ -10759,6 +10759,21 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
                 mSide = costs[0] < costs[1] ? -1 : 1;
             }
         }
+        // Nor round to its other side over a plate that turns a gate over: that opens what the plate on his side
+        // shut. (The second Mudomo vault's locks, each between two such plates: in over the right one, the
+        // gates shut on the Paramites outside, and slapped from the left one, they were opened on him.)
+        {
+            const s32 mine = bot.Abe().mX > entity->CentreX() ? 1 : -1;
+            const s32 far = Domain::UseNode(bot.Nav(), *entity, nullptr, -mine);
+            for (const Entity& plate : bot.GetWorld().mEntities)
+            {
+                if (far >= 0 && plate.mKind == EntityKind::eFootSwitch && !plate.mGone && plate.mOp == 2 && plate.mSwitch > 1 &&
+                    bot.Nav().NodeAt(plate.CentreX(), plate.mY2, plate.mHalf, 30) == far && Domain::UseNode(bot.Nav(), *entity, nullptr, mine) >= 0)
+                {
+                    mSide = mine;
+                }
+            }
+        }
     }
     bool faceLeft = false;
     const s32 node = Domain::UseNode(bot.Nav(), *entity, &faceLeft, mSide);
