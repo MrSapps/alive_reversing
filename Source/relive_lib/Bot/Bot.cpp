@@ -2012,7 +2012,15 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             {
                 comesBack = comesBack || (other.mKind == at.mKind && std::abs(other.mX1 - at.mX1) <= 2 && other.mSwitch > 1);
             }
-            if (!comesBack && !world->LiftAtStop(at.mX1, at.mX2, stop->mY, at.mA != 0))
+            // (a hop or a fall onto a stop it is not at, with the lift waiting a little lower in its shaft: he comes down
+            // on it there. The Barracks' path 5 (Workers' Campus), the lift at 3900 at its middle stop 900, hopped
+            // onto from the ledge at 840: "stand and jump to the lift once the Mine passes over you again".)
+            bool below = false;
+            for (const LiftAt& lift : e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eRunJump ? world->mLifts : std::vector<LiftAt>{})
+            {
+                below = below || (stop->mX >= lift.mX1 && stop->mX <= lift.mX2 && lift.mY > stop->mY + 10 && lift.mY <= stop->mY + 80);
+            }
+            if (!comesBack && !below && !world->LiftAtStop(at.mX1, at.mX2, stop->mY, at.mA != 0))
             {
                 *refused = __LINE__;
                 return -1;
