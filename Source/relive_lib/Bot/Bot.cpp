@@ -2763,10 +2763,18 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     }
 }
 
+// The shift a timing past a drill takes after each death under drills on that screen
+static const s32 kSweepLate[] = {0, 6, -6, 12, -12, 18, 24, -18};
+
+std::pair<s32, s32> Bot::SweepScreen() const
+{
+    return {mAbe.mLevel * 1000 + mAbe.mPath, mKnow ? mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5) : -1};
+}
+
 s32 Bot::SweepLate() const
 {
-    static const s32 kLate[] = {0, 6, -6, 12, -12, 18, 24, -18};
-    return kLate[mSweepDeaths % 8];
+    const auto it = mSweepDeaths.find(SweepScreen());
+    return it == mSweepDeaths.end() ? 0 : kSweepLate[it->second % 8];
 }
 
 bool Bot::BeamRoll()
@@ -3187,8 +3195,8 @@ void Bot::OnDeath(BaseMap& map)
     }
     if (mSweepPending && mAbe.mFrame - mSweepFrame < 250)
     {
-        mSweepDeaths++;
-        Log("the drill got Abe: next time as if he were " + std::to_string(SweepLate()) + " frames later than worked out");
+        const s32 deaths = ++mSweepDeaths[mSweepScreen];
+        Log("the drill got Abe: next time on this screen as if he were " + std::to_string(kSweepLate[deaths % 8]) + " frames later than worked out");
     }
     mSweepPending = false;
     if (look)

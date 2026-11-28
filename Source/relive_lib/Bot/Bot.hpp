@@ -527,6 +527,7 @@ public:
     {
         mSweepPending = true;
         mSweepFrame = mAbe.mFrame;
+        mSweepScreen = SweepScreen();
     }
     // Going for a drill's lever: no going for another's on the way there
     void StoppingSweep()
@@ -803,7 +804,13 @@ private:
     s32 mMissRewinds = 0;
     bool mSweepPending = false;
     u32 mSweepFrame = 0;
-    s32 mSweepDeaths = 0;
+    // Deaths under drills per screen (level and path, camera): what one screen's drills taught is not another's.
+    // (Kept for the whole run, three deaths under the brewery's final Zulag's UXB-room drills had his timing at the
+    // three drills of 1650..1774,1500 a screen on 12 frames out, and he ran into the one at 1712 at the bottom of
+    // its stroke.)
+    std::map<std::pair<s32, s32>, s32> mSweepDeaths;
+    std::pair<s32, s32> mSweepScreen;
+    std::pair<s32, s32> SweepScreen() const;
     s32 mSweepStopFrame = -100000;
     // Deaths per cell (x, y): the same place over and over is not a matter of luck
     std::map<std::pair<s32, s32>, s32> mDeathCells;
