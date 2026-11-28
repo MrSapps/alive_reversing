@@ -7579,6 +7579,23 @@ void Domain::Builder::GuardedLevers()
                 }
                 continue;
             }
+            // (nor one on the far side of a gate that this lever shuts, between it and the lever: shut, it keeps it
+            // off. FeeCo's Executive Offices, the lever of 17 by the slam door at 1975 with the two Sligs beyond it,
+            // "pull it, all while the Sligs are at the left side, raising a slamdoor to prevent them from shooting you")
+            bool shutOff = false;
+            const s32 slx = slig.mLive ? slig.mLiveX : sx;
+            for (const NavFeature& f : nav.Input().mFeatures)
+            {
+                const s32 gx = (f.mX1 + f.mX2) / 2;
+                // (where it is now or where its beat takes it: the way to the lever is timed for it to be beyond)
+                const s32 farX = lever.CentreX() > gx ? std::min(slx, slig.mBeatMax > slig.mBeatMin ? slig.mBeatMin : slx) : std::max(slx, slig.mBeatMax > slig.mBeatMin ? slig.mBeatMax : slx);
+                shutOff = shutOff || (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch == lever.mSwitch && f.mHalf == lever.mHalf && std::abs(f.mY2 - lever.mY2) <= 40 && world.Switch(f.mSwitch) == (f.mStartClosed ? 1 : 0) &&
+                                      gx > std::min(farX, lever.CentreX()) && gx < std::max(farX, lever.CentreX()));
+            }
+            if (shutOff)
+            {
+                continue;
+            }
             // (the Glukkon there is for those a spawner lets out, above: a Slig of the map's under it is taken over
             // or got by as it was)
             if (orb && slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch <= 1 && (slig.mState != 1 || byIt) && slig.mHalf == lever.mHalf && std::abs(slig.mY2 - lever.mY2) <= 40 &&
