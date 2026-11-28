@@ -4380,6 +4380,9 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
     std::vector<Goap::Fact> guards;
     // (the ones of them that are Paramites loose on its floor: see the last resort at the plain use)
     std::vector<Goap::Fact> packGuards;
+    // (the gates that shut those Paramites out of where he works it, and whether every one of them has one)
+    std::vector<Goap::Fact> packShut;
+    bool packGated = true;
     if (entity.mKind == EntityKind::eSlapLock)
     {
         for (const Entity& f : world.mEntities)
@@ -4448,6 +4451,23 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
             {
                 pack.push_back(para.mId);
                 nearest = std::min(nearest, std::abs(px - at.mX));
+                // (and the gate between, open now, that shuts it out: the one nearest him)
+                const NavFeature* gate = nullptr;
+                for (const NavFeature& f : nav.Input().mFeatures)
+                {
+                    const s32 gx = (f.mX1 + f.mX2) / 2;
+                    if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == at.mHalf && std::abs(f.mY2 - at.mY) * (at.mHalf ? 2 : 1) <= 30 && gx > std::min(px, at.mX) && gx < std::max(px, at.mX) &&
+                        (!gate || std::abs(gx - at.mX) < std::abs((gate->mX1 + gate->mX2) / 2 - at.mX)))
+                    {
+                        gate = &f;
+                    }
+                }
+                const Goap::Fact shutIt = gate ? Goap::Fact{Key::Switch(gate->mSwitch), gate->mStartClosed ? 0 : 1} : Goap::Fact{};
+                packGated = packGated && gate;
+                if (gate && std::find(packShut.begin(), packShut.end(), shutIt) == packShut.end())
+                {
+                    packShut.push_back(shutIt);
+                }
             }
         }
         if (pack.size() >= 2 || (pack.size() == 1 && nearest <= 250))
@@ -4911,6 +4931,14 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
                 }
             }
             add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on with the Paramites of its floor about", bare, gives, 6000, step);
+            // (or with them shut out behind gates: the second Mudomo vault's locks, each between two foot switches
+            // and two gates, "stop on the first pressure plate beside the Ghost Lock to trap them outside")
+            if (packGated && !packShut.empty())
+            {
+                std::vector<Goap::Fact> shutOut = bare;
+                shutOut.insert(shutOut.end(), packShut.begin(), packShut.end());
+                add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on with the Paramites shut out", shutOut, gives, useCost + 100, step);
+            }
         }
         if (shy)
         {
