@@ -1548,7 +1548,7 @@ std::vector<u32> Domain::SligsMet(const NavGraph& nav, const World& world, s32 f
     return met;
 }
 
-bool Domain::ScrabReaches(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, bool charged, std::vector<Goap::Fact>* keep, std::vector<Goap::Fact>* shut, bool* canShut)
+bool Domain::ScrabReaches(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, bool charged, std::vector<Goap::Fact>* keep, std::vector<Goap::Fact>* shut, bool* canShut, bool still)
 {
     if (canShut)
     {
@@ -1576,7 +1576,7 @@ bool Domain::ScrabReaches(const NavGraph& nav, const World& world, s32 x, s32 y,
         // One that waits before it strikes is run from, like a Slig that waits before it shoots (the Mudanchee
         // vault's path 3: "run right ahead of the Scrab and jump up"). Not one that was left shut in: where it
         // is there is nowhere to run to.
-        if (e.mInputs[0] >= 30 && parked == world.mScrabParked.end())
+        if (e.mInputs[0] >= 30 && parked == world.mScrabParked.end() && !still)
         {
             continue;
         }
@@ -1605,8 +1605,10 @@ bool Domain::ScrabReaches(const NavGraph& nav, const World& world, s32 x, s32 y,
                 }
             }
         }
-        // (one left shut in has the whole of its stretch, however long)
-        if (possessed || (std::abs(sx - x) * scale > 700 && parked == world.mScrabParked.end()))
+        // (one left shut in has the whole of its stretch, however long; and so has any for a while there: it walks
+        // its floor and comes. Mudanchee vault path 4's Scrab#3002, put at 1313 of the background, 958 off the ghost
+        // lock at 1792 by the half scale, was taken to be too far off to come.)
+        if (possessed || (std::abs(sx - x) * scale > 700 && parked == world.mScrabParked.end() && !still))
         {
             continue;
         }
@@ -4624,6 +4626,27 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
         // it (a ledge over its floor):
         // unseen (the walkthrough's sixth Mudanchee vault: "use your invisibility power to slap that
         // other Ghost Lock, then jump back into the well")
+        std::vector<Goap::Fact> scrabGates;
+        // On a floor with a gate, a Scrab that can get to him where he works the thing, even one that waits before
+        // it strikes: run from on the way, it gets him as he stands there. Its gate shut first, or unseen.
+        // (Mudanchee vault path 4: the ghost lock at 1792,319, slapped with Scrab#3002 out on its floor past the
+        // open slam door of lever 4003; he was killed there twelve times.)
+        if (node >= 0)
+        {
+            const NavNode& at = nav.Nodes()[node];
+            bool gated = false;
+            for (const NavFeature& f : nav.Input().mFeatures)
+            {
+                const s32 by = f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == at.mHalf ? nav.NodeAt((f.mX1 + f.mX2) / 2, f.mY2, f.mHalf, 30) : -1;
+                gated = gated || (by >= 0 && nav.Nodes()[by].mLine == at.mLine);
+            }
+            std::vector<Goap::Fact> shut;
+            bool canShut = true;
+            if (gated && ScrabReaches(nav, world, at.mX, at.mY, at.mHalf, false, nullptr, &shut, &canShut, true) && canShut && !shut.empty())
+            {
+                scrabGates = shut;
+            }
+        }
         if (!freesOn && node >= 0)
         {
             const NavNode& at = nav.Nodes()[node];
@@ -4858,6 +4881,13 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
         }
         else
         {
+            if (!scrabGates.empty() && std::find(pre.begin(), pre.end(), Goap::Fact{Key::kInvisNow, 1}) == pre.end())
+            {
+                std::vector<Goap::Fact> unseenAt = pre;
+                unseenAt.push_back({Key::kInvisNow, 1});
+                add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on unseen by the Scrab", unseenAt, gives, useCost + 300, step);
+                pre.insert(pre.end(), scrabGates.begin(), scrabGates.end());
+            }
             add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, useCost, step);
         }
         // With Paramites loose on its floor and nothing that rids it of them: all the same, dear, so that

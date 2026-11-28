@@ -403,7 +403,9 @@ struct Domain final
     // charged: the power not yet used (or its ring on the way) counts as cover too, as it does for finding a route.
     // keep: the shut gates that are all that keeps a Scrab from there (each as the fact that it stays shut);
     // shut: for the Scrabs that can get there, the open gate nearest each, shut; canShut: every one of them has one
-    static bool ScrabReaches(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, bool charged = true, std::vector<Goap::Fact>* keep = nullptr, std::vector<Goap::Fact>* shut = nullptr, bool* canShut = nullptr);
+    // still: he stays there a while (at a lever or lock), so a Scrab that waits before it strikes gets him as well:
+    // there is no running from it
+    static bool ScrabReaches(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, bool charged = true, std::vector<Goap::Fact>* keep = nullptr, std::vector<Goap::Fact>* shut = nullptr, bool* canShut = nullptr, bool still = false);
     // Whether a gate that is shut now stands on the floor at y between x1 and x2
     static bool GateBetween(const NavGraph& nav, const World& world, s32 x1, s32 x2, s32 y, bool half);
     // The stretch of floor a cell is in, as Scrabs see it: its floor's line, cut at the gates on it. A number that
