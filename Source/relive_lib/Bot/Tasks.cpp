@@ -19432,6 +19432,16 @@ TaskStep StepOnTask::Next(Bot& bot, const std::string& lastFailed)
     }
     if (bot.AbeNode() != on)
     {
+        // (along his own floor, a few cells off with nothing between: walked onto. By the way the costs of
+        // plates have, the way to it from beside it was a hop over it onto the other plate of its gate, which
+        // turned the gate the other way: the second Mudomo vault's locks)
+        const NavNode& here = nav.Nodes()[bot.AbeNode() >= 0 ? bot.AbeNode() : on];
+        const NavNode& to = nav.Nodes()[on];
+        if (bot.AbeNode() >= 0 && here.mLine == to.mLine && std::abs(here.mX - to.mX) <= 6 * NavGraph::GridStep(to.mHalf) &&
+            !Domain::GateBetween(nav, world, here.mX, to.mX, to.mY, to.mHalf) && !Domain::WallBetween(nav, here.mX, to.mX, to.mY, to.mHalf))
+        {
+            return TaskStep::Do(Prim::MoveTo(to.mX, Gait::eWalk));
+        }
         mPhase = 2;
         mGo = std::make_unique<GoToTask>("onto the foot switch", [on](s32 n)
                                          { return n == on; });
