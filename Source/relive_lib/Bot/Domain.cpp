@@ -7660,13 +7660,27 @@ void Domain::Builder::GlukkonCalls()
             // Office of Bonewerkz: the first thing Director Phleg has done is a lever pulled.)
             // (a Slig to do it: one that comes down at a call for help, or one that is with the Glukkon now, which
             // it brings along. The last lever of Bonewerkz' Executive Office has no spawner over it.)
+            // (brought along on foot or on a lift it works for the Glukkon, but not down off the end of a floor: it does
+            // not follow that. Zulag 9's third executive office: the Glukkon dropped by the voice lock of 195 to the
+            // lever of 196, the Slig stayed above. The last of Bonewerkz' Executive Office: "go to the lift on the
+            // left here and go down. Stand to the left of the lever with the Slig".)
+            const bool sameFloor = std::abs(lever.mY2 - glukkon.mY) <= 30;
+            bool follows = sameFloor;
+            if (!follows && glukkon.mPossessed)
+            {
+                std::vector<s32> wayNodes;
+                std::vector<bool> wayLifts;
+                follows = GlukkonWayTo(nav, world, glukkon.mX, glukkon.mY, glukkon.mHalf, lever.CentreX() - 3 * cell, lever.CentreX() + 3 * cell, lever.mY2, nullptr, &wayNodes, nullptr, &wayLifts);
+                for (std::size_t i = 1; follows && i < wayNodes.size(); i++)
+                {
+                    follows = wayLifts[i] || std::abs(nav.Nodes()[wayNodes[i]].mY - nav.Nodes()[wayNodes[i - 1]].mY) <= 30;
+                }
+            }
             bool with = false;
             for (const SligAt& slig : world.mSligs)
             {
-                // (brought along on foot only: it does not follow down through a floor. Zulag 9's third executive
-                // office: the Glukkon dropped by the voice lock of 195 to the lever of 196, the Slig stayed above.)
-                with = with || (glukkon.mPossessed && !slig.mPossessed && !slig.mAsleep && slig.mHalf == glukkon.mHalf && std::abs(slig.mY - glukkon.mY) <= 20 && std::abs(lever.mY2 - glukkon.mY) <= 30 &&
-                                nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(glukkon.mX, glukkon.mY - 5) && FloorOpen(nav.Input(), world, slig.mX, lever.CentreX(), lever.mY2 + 4, lever.mHalf));
+                with = with || (glukkon.mPossessed && !slig.mPossessed && !slig.mAsleep && slig.mHalf == glukkon.mHalf && std::abs(slig.mY - glukkon.mY) <= 20 && follows &&
+                                nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(glukkon.mX, glukkon.mY - 5) && (!sameFloor || FloorOpen(nav.Input(), world, slig.mX, lever.CentreX(), lever.mY2 + 4, lever.mHalf)));
             }
             // (or one of the path's Sligs that is on the lever's own floor and screen already, which the Glukkon goes
             // down to: that screen need not be loaded while the Glukkon is above it. There, the Slig of level 3, "use
