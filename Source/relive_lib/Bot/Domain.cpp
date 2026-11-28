@@ -8307,7 +8307,14 @@ void Domain::Builder::Fliers()
             speak.mEntity = spawner.mId;
             speak.mOther = lock.mId;
             speak.mEdge = spot;
-            add("Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with the flying Slig of FlierSpawner#" + std::to_string(spawner.mId), {regionFact(spot)}, {{Key::Switch(lock.mSwitch), 1}}, 900, speak);
+            // (with the spawner turned on, as for a lever: the Barracks' Slig Bunks, the flying Slig lost and its
+            // spawner off again, "have Abe climb up here and pull the lever")
+            std::vector<Goap::Fact> pre{regionFact(spot)};
+            if (wantsOn)
+            {
+                pre.push_back({Key::Switch(spawner.mSwitch), 1});
+            }
+            add("Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with the flying Slig of FlierSpawner#" + std::to_string(spawner.mId), pre, {{Key::Switch(lock.mSwitch), 1}}, 900, speak);
         }
     }
 }
