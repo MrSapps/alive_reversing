@@ -3811,6 +3811,26 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             break;
         }
     }
+    // A walk back to the cell he has just walked from, and then back again: the way from each of two cells starts by
+    // going to the other (the first step of a way is costed with more in it than the rest). He stands where he is
+    // instead, and the way is looked at again each frame until it goes on from here. FeeCo's Executive Offices: on
+    // the ledge at 1962..1987,1420 over the Sligs, to and fro between the hop from 1962 and the hop from 1987 for
+    // 18,000 frames.
+    if (first.mKind == EdgeKind::eWalk && mWalkedFrom == first.mTo && mWalkedTo == cur && static_cast<s32>(abe.mFrame) - mWalkedAt < 120)
+    {
+        if (++mToAndFro >= 2 && mToAndFroWaits < 6000)
+        {
+            mToAndFroWaits++;
+            mSteps--;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+    }
+    if (first.mKind == EdgeKind::eWalk && !(mWalkedFrom == cur && mWalkedTo == first.mTo))
+    {
+        mWalkedFrom = cur;
+        mWalkedTo = first.mTo;
+        mWalkedAt = static_cast<s32>(abe.mFrame);
+    }
     // (what the step for the edge in hand is worked out from)
     const Way way{abe, nav, cur, path, atGoal, led, zOther, sweepStop, sweepWalk, sweepRoll, wasDucked, first, overGap};
     switch (first.mKind)

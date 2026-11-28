@@ -921,6 +921,13 @@ private:
     Gait mTopGait = Gait::eRun;
     bool mQuiet = false;
     s32 mLastEdge = -1;
+    // The last walk begun, from and to which cell and when, and how often one has gone straight back on it: see
+    // GoToTask::Next, to and fro
+    s32 mWalkedFrom = -1;
+    s32 mWalkedTo = -1;
+    s32 mWalkedAt = 0;
+    s32 mToAndFro = 0;
+    s32 mToAndFroWaits = 0;
     s32 mReflexes = -1;
     bool mHurry = false;
     // Turned away from a running jump with a one-cell run-up, so that its run starts out of the turn
