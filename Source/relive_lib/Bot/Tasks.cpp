@@ -2366,10 +2366,19 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Done();
     }
-    // Crouched after a roll: up again, unless there's more to roll or no room to stand
+    // Crouched after a roll: up again, unless there's more to roll or no room to stand, or what comes next is done
+    // crouched (SetStayDown)
     // (up from under a mine's track is for BombStep, which times it)
-    if (abe.mMove == Move::eCrouch && !nav.Nodes()[cur].mLow && !((mSweepDuck || mBombDuck) && !atGoal) && !MinesOverhead(bot, cur) && (atGoal || (nav.Edges()[path[0]].mKind != EdgeKind::eRoll && !nav.Edges()[path[0]].mCrouched)))
+    if (abe.mMove == Move::eCrouch && !(atGoal && mStayDown) && !nav.Nodes()[cur].mLow && !((mSweepDuck || mBombDuck) && !atGoal) && !MinesOverhead(bot, cur) && (atGoal || (nav.Edges()[path[0]].mKind != EdgeKind::eRoll && !nav.Edges()[path[0]].mCrouched)))
     {
+        // (not up into a drill: rolled under it as it rose, he is clear only crouched until it is up out of reach of
+        // him standing. Where the way ends he stays down, and what comes next starts from a crouch. The final
+        // Zulag's UXBs at 1662..1762,980, each under a drill that comes down to the floor: rolled to where each is
+        // slapped from, he stood up into the drill.)
+        if (!StandClear(bot.GetWorld(), abe.mX, abe.mY, abe.mHalfScale, 24))
+        {
+            return atGoal ? TaskStep::Done() : TaskStep::Do(Prim::Wait(1));
+        }
         return TaskStep::Do(Prim::Press(Btn::eUp));
     }
     if (atGoal)
@@ -2479,7 +2488,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         }
         const auto clear = [&](std::size_t edges, bool rolled)
         {
-            return SweepsClear(nav, world, path, edges, bot.SweepLate(), rolled) && (followLag < 0 || SweepsClear(nav, world, path, edges, bot.SweepLate() + followLag, false));
+            return SweepsClear(nav, world, path, edges, bot.SweepLate(), rolled, false, mDwell) && (followLag < 0 || SweepsClear(nav, world, path, edges, bot.SweepLate() + followLag, false));
         };
         // (cells a drill reaches that stands still as its switch is: a cell at a time, so that it is looked at again
         // when it has been set going. The Executive Office of Bonewerkz: the drills of the last platform are set
@@ -2616,9 +2625,21 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 // on as it goes: the final Zulag, "Follow the middle drill to the right and run as soon as you hit
                 // the ground", the floor of 350..575,380 swept by the drill of 449..625 and off its end to 460.
                 // Walked, he is never down before it comes back.)
-                const bool walked = lead >= 1 && (lead + 1 >= std::min(count, path.size()) || mSweepWait >= 140);
+                // (walked, not once clear in the next 160 frames whenever begun: no use waiting for that, the roll at
+                // once. The final Zulag's middle drill at 449..647,340: three of its strokes waited out for a walk that
+                // never came, before the roll that follows it went.)
+                // (not leading: the ones following can't roll, and they go at a run with him, above)
+                if (mSweepWait == 0)
+                {
+                    mWalkHopeless = followLag < 0;
+                    for (s32 t = 2; t <= 160 && mWalkHopeless; t += 2)
+                    {
+                        mWalkHopeless = !SweepsClear(nav, world, path, count, bot.SweepLate() + t, false);
+                    }
+                }
+                const bool walked = lead >= 1 && (lead + 1 >= std::min(count, path.size()) || mSweepWait >= 140 || mWalkHopeless);
                 const bool mustRoll = nav.Edges()[path[0]].mKind == EdgeKind::eRoll && lead > 1;
-                if (walked && !inside && (wasDucked || mustRoll || mSweepWait >= 70))
+                if (walked && !inside && (wasDucked || mustRoll || mSweepWait >= 70 || mWalkHopeless))
                 {
                     mSweepDuck = true;
                     // (turned the way of the roll first, standing: turned crouched it takes 12 frames the timing has
@@ -6020,7 +6041,7 @@ const Entity* GoToTask::SweepHigh(const NavGraph& nav, const World& world, s32 n
     return drill && drill->mKind == EntityKind::eDrill && world.SweepLive(*drill) ? drill : nullptr;
 }
 
-void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::size_t first, std::size_t count, bool rolled, bool rest, std::vector<Body>& out, bool ran)
+void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::size_t first, std::size_t count, bool rolled, bool rest, std::vector<Body>& out, bool ran, s32 dwell)
 {
     // Where Abe is frame by frame: along each edge at an even pace for the frames it takes (measured, see
     // BOT_DESIGN.md)
@@ -6037,7 +6058,7 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
         const NavNode& a = nav.Nodes()[last ? e.mTo : e.mFrom];
         const NavNode& b = nav.Nodes()[e.mTo];
         const EdgeKind kind = rolled && e.mKind == EdgeKind::eWalk ? EdgeKind::eRoll : e.mKind;
-        s32 frames = 12;
+        s32 frames = last && i == path.size() ? std::max(12, dwell) : 12;
         if (!last)
         {
             switch (kind)
@@ -6291,12 +6312,12 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
     }
 }
 
-bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late, bool rolled, bool ran)
+bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late, bool rolled, bool ran, s32 dwell)
 {
     // (where he is, give or take kSlack pixels)
     const s32 kSlack = 9;
     std::vector<Body> bodies;
-    Bodies(nav, path, 0, count, rolled, true, bodies, ran);
+    Bodies(nav, path, 0, count, rolled, true, bodies, ran, dwell);
     for (std::size_t k = 0; k < bodies.size(); k++)
     {
         const Body& body = bodies[k];
@@ -6312,6 +6333,27 @@ bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::v
             s32 x2 = 0;
             s32 y2 = 0;
             if (sweep.mHalf == body.mHalf && sweep.At(t < 0 ? 0 : t, x1, y1, x2, y2) && body.mX + 3 + slack >= x1 && body.mX - 3 - slack <= x2 && body.mY >= y1 && body.mY - body.mTall <= y2)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool GoToTask::StandClear(const World& world, s32 x, s32 y, bool half, s32 frames)
+{
+    // (standing up and stood, full height: 60, as Bodies has him)
+    const s32 tall = half ? 30 : 60;
+    for (s32 t = 0; t <= frames; t++)
+    {
+        for (const SweepAt& sweep : world.mSweeps)
+        {
+            s32 x1 = 0;
+            s32 y1 = 0;
+            s32 x2 = 0;
+            s32 y2 = 0;
+            if (sweep.mHalf == half && sweep.At(t, x1, y1, x2, y2) && x + 3 + 4 >= x1 && x - 3 - 4 <= x2 && y >= y1 && y - tall <= y2)
             {
                 return false;
             }
@@ -10441,7 +10483,8 @@ TaskStep DisarmTask::Next(Bot& bot, const std::string& lastFailed)
     const bool mines = GoToTask::MinesOverhead(bot, bot.AbeNode());
     if (uxb->mOff)
     {
-        if (abe.mMove == Move::eCrouch && !mines)
+        // (up again where that is clear of drills; under one, the way on stands him up when it is: GoToTask)
+        if (abe.mMove == Move::eCrouch && !mines && GoToTask::StandClear(bot.GetWorld(), abe.mX, abe.mY, abe.mHalfScale, 24))
         {
             return TaskStep::Do(Prim::Press(Btn::eUp));
         }
@@ -10473,16 +10516,22 @@ TaskStep DisarmTask::Next(Bot& bot, const std::string& lastFailed)
     }
     if (cur != left && cur != right)
     {
-        if (abe.mMove == Move::eCrouch)
-        {
-            return TaskStep::Do(Prim::Press(Btn::eUp));
-        }
+        // (crouched, the way there stands him up when that is clear of drills, or rolls on: GoToTask. The final
+        // Zulag's UXB at 1662, done from 1637: rolled to 1687 under the drill as it rose, he stood up into it.)
         if (left < 0 && right < 0)
         {
             return TaskStep::Failed("nowhere to stand by the UXB");
         }
         mGo = std::make_unique<GoToTask>("to the UXB", [left, right](s32 n)
                                          { return n == left || n == right; });
+        // (and there for as long as it takes, clear of drills: crouched in 16 frames, a green light within 30 (a tick
+        // every 10, two red at most in the patterns there are), the slap's 14 and 12 up again. The final Zulag's UXB
+        // at 1762,980 under a drill that comes down to the floor: walked to as the drill was up, slapped, and stood up
+        // into it.)
+        mGo->SetDwell(72);
+        // (rolled there, not up and down again: the final Zulag's UXB at 1762, rolled to under the drill as it rose
+        // and stood up into it)
+        mGo->SetStayDown();
         return Next(bot, "");
     }
     const bool faceLeft = cur == right;

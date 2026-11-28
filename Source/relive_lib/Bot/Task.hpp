@@ -771,7 +771,8 @@ public:
     // Where he is each frame of `count` edges of a way from the edge `first` on (rest: and for a moment where it
     // ends), added to out
     // (ran: the walks run, about 4 frames a cell)
-    static void Bodies(const NavGraph& nav, const std::vector<s32>& path, std::size_t first, std::size_t count, bool rolled, bool rest, std::vector<Body>& out, bool ran = false);
+    // (dwell: the frames of that moment where the way ends, if more than the 12 it is otherwise)
+    static void Bodies(const NavGraph& nav, const std::vector<s32>& path, std::size_t first, std::size_t count, bool rolled, bool rest, std::vector<Body>& out, bool ran = false, s32 dwell = 0);
     // His box as the flying mines are kept clear of
     static BombCycle::Box BombBody(const Body& body);
     // A cell no flying mine ever reaches him at: standing, or (duck) only crouched
@@ -782,9 +783,12 @@ public:
     // delay: frames he stands where he is first; later: as it will be that many frames from now
     static bool BombsClear(const NavGraph& nav, const BombCycle& bombs, const std::vector<s32>& path, std::size_t count, bool rolled, s32 delay, s32 later = 0);
     // rolled: as it goes if the walking of it is rolled, from a crouch
-    static bool SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late = 0, bool rolled = false, bool ran = false);
+    // dwell: the frames he then stays where the way ends (Bodies)
+    static bool SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late = 0, bool rolled = false, bool ran = false, s32 dwell = 0);
     // The same for a roll from a crouch where he is, frame by frame as it was measured: for a row of drills that
     // SweepsClear's margins never find a moment under
+    // Whether he can stand up where he crouches at x, y and stay stood for that many frames, clear of drills
+    static bool StandClear(const World& world, s32 x, s32 y, bool half, s32 frames);
     static bool RollClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count);
     // The drill that reaches a cell and runs as things are, or null
     static const Entity* SweepOver(const NavGraph& nav, const World& world, s32 node);
@@ -853,6 +857,17 @@ public:
     void SetPullGates(bool pull)
     {
         mPullGates = pull;
+    }
+    // The frames he stays at the goal once there, kept clear of drills with the way (DisarmTask: crouched by a UXB
+    // and up again)
+    void SetDwell(s32 frames)
+    {
+        mDwell = frames;
+    }
+    // Crouched where the way ends (a roll's end), he stays down: what comes next is done crouched
+    void SetStayDown()
+    {
+        mStayDown = true;
     }
     void SetHurry(bool hurry)
     {
@@ -1131,6 +1146,10 @@ private:
     s32 mInvisWaits = 0;
     // Frames spent waiting for a drill to be out of the way
     s32 mSweepWait = 0;
+    // Walking the stretch a drill sweeps is never clear in the frames ahead, as worked out when the wait began
+    bool mWalkHopeless = false;
+    s32 mDwell = 0;
+    bool mStayDown = false;
     // Frames waited for a drill in a gap to be clear of a running jump over it
     s32 mJumpDrillWaits = 0;
     // Frames waited for a door he is on his way through before it is judged
