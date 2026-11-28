@@ -5648,7 +5648,12 @@ void Bot::Think(BaseMap& map)
             break;
         }
         mDawdled = false;
-        const TaskStep step = mTask->Next(*this, mLastPrimFailed);
+        if (!mTask->mTimed || mAbe.mFrame < mTask->mBegan)
+        {
+            mTask->mTimed = true;
+            mTask->mBegan = mAbe.mFrame;
+        }
+        const TaskStep step = mAbe.mFrame - mTask->mBegan > kTaskFrames ? TaskStep::Failed("ran " + std::to_string(kTaskFrames) + " frames without an end") : mTask->Next(*this, mLastPrimFailed);
         mLastPrimFailed.clear();
         switch (step.mKind)
         {

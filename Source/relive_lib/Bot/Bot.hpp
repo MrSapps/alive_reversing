@@ -855,6 +855,10 @@ private:
     BotState mState = BotState::eIdle;
     std::string mWhy;
     std::unique_ptr<Task> mTask;
+    // The frames a task may run before it is given up as failed, whatever it waits for: the Barracks' path 1, a
+    // grenade for the orb by the boom machine waited for in the shadow at 262,1240 from f=286,361 to the end of the
+    // run 390,000 frames later, with nothing in the log.
+    static constexpr u32 kTaskFrames = 20000;
     // Something that can't wait, done before the task goes on: a wired Mudokon tagging along slapped out of it
     std::unique_ptr<Task> mReflex;
     std::vector<s32> mPlanNodes;

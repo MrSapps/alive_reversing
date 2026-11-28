@@ -54,6 +54,10 @@ public:
     virtual std::string Name() const = 0;
     // lastFailed: why the Prim it gave last failed, or empty
     virtual TaskStep Next(Bot& bot, const std::string& lastFailed) = 0;
+
+    // The frame it was first asked for a step (Bot::kTaskFrames), once it has been
+    bool mTimed = false;
+    u32 mBegan = 0;
 };
 
 class GoToTask;
