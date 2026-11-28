@@ -455,7 +455,7 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<SlogRingTask>(step.mEntity, step.mEdge, step.mOther == 1);
         case StepKind::eStepOn:
         {
-            return std::make_unique<StepOnTask>(step.mEntity, step.mEdge);
+            return std::make_unique<StepOnTask>(step.mEntity, step.mEdge, step.mOther != 0 ? static_cast<s32>(step.mOther) - 1 : -1);
         }
         case StepKind::eZone:
             return std::make_unique<SwitchZoneTask>(static_cast<s32>(step.mOther), step.mEdge);

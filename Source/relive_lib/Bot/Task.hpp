@@ -2347,9 +2347,12 @@ private:
 class StepOnTask final : public Task
 {
 public:
-    StepOnTask(u32 plate, s32 on)
+    // want: the switch as the plan has it after (-1: turned over from what it is when this starts). Done as soon
+    // as it is: a run that ends on the plate has stepped on it already.
+    StepOnTask(u32 plate, s32 on, s32 want = -1)
         : mPlate(plate)
         , mOn(on)
+        , mWant(want)
     {
     }
     ~StepOnTask() override;
@@ -2362,6 +2365,7 @@ public:
 private:
     u32 mPlate;
     s32 mOn;
+    s32 mWant;
     s32 mPhase = 0;
     s32 mWas = -1;
     s32 mWaits = 0;

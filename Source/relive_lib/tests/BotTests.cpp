@@ -5333,7 +5333,8 @@ TEST(BotVault, AToggleFootSwitchOfAGatesSwitchIsSteppedOnAndTheShutGateWantsTheN
         nearCrossings += wantsNear ? 1 : 0;
         EXPECT_EQ(std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::kPlate, 4}), a.mPre.end()) << a.mName;
     }
-    EXPECT_EQ(steps, 2);
+    // (each plate either way: it turns the gate over each time)
+    EXPECT_EQ(steps, 4);
     EXPECT_GT(gateCrossings, 0);
     EXPECT_GT(nearCrossings, 0);
     // A plate that sets rather than turns over (mOp 0) is no such step, and the crossing wants none

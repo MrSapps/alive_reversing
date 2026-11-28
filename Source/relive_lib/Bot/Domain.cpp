@@ -9085,12 +9085,19 @@ void Domain::Builder::FootSwitchGates()
         {
             continue;
         }
-        const s32 now = world.Switch(plate.mSwitch);
-        DomainStep stepOn;
-        stepOn.mKind = StepKind::eStepOn;
-        stepOn.mEntity = plate.mId;
-        stepOn.mEdge = on;
-        add("Step on FootSwitch#" + std::to_string(plate.mId) + " sw" + std::to_string(plate.mSwitch), {regionFact(on), {Key::Switch(plate.mSwitch), now}}, {{Key::Switch(plate.mSwitch), now ? 0 : 1}, {Key::kPlate, static_cast<s32>(plate.mId)}}, 60, stepOn);
+        // (either way: it turns over each time, so a plan may shut the gates with one and open them again with
+        // another. In over one and shut in with the lock, and out over the other: as planned only the way the
+        // switch is now, the way out was never there to plan.)
+        for (s32 now = 0; now <= 1; now++)
+        {
+            DomainStep stepOn;
+            stepOn.mKind = StepKind::eStepOn;
+            stepOn.mEntity = plate.mId;
+            stepOn.mEdge = on;
+            // (the switch as it is to be after, plus one: the task is done when it is so)
+            stepOn.mOther = static_cast<u32>((now ? 0 : 1) + 1);
+            add("Step on FootSwitch#" + std::to_string(plate.mId) + " sw" + std::to_string(plate.mSwitch) + (now ? " off" : " on"), {regionFact(on), {Key::Switch(plate.mSwitch), now}}, {{Key::Switch(plate.mSwitch), now ? 0 : 1}, {Key::kPlate, static_cast<s32>(plate.mId)}}, 60, stepOn);
+        }
     }
     // (and a gate that is shut is opened from the one of them nearest to it: on the way from another he would
     // step on that one too, and shut it again. Measured there: in and out of the cell at 1287 four times.)

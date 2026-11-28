@@ -19336,7 +19336,7 @@ TaskStep StepOnTask::Next(Bot& bot, const std::string& lastFailed)
     {
         mWas = world.Switch(plate->mSwitch, true);
     }
-    if (world.Switch(plate->mSwitch, true) != mWas)
+    if (world.Switch(plate->mSwitch, true) != mWas || (mWant >= 0 && (world.Switch(plate->mSwitch, true) != 0 ? 1 : 0) == mWant))
     {
         return TaskStep::Done();
     }

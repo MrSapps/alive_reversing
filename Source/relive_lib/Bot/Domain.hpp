@@ -118,7 +118,7 @@ enum class StepKind : u8
                 // then pull it
     eSlogRing,  // the Slogs of the floor under pull ring mEntity (pulled from the cell mEdge): from a floor over
                 // them until they are shut away from it, then at the ring until they run back over its trap doors
-    eStepOn,    // onto the cell mEdge, where a foot switch that turns a gate over is
+    eStepOn,    // onto the cell mEdge, where a foot switch that turns a gate over is (mOther: its switch after, plus one)
     eLeadBelow, // from over foot switch mEntity, step about until the Mudokons that follow under him have left its
                 // switch at mOther (FollowBelow)
     eLiftCall,  // with wheel mEntity, whose switch is on with the lift ridden off: off and on again, the lift
