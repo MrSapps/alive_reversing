@@ -2639,7 +2639,10 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 const bool walked = lead >= 1 && (lead + 1 >= std::min(count, path.size()) || mSweepWait >= 140 || mWalkHopeless);
                 const bool mustRoll = nav.Edges()[path[0]].mKind == EdgeKind::eRoll && lead > 1;
-                if (walked && !inside && (wasDucked || mustRoll || mSweepWait >= 70 || mWalkHopeless))
+                // (not leading: down for a roll and up again for the run at a run with them, each time round, he
+                // looked for that moment once every 23 frames, and the final Zulag's drills of 1650..1774,1500 have
+                // one some 20 frames long every 240)
+                if (walked && !inside && followLag < 0 && (wasDucked || mustRoll || mSweepWait >= 70 || mWalkHopeless))
                 {
                     mSweepDuck = true;
                     // (turned the way of the roll first, standing: turned crouched it takes 12 frames the timing has
