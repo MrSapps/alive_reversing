@@ -164,6 +164,8 @@ struct BotMemory
     u32 mSeenByScrabAt = 0;
     // By Scrab: where it was last, and the frame it came to stand there (0 while it moves or is not known to have)
     std::map<u32, std::pair<s32, u32>> mScrabStill;
+    // (LiftSeenStill: (level and path, lift stop) to the movers' switches then)
+    std::map<std::pair<s32, s32>, s32> mLiftsStill;
     std::set<u32> mScrabMoved;
     std::map<u32, std::pair<s32, s32>> mScrabBeat;
 };
@@ -508,6 +510,18 @@ public:
         lo = std::min(it->second.first, it->second.second);
         hi = std::max(it->second.first, it->second.second);
         return true;
+    }
+    // A lift stop a mover works, watched a while with its lift staying put, as the movers' switches were then
+    // (GoToTask): not watched again for every walk that looks ahead to it. (The final Zulag: the lifts of
+    // 1237,1240, watched 130 frames on the way to the Mudokons and 130 again leading them.)
+    bool LiftSeenStill(s32 stop, s32 switches) const
+    {
+        const auto it = mLiftsStill.find({mAbe.mLevel * 1000 + mAbe.mPath, stop});
+        return it != mLiftsStill.end() && it->second == switches;
+    }
+    void NoteLiftStill(s32 stop, s32 switches)
+    {
+        mLiftsStill[{mAbe.mLevel * 1000 + mAbe.mPath, stop}] = switches;
     }
     // The frame from which a Scrab has stood where it is (0: not known, or it moves)
     u32 ScrabStillSince(u32 id) const

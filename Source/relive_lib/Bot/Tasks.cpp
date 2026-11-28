@@ -4270,6 +4270,9 @@ TaskStep GoToTask::WalkStep(Bot& bot, const std::string& lastFailed, const Way& 
         bool moved = false;
         bool allHere = true;
         bool movered = false;
+        bool watched = true;
+        std::size_t firstStop = path.size();
+        std::vector<std::pair<s32, s32>> stops;
         for (std::size_t k = 0; k <= last && k < path.size(); k++)
         {
             const NavNode& to = nav.Nodes()[nav.Edges()[path[k]].mTo];
@@ -4280,6 +4283,7 @@ TaskStep GoToTask::WalkStep(Bot& bot, const std::string& lastFailed, const Way& 
             const NavFeature& stop = nav.Input().mFeatures[to.mLiftStop];
             any = true;
             lastStop = k;
+            firstStop = std::min(firstStop, k);
             if (!world.LiftAtStop(stop.mX1, stop.mX2, to.mY, stop.mA != 0))
             {
                 mLiftAway.insert(to.mLiftStop);
@@ -4292,19 +4296,52 @@ TaskStep GoToTask::WalkStep(Bot& bot, const std::string& lastFailed, const Way& 
             }
             moved = moved || mLiftAway.count(to.mLiftStop) != 0;
             // (a mover's switch is on the stop it brings the lift to: any stop of the column)
+            s32 switches = 0;
             for (const NavFeature& other : nav.Input().mFeatures)
             {
-                movered = movered || (other.mKind == stop.mKind && std::abs(other.mX1 - stop.mX1) <= 2 && other.mSwitch > 1);
+                if (other.mKind == stop.mKind && std::abs(other.mX1 - stop.mX1) <= 2 && other.mSwitch > 1)
+                {
+                    movered = true;
+                    switches = switches * 31 + other.mSwitch * 2 + (world.Switch(other.mSwitch) ? 1 : 0);
+                }
+            }
+            // (only one there to be seen: one off the screens there are is where it was last seen, and watching that
+            // shows nothing. Watched once its screen is here. The final Zulag: the lifts of 1237,1240 watched from
+            // 1337,1500 a screen under them, 130 frames by the Mudokons he was leading there.)
+            bool live = false;
+            for (const LiftAt& lift : world.mLifts)
+            {
+                live = live || std::abs(lift.mX1 + lift.mX2 - stop.mX1 - stop.mX2) <= 24;
+            }
+            if (live)
+            {
+                stops.push_back({to.mLiftStop, switches});
+            }
+            watched = watched && (!live || bot.LiftSeenStill(to.mLiftStop, switches));
+        }
+        // (ones a mover works are watched a while first, to see whether they come and go; once, as the switches are.
+        // On the way to them meanwhile, short of the first: stood still to watch, the final Zulag's two Mudokons
+        // waited 130 frames with him at 1337,1500 before he led them to the lifts of 1237,1240.)
+        const s32 watchedFor = mLiftWatchFrom < 0 ? 0 : static_cast<s32>(abe.mFrame) - mLiftWatchFrom;
+        if (any && movered && !moved && !watched && watchedFor >= 130)
+        {
+            for (const std::pair<s32, s32>& stop : stops)
+            {
+                bot.NoteLiftStill(stop.first, stop.second);
             }
         }
-        // (ones a mover works are watched a while first, to see whether they come and go)
-        if (any && movered && !moved && mLiftWatch < 130)
+        if (any && movered && !moved && !watched && watchedFor < 130)
         {
-            if (mLiftWatch++ == 0)
+            if (mLiftWatchFrom < 0)
             {
+                mLiftWatchFrom = static_cast<s32>(abe.mFrame);
                 bot.Log("lifts a mover works ahead: watching whether they come and go");
             }
-            return TaskStep::Do(Prim::Wait(1));
+            if (firstStop == 0)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            last = std::min(last, firstStop - 1);
         }
         if (any && moved)
         {

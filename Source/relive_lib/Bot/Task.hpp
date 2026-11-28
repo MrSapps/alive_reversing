@@ -1158,7 +1158,8 @@ private:
     std::set<s32> mLiftAway;
     std::map<s32, s32> mLiftCame;
     s32 mLiftWaits = 0;
-    s32 mLiftWatch = 0;
+    // (the frame watching them began, -1 not yet)
+    s32 mLiftWatchFrom = -1;
     // That, from standing: at a run
     bool mRunOn = false;
     // Flying mines: frames spent watching them and waiting for them, and crouched where one goes over his head
