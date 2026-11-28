@@ -6072,8 +6072,11 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
             switch (kind)
             {
                 case EdgeKind::eWalk:
-                    // (at a run 6.24 a frame, the first cell taken getting going)
-                    frames = ran ? (before == EdgeKind::eWalk ? 4 : 8) : (before == EdgeKind::eWalk ? 9 : 17);
+                    // (at a run 6.24 a frame, the first cell taken getting going: measured at the final Zulag's
+                    // drills of 1650..1774,1500, from standing at 1787 he was at 1762 6 frames on and 1712 12 on.
+                    // Taken as 8, he was worked out four frames late under them, and a moment that was clear
+                    // passed by.)
+                    frames = ran ? (before == EdgeKind::eWalk ? 4 : 6) : (before == EdgeKind::eWalk ? 9 : 17);
                     break;
                 case EdgeKind::eRoll:
                     // (6.25 pixels a frame)
