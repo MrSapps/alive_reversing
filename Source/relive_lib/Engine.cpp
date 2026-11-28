@@ -104,6 +104,13 @@ Engine::Engine(GameType gameType, FileSystem& fs, const CommandLineOptions& opti
     mPathReloadEventType = SDL_RegisterEvents(1);
     LOG_INFO("Event base %d", mPathReloadEventType);
 
+    // A scripted run (-automation, the bot) must play the same whatever else is running: every relive
+    // listens on the one editor socket, so an editor (or its tests) saving a level would reload it into
+    // the run. It doesn't listen, as it ignores pad hotplug.
+    if (mOptions.mAutomationScript)
+    {
+        return;
+    }
     mIpcInterface = relive::MakeIpcInterface();
     mIpcInterface->Listen([this](relive::PacketTypes packetType, const std::vector<unsigned char>& buffer)
     {
