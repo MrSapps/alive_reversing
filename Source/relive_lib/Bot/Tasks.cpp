@@ -19868,9 +19868,10 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                         }
                         const s32 on = nav.NodeAt(f.CentreX(), f.mY2, f.mHalf, 30);
                         s32 cost = 0;
+                        // (one it can't get to is left: not counted eaten. The second Mudomo vault: the four by the locks,
+                        // behind a shut gate from it, were counted eaten, and were awake on the floor he came down onto.)
                         if (on < 0 || !Domain::ParamiteRoute(nav, world, at, on, nullptr, &cost))
                         {
-                            mBeenTo.insert(f.mId);
                             continue;
                         }
                         if (cost <= 3)
