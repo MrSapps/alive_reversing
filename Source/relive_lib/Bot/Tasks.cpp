@@ -11149,6 +11149,12 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Do(Prim::Wait(10));
     }
 
+    // (not a word while he is still in a motion of his own: it is not said. The final Zulag: "All o' ya" from wheel
+    // 23 as its last turn ended, and the two at their wheels stayed there for the drill.)
+    if (!abe.Settled())
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
     const bool faceLeft = mud->mLiveX < abe.mX;
     if (abe.mFacingLeft != faceLeft)
     {
