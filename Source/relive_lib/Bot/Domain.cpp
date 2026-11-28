@@ -7598,7 +7598,10 @@ void Domain::Builder::GuardedLevers()
             }
             // (the Glukkon there is for those a spawner lets out, above: a Slig of the map's under it is taken over
             // or got by as it was)
-            if (orb && slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch <= 1 && (slig.mState != 1 || byIt) && slig.mHalf == lever.mHalf && std::abs(slig.mY2 - lever.mY2) <= 40 &&
+            // (on its floor: half as far at half scale. Zulag 4's second part, the Sligs on the ledge at 329 over the
+            // lever of 172 at 369, "Sneak to the lever and pull it, then sneak back a bit and hoist up to each ledge
+            // as they turn away")
+            if (orb && slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch <= 1 && (slig.mState != 1 || byIt) && slig.mHalf == lever.mHalf && std::abs(slig.mY2 - lever.mY2) <= (lever.mHalf ? 20 : 40) &&
                 (byIt || (slig.mBeatMax > slig.mBeatMin && nav.CameraOf(slig.mBeatMin, slig.mY2 - 5) == cam && nav.CameraOf(slig.mBeatMax, slig.mY2 - 5) == cam && lever.mX2 >= slig.mBeatMin && lever.mX1 <= slig.mBeatMax)))
             {
                 guarded[lever.mId].push_back(slig.mId);
