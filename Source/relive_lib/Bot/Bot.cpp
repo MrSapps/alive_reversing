@@ -1078,12 +1078,24 @@ bool Bot::Replan(BaseMap& map)
     // there and back. (The final Zulag: from the last UXB at 1637,980, beside the Mudokon at 1562, over the drill
     // to the wheel at 1812 and back for him, under it a third time with him; and through the gate of 1212,1500
     // and back to the two at 1262 and 1287.)
-    if (mTask && doing == &first && domain.mSteps[first.mTag].mKind == StepKind::eCross && domain.mSteps[first.mTag].mOther == 0)
+    // (on foot along and between floors only: what a door, well, lift, teleporter or bird portal takes him through
+    // is a crossing of its own. Necrum after the trials: the bird portal at 2337,980 out to the sick Mudokons at
+    // 4037,1240, left to the task that leads them, was walked at for 50000 frames.)
+    const auto onFoot = [&](const DomainStep& st)
+    {
+        if (st.mKind != StepKind::eCross || st.mOther != 0 || st.mEdge < 0)
+        {
+            return false;
+        }
+        const EdgeKind kind = mKnow->mNav.Edges()[st.mEdge].mKind;
+        return kind == EdgeKind::eWalk || kind == EdgeKind::eRoll || kind == EdgeKind::eHop || kind == EdgeKind::eRunJump || kind == EdgeKind::eFall || kind == EdgeKind::eHoistUp || kind == EdgeKind::eHoistDown;
+    };
+    if (mTask && doing == &first && onFoot(domain.mSteps[first.mTag]))
     {
         for (std::size_t i = 1; i < best.mSteps.size(); i++)
         {
             const DomainStep& next = domain.mSteps[actions[best.mSteps[i]].mTag];
-            if (next.mKind == StepKind::eLogic || (next.mKind == StepKind::eCross && next.mOther == 0))
+            if (next.mKind == StepKind::eLogic || onFoot(next))
             {
                 continue;
             }
