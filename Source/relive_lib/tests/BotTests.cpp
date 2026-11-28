@@ -5982,6 +5982,9 @@ static World BrewWorld(bool orb)
     }
     Entity brew = MakeEntity(EntityKind::eBrew, 3000, 100, 266, 124, 302);
     brew.mCamera = 1;
+    // (the Brews it has, as the game's map gives them, and left: GameView)
+    brew.mInputs[0] = 4;
+    brew.mState = 4;
     world.mEntities.push_back(brew);
     if (orb)
     {
