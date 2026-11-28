@@ -22663,6 +22663,61 @@ TaskStep LiftCallTask::Next(Bot& bot, const std::string& lastFailed)
     return ++mFrames < 900 ? TaskStep::Do(Prim::Wait(2)) : TaskStep::Failed("the lift didn't come back");
 }
 
+InvisAgainTask::~InvisAgainTask() = default;
+
+TaskStep InvisAgainTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const AbeState& abe = bot.Abe();
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const s32 trapCam = nav.CameraOf(nav.Nodes()[mNode].mX, nav.Nodes()[mNode].mY - 5);
+    const s32 cam = nav.CameraOf(abe.mX, abe.mY - 5);
+    mLeft = mLeft || cam != trapCam;
+    // (a power held and not yet used is fresh; one that is on is waited out, as the trap gives none to him while it
+    // is: SlapLock)
+    if (world.mInvisCharge || (mLeft && world.mInvisComing))
+    {
+        return TaskStep::Done();
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        return step;
+    }
+    if (!mLeft)
+    {
+        // (the nearest cell of another screen)
+        if (++mTries > 3)
+        {
+            return TaskStep::Failed("no way off the ghost trap's screen");
+        }
+        bot.Log("off the ghost trap's screen and back, for its power again");
+        mGo = std::make_unique<GoToTask>("off the ghost trap's screen", [&nav, trapCam](s32 n)
+                                         { return nav.CameraOf(nav.Nodes()[n].mX, nav.Nodes()[n].mY - 5) != trapCam; });
+        return Next(bot, "");
+    }
+    if (bot.AbeNode() != mNode)
+    {
+        if (++mTries > 6)
+        {
+            return TaskStep::Failed("can't get back to the ghost trap");
+        }
+        mGo = GoToNode(mNode);
+        return Next(bot, "");
+    }
+    // (it gives the power a second or so after its screen is back, as he stands there without it)
+    if (++mWaits > 400)
+    {
+        return TaskStep::Failed("the ghost trap gave nothing");
+    }
+    return TaskStep::Do(Prim::Wait(2));
+}
+
+
 ShrykullTask::~ShrykullTask() = default;
 
 ParamiteAsideTask::~ParamiteAsideTask() = default;

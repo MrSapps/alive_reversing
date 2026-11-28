@@ -4559,6 +4559,19 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
             d.mActions.back().mSpend = {Key::kMeat, 1};
         }
     }
+    // One that has given it already gives it again when its screen comes back (InvisAgainTask): off it and back.
+    // FeeCo's Executive Offices (path 11): given at 932,376 for the way past the luggage, the power ran out, and the
+    // drop to the Sligs' floor at 873,389 had no way: "Slap it, turn invisible and drop to the bottom level".
+    if (entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0 && node >= 0 && world.mInvisEver && entity.mSwitch <= 1)
+    {
+        DomainStep again;
+        again.mKind = StepKind::eInvisAgain;
+        again.mEntity = entity.mId;
+        again.mEdge = node;
+        std::vector<Goap::Fact> pre{regionFact(node), {Key::kInvisNow, 0}};
+        pre.insert(pre.end(), guards.begin(), guards.end());
+        add("Get invisibility again from " + name + ", off its screen and back", pre, {{Key::kInvisNow, 1}}, 400, again);
+    }
     // A wheel on only while it is turned that calls a Glukkon in: turned till that is out (Zulag 14: "climb up
     // to the right and turn the wheel to summon a Glukkon. Possess him."). Its switch is planned as on: the
     // Glukkon out is planned with as if it were (addForGlukkon).

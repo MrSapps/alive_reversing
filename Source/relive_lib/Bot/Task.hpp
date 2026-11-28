@@ -2597,6 +2597,31 @@ private:
 
 // To the cell given and chant with the Shrykull's power: he turns into it, it zaps what it can on the screen, and
 // he is himself again
+// A ghost trap that has given its power gives it again once its screen is left and come back to (SlapLock: made
+// anew from the map, it gives the power to him on its screen while he hasn't it): off the screen of the cell mNode,
+// back to that cell, and there until he has it
+class InvisAgainTask final : public Task
+{
+public:
+    explicit InvisAgainTask(s32 node)
+        : mNode(node)
+    {
+    }
+    ~InvisAgainTask() override;
+    std::string Name() const override
+    {
+        return "Off the ghost trap's screen and back for its power, to cell " + std::to_string(mNode);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    s32 mNode;
+    std::unique_ptr<GoToTask> mGo;
+    bool mLeft = false;
+    s32 mWaits = 0;
+    s32 mTries = 0;
+};
+
 class ShrykullTask final : public Task
 {
 public:
