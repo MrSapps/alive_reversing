@@ -9184,6 +9184,8 @@ void Domain::Builder::ParamiteFleeches()
             continue;
         }
         std::vector<Goap::Fact> eaten;
+        std::vector<Goap::Fact> behind;
+        std::vector<Goap::Fact> behindOpen;
         std::set<s32> lines;
         for (const Entity& f : world.mEntities)
         {
@@ -9197,10 +9199,53 @@ void Domain::Builder::ParamiteFleeches()
                 eaten.push_back({Key::Mud(f.mId), 2});
                 lines.insert(nav.Nodes()[on].mLine);
             }
+            else if (on >= 0 && nav.Nodes()[on].mLine == nav.Nodes()[at].mLine)
+            {
+                // (along its floor behind gates that are shut now: eaten too with them open first. The second
+                // Mudomo vault: "pulling both levers along the way", then the Paramite. Sent before the lever of
+                // 106, it could not get to the four in the locks' rooms, and he was eaten there by them.)
+                bool walled = WallBetween(nav, live.mX, f.CentreX(), live.mY, live.mHalf);
+                std::vector<Goap::Fact> open;
+                for (const NavFeature& g : nav.Input().mFeatures)
+                {
+                    const s32 gx = (g.mX1 + g.mX2) / 2;
+                    if (g.mKind != FeatureKind::eBarrier || !g.mSolid || g.mHalf != live.mHalf || std::abs(g.mY2 - nav.Nodes()[at].mY) * (live.mHalf ? 2 : 1) > 30 || gx <= std::min(live.mX, f.CentreX()) || gx >= std::max(live.mX, f.CentreX()))
+                    {
+                        continue;
+                    }
+                    walled = walled || g.mSwitch <= 1;
+                    const Goap::Fact o{Key::Switch(g.mSwitch), g.mStartClosed ? 1 : 0};
+                    if (std::find(open.begin(), open.end(), o) == open.end())
+                    {
+                        open.push_back(o);
+                    }
+                }
+                if (!walled && !open.empty())
+                {
+                    behind.push_back({Key::Mud(f.mId), 2});
+                    for (const Goap::Fact& o : open)
+                    {
+                        if (std::find(behindOpen.begin(), behindOpen.end(), o) == behindOpen.end())
+                        {
+                            behindOpen.push_back(o);
+                        }
+                    }
+                }
+            }
         }
         if (eaten.empty())
         {
             continue;
+        }
+        // (with the gates open: all of them)
+        std::vector<Goap::Fact> eatenOpen = eaten;
+        eatenOpen.insert(eatenOpen.end(), behind.begin(), behind.end());
+        for (const Goap::Fact& f : behind)
+        {
+            if (std::find(eatenAll.begin(), eatenAll.end(), f) == eatenAll.end())
+            {
+                eatenAll.push_back(f);
+            }
         }
         for (const Goap::Fact& f : eaten)
         {
@@ -9243,6 +9288,12 @@ void Domain::Builder::ParamiteFleeches()
             clear.mOther = live.mId;
             clear.mEdge = static_cast<s32>(n);
             add("Have Paramite#" + std::to_string(live.mId) + " eat the Fleeches of its floor from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), {regionFact(static_cast<s32>(n)), {Key::kInvisNow, 0}}, eaten, 900, clear);
+            if (!behind.empty())
+            {
+                std::vector<Goap::Fact> pre{regionFact(static_cast<s32>(n)), {Key::kInvisNow, 0}};
+                pre.insert(pre.end(), behindOpen.begin(), behindOpen.end());
+                add("Have Paramite#" + std::to_string(live.mId) + " eat the Fleeches of its floor from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY) + " with its gates open", pre, eatenOpen, 900, clear);
+            }
         }
     }
     // What is done on those floors, and the ways onto them, wait for that
