@@ -4344,11 +4344,19 @@ TEST(BotNav, ABirdPortalToAnotherPathIsAWayOutFromTwoCellsBeforeIt)
     ASSERT_EQ(g.Exits().size(), 1u);
     // (hopped into from two cells to its left)
     EXPECT_EQ(g.Exits()[0].mNode, g.NodeAt(112, 100, false));
-    // One that stays in the path is no exit
+    // One that stays in the path, into a screen it comes out on, is no exit
     in.mFeatures[0].mDestPath = -1;
+    NavFeature out = Feature(FeatureKind::ePortalExit, 300, 80, 324, 104);
+    out.mCamera = 2;
+    in.mFeatures.push_back(out);
     NavGraph local;
     local.Build(in);
     EXPECT_TRUE(local.Exits().empty());
+    // One into a screen of the path with nowhere there to come out is the game's end: a way out
+    in.mFeatures.pop_back();
+    NavGraph end;
+    end.Build(in);
+    EXPECT_EQ(end.Exits().size(), 1u);
 }
 
 static NavInput PackCorridor()
