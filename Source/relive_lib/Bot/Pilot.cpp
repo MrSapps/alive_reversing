@@ -112,6 +112,8 @@ void Pilot::Start(const Prim& prim, const AbeState& abe)
     mSliding = false;
     mRolled = false;
     mAired = false;
+    mUp = false;
+    mLandings = 0;
     mStuck = 0;
     mStartX = abe.mX;
     mLastX = abe.mX;
@@ -806,6 +808,25 @@ PilotStatus Pilot::StepPress(const AbeState& abe, u32& bits)
     if (mFrames > 1500)
     {
         return Fail("did not settle");
+    }
+    // (held on through the moves before the last, landing after landing)
+    if (mPrim.mRepeat > 1)
+    {
+        if (!abe.mOnGround)
+        {
+            mUp = true;
+        }
+        else if (mUp)
+        {
+            mUp = false;
+            mLandings++;
+        }
+        if (mLandings < mPrim.mRepeat - 1)
+        {
+            bits = mPrim.mBits;
+            mStill = 0;
+            return PilotStatus::eRunning;
+        }
     }
     if (!abe.mTransition && LandsInto(abe, bits))
     {

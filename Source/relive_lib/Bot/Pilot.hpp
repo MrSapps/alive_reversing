@@ -47,6 +47,9 @@ struct Prim final
     // A fall or a well: the buttons of the move after it, held as he lands. Both games go from the landing
     // straight into a walk or a run when a direction is held as his feet touch, and skip the rest of it.
     u32 mAfter = 0;
+    // A press held on through this many moves in a row (a hop after hop): let go once the last has begun. "Stand
+    // beside the first mine, and hold the hop button to triple-jump over all of them" (Bonewerkz' fifth annex).
+    s32 mRepeat = 1;
     // A walk off the end of the floor that is a run through this many falls without a stop, done as he lands
     // from the last of them still running (0: a walk off one edge). With something after him on the floor he
     // comes down on: measured in the Mudomo vaults' path 7, from 1187,1400 down two ledges to 1345,1520 in 34
@@ -128,6 +131,9 @@ private:
     bool mRolled = false;
     // Seen off the ground in this prim
     bool mAired = false;
+    // (ePress with mRepeat: in the air now, and the landings so far)
+    bool mUp = false;
+    s32 mLandings = 0;
     s32 mStartX = 0;
     s16 mStartMotion = 0;
     s32 mLastX = 0;

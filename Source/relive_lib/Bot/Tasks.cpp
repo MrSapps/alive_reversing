@@ -5652,7 +5652,17 @@ TaskStep GoToTask::HopStep(Bot& bot, const std::string& lastFailed, const Way& w
         }
     }
     mLastEdge = path[0];
-    return TaskStep::Do(Prim::Press(Btn::eHop));
+    // Hop after hop the same way along a floor: in one, the button held on through them, with no stop between
+    // (Bonewerkz' fifth annex: "hold the hop button to triple-jump over all of them". Hopped one at a time, he
+    // stood between two mines as the flying Slig's grenade set one off.)
+    Prim hop = Prim::Press(Btn::eHop);
+    for (std::size_t i = 1; i < path.size() && nav.Edges()[path[i]].mKind == EdgeKind::eHop && nav.Edges()[path[i]].mLeft == first.mLeft &&
+                            nav.Nodes()[nav.Edges()[path[i]].mTo].mLine == nav.Nodes()[cur].mLine && nav.Nodes()[first.mTo].mLine == nav.Nodes()[cur].mLine;
+         i++)
+    {
+        hop.mRepeat++;
+    }
+    return TaskStep::Do(hop);
 }
 
 TaskStep GoToTask::ClimbStep(Bot& bot, const std::string& lastFailed, const Way& way)

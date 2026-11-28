@@ -201,6 +201,41 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             // angry Mudokon's lever opens again and again, or by an electric wall it turns on. Zulag 6's top floor:
             // through the wall at 900, over the doors of 925..1026 and down through them, stopped at 912 between
             // wall and doors, he was got as the wall came on.)
+            // (hops the same way along a floor one after another: in one go, held on through them, HopStep)
+            if (step.mOther == 0 && mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eHop && !mKeptPlan.empty() && mKeptPlan[0] == action.mName)
+            {
+                const NavGraph& nav = mKnow->mNav;
+                const NavEdge& hop = nav.Edges()[step.mEdge];
+                s32 last = hop.mTo;
+                for (std::size_t i = 1; i < mKeptPlan.size(); i++)
+                {
+                    const DomainStep* next = nullptr;
+                    for (const Goap::Action& other : domain.mActions)
+                    {
+                        if (other.mName == mKeptPlan[i])
+                        {
+                            next = &domain.mSteps[other.mTag];
+                            break;
+                        }
+                    }
+                    if (!next || next->mKind != StepKind::eCross || next->mOther != 0 || next->mEdge < 0)
+                    {
+                        break;
+                    }
+                    const NavEdge& e = nav.Edges()[next->mEdge];
+                    if (e.mKind != EdgeKind::eHop || e.mLeft != hop.mLeft || e.mFrom != last || nav.Nodes()[e.mTo].mLine != nav.Nodes()[hop.mFrom].mLine)
+                    {
+                        break;
+                    }
+                    last = e.mTo;
+                }
+                if (last != hop.mTo)
+                {
+                    Log("hop after hop along the floor: in one go, to " + std::to_string(nav.Nodes()[last].mX) + "," + std::to_string(nav.Nodes()[last].mY));
+                    return std::make_unique<GoToTask>(action.mName, [last](s32 node)
+                                                      { return node == last; });
+                }
+            }
             const bool noStop = NoStopAt(to);
             // (and once chased in this path by what hunts him on its floor, a pack of Paramites: in one run, a stop at
             // each is where they get him. The second Mudomo vault: from the well at 1687,480 to the plate by the lock
