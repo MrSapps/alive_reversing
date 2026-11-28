@@ -4977,6 +4977,53 @@ TaskStep GoToTask::WalkStep(Bot& bot, const std::string& lastFailed, const Way& 
     // (and through something that shuts by itself, TimedDoorTask: the trap door of FeeCo's path 9 was
     // missed by ten frames, walked to and walked off)
     chased = chased || bot.TimedRunOn();
+    // A pack of Paramites on this floor in the way, a few cells on: over them at a running jump, and on beyond.
+    // (The second Mudomo vault: "Jump over the Paramites, go left and stop on the first pressure plate beside the
+    // Ghost Lock". Walked or run at they had him, every time.) A running jump is some 16 frames in the air at 7.6 a
+    // frame: five cells.
+    if (bot.IsAe() && Domain::ParamitePack(nav, bot.GetWorld(), here.mX, here.mY, here.mHalf))
+    {
+        const s32 way = first.mLeft ? -1 : 1;
+        const s32 cell = NavGraph::GridStep(here.mHalf);
+        // (the floor on ahead that way, cells of it with nothing between: where the jump comes down, past where this
+        // step ends if need be. The lock's plate at 1312 is the far side of the Paramites from the well.)
+        s32 along = 0;
+        for (s32 k = 1; k <= 7; k++)
+        {
+            const s32 n = nav.NodeAt(here.mX + way * k * cell, here.mY, here.mHalf, 8);
+            if (n < 0 || nav.Nodes()[n].mLine != here.mLine || nav.Nodes()[n].mHazard || Domain::GateBetween(nav, bot.GetWorld(), here.mX, nav.Nodes()[n].mX, here.mY, here.mHalf) ||
+                Domain::WallBetween(nav, here.mX, nav.Nodes()[n].mX, here.mY, here.mHalf))
+            {
+                break;
+            }
+            along = k;
+        }
+        s32 nearest = 100000;
+        for (const ParamiteAt& p : bot.GetWorld().mParamites)
+        {
+            const s32 ahead = (p.mX - here.mX) * way;
+            if (!p.mPossessed && !p.Hidden() && p.mHalf == here.mHalf && std::abs(p.mY - here.mY) <= 30 && ahead > 0 && !Domain::GateBetween(nav, bot.GetWorld(), p.mX, here.mX, here.mY, here.mHalf))
+            {
+                nearest = std::min(nearest, ahead);
+            }
+        }
+        // (only a walk that takes him to them or past them: one that stops short leaves them be)
+        const s32 reach = path.empty() ? 0 : (nav.Nodes()[nav.Edges()[path.back()].mTo].mX - here.mX) * way;
+        const bool toThem = nearest < 100000 && reach >= nearest - cell;
+        if (toThem && along >= 6 && nearest >= cell * 3 / 2 && nearest <= cell * 5)
+        {
+            const s32 takeoff = here.mX + way * cell;
+            bot.Log("Paramites " + std::to_string(nearest) + " on along this floor: over them at a running jump from " + std::to_string(takeoff));
+            mLastEdge = -1;
+            return TaskStep::Do(Prim::RunJump(takeoff, first.mLeft));
+        }
+        // (further off: on until they are that near, and looked at again there; a move further runs him into them)
+        if (toThem && along >= 6 && nearest > cell * 5)
+        {
+            const s32 to = here.mX + way * std::max(cell, nearest - cell * 4);
+            return TaskStep::Do(Prim::MoveTo(to, Gait::eWalk));
+        }
+    }
     // And no walking the last cells to stop on the right one (a run is left four cells early for that,
     // twenty frames a Scrab does not give): from the run into a roll, which stops where it is told
     if (chased)
