@@ -18471,7 +18471,11 @@ bool SligLockTask::DropClear(const NavGraph& nav, const World& world, s32 x, s32
         // (or behind it, walking off with its back to it: turned round, it is shot before it has turned. A Slig
         // that sees it waits 30 frames before it shoots (Slig::RespondToEnemyOrPatrol). Zulag 14: the Slig at
         // 1587..1637,980 under the ledge it walks off at 1612,880 is never two cells off.)
-        const bool behind = (left ? s.mX >= x : s.mX <= x) && s.mFacingLeft == (s.mX < x) && s.mMotion == kSligWalking;
+        // (and still walking away as it comes down: one at the end of its beat turns as it lands, which it hears,
+        // and shoots first. FeeCo Depot's path 3: down off 1562,1160 with the Slig below at 1579 walking to its end
+        // at 1550; 30 frames at a Slig's walk of 2.77 a frame from the drop to standing below.)
+        const s32 toEnd = s.mBeatMax > s.mBeatMin ? (s.mFacingLeft ? s.mX - s.mBeatMin : s.mBeatMax - s.mX) : 1000;
+        const bool behind = (left ? s.mX >= x : s.mX <= x) && s.mFacingLeft == (s.mX < x) && s.mMotion == kSligWalking && toEnd * 100 / 277 >= 30;
         if (!behind && (!ahead || s.mFacingLeft != left || s.mMotion != kSligWalking))
         {
             return false;
