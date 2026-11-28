@@ -4383,6 +4383,10 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
     // (the gates that shut those Paramites out of where he works it, and whether every one of them has one)
     std::vector<Goap::Fact> packShut;
     bool packGated = true;
+    // (the shut gates that keep Paramites out of where he works it now, and how many they keep out)
+    std::vector<Goap::Fact> packKept;
+    s32 shutOutNow = 0;
+    s32 paramitesNear = 0;
     if (entity.mKind == EntityKind::eSlapLock)
     {
         for (const Entity& f : world.mEntities)
@@ -4447,6 +4451,26 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
                 }
             }
             const s32 on = nav.NodeAt(px, py, para.mHalf, 30);
+            // (one shut out now behind a gate: that gate kept shut while it is worked. The second Mudomo vault's
+            // locks: shut in with the lock by the plate, the plan stepped on the other plate first, which let the
+            // Paramites back in on him.)
+            if (on >= 0 && nav.Nodes()[on].mLine == at.mLine && !WallBetween(nav, px, at.mX, at.mY, at.mHalf) && GateBetween(nav, world, px, at.mX, at.mY, at.mHalf))
+            {
+                for (const NavFeature& f : nav.Input().mFeatures)
+                {
+                    const s32 gx = (f.mX1 + f.mX2) / 2;
+                    const bool shutNow = f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && world.Switch(f.mSwitch) != (f.mStartClosed ? 1 : 0);
+                    if (shutNow && f.mHalf == at.mHalf && std::abs(f.mY2 - at.mY) * (at.mHalf ? 2 : 1) <= 30 && gx > std::min(px, at.mX) && gx < std::max(px, at.mX))
+                    {
+                        const Goap::Fact keepIt{Key::Switch(f.mSwitch), f.mStartClosed ? 0 : 1};
+                        if (std::find(packKept.begin(), packKept.end(), keepIt) == packKept.end())
+                        {
+                            packKept.push_back(keepIt);
+                        }
+                        shutOutNow++;
+                    }
+                }
+            }
             if (on >= 0 && nav.Nodes()[on].mLine == at.mLine && !WallBetween(nav, px, at.mX, at.mY, at.mHalf) && !GateBetween(nav, world, px, at.mX, at.mY, at.mHalf))
             {
                 pack.push_back(para.mId);
@@ -4473,6 +4497,7 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
                 }
             }
         }
+        paramitesNear = static_cast<s32>(pack.size()) + shutOutNow;
         if (pack.size() >= 2 || (pack.size() == 1 && nearest <= 250))
         {
             for (u32 id : pack)
@@ -4909,6 +4934,18 @@ void Domain::Builder::UseThing(const Entity& entity, const std::string& name, Do
         }
         else
         {
+            // (Paramites kept out by gates shut now: kept out while he is at it. Even one: shut in with him there it
+            // is cornered, and turns on him)
+            if (paramitesNear >= 1 && !packKept.empty())
+            {
+                for (const Goap::Fact& f : packKept)
+                {
+                    if (std::find(pre.begin(), pre.end(), f) == pre.end())
+                    {
+                        pre.push_back(f);
+                    }
+                }
+            }
             if (!scrabGates.empty() && std::find(pre.begin(), pre.end(), Goap::Fact{Key::kInvisNow, 1}) == pre.end())
             {
                 std::vector<Goap::Fact> unseenAt = pre;
