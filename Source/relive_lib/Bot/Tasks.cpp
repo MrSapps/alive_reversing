@@ -16336,6 +16336,29 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
         mCorner = 0;
         bot.Log("the fart is his: " + std::to_string(mWay.size()) + " legs to " + std::to_string(aim.mX) + "," + std::to_string(aim.mY));
     }
+    // (the last leg goes to what it is for, which moves: once the line from where the fart is to it is cut, the way
+    // is found again from here, at most every 30 frames. The brewery's path 16, the orb at 1437 drifting up and down
+    // over the end of the wall at 1525 that the leg first went under: the fart flew into the wall at 1528,815 and
+    // ran out of time there, fourteen times.)
+    if (mPhase == 3 && mCorner + 1 >= mWay.size() && mRerouted-- <= 0)
+    {
+        const std::vector<NavLine> gates = FartFlight::Gates(nav.Input(), target->mHalf, &world);
+        std::vector<FartFlight::Point> corners;
+        if (!FartFlight::Open(nav.Input(), target->mHalf, body, aim, &gates) && FartFlight::Route(nav.Input(), target->mHalf, body, aim, 3000, corners, nullptr, &gates))
+        {
+            mWay.clear();
+            for (const FartFlight::Point& p : corners)
+            {
+                mWay.push_back({p.mX, p.mY});
+            }
+            mCorner = 0;
+            mCornerBest = 100000;
+            mCornerStall = 0;
+            mLift = 0;
+            mRerouted = 30;
+            bot.Log("the way of the fart to " + std::to_string(aim.mX) + "," + std::to_string(aim.mY) + " is cut from " + std::to_string(body.mX) + "," + std::to_string(body.mY) + ": " + std::to_string(mWay.size()) + " legs anew");
+        }
+    }
     const bool still = fart.mVelX100 == 0 && fart.mVelY100 == 0;
     const bool last = mCorner + 1 >= mWay.size();
     const s32 tx = last ? aim.mX : mWay[mCorner].first;
